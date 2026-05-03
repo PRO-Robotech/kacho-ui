@@ -112,10 +112,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "organizations",
     singular: "Organization",
     plural: "Organizations",
-    description:
-      "Корневой уровень иерархии. У YC OrganizationManagerService поддерживает только Get/List/Update — Create/Delete недоступны через API (Org создаётся billing-flow-ом).",
+    description: "Корневой уровень иерархии ресурсов Kachō.",
     scope: "global",
-    ops: { create: false, update: true, delete: false },
+    ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
       { header: "Title", path: "title", format: "text" },
