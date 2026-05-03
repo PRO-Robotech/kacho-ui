@@ -1,0 +1,8 @@
+name: ui
+replicas: 1
+image: kacho-ui:dev
+imagePullPolicy: IfNotPresent
+port: 8080
+ingress:
+  enabled: true
+  host: console.kacho.local
