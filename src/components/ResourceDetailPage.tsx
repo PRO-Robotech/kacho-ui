@@ -1,17 +1,22 @@
+// ResourceDetailPage — детальная страница ресурса (flat API, 1.0).
+// Поллит GET /v1/<plural>/{id} каждые 3 сек.
+// Restart/Start/Stop → POST /v1/<plural>/{id}:verb → Operation.
+
+import { useCallback, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, RotateCw } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, RotateCw, Play, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
-import { WatchIndicator } from "@/components/ResourceListPage";
-import { post } from "@/api/client";
+import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
+import { api, ApiError } from "@/api/client";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
-import { useResourceWatch } from "@/lib/use-resource-watch";
+import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
   spec: ResourceSpec;
@@ -21,24 +26,66 @@ export function ResourceDetailPage({ spec }: Props) {
   const { uid } = useParams();
   const navigate = useNavigate();
   const folder = useFolderStore((s) => s.folder);
+  const invalidate = useInvalidateResourceList();
 
-  // Подписываемся на ту же list-watch (через folder-scope), потом выбираем
-  // нужный uid в memory. Это даёт live-updates без отдельного watch-stream.
-  const { items, status, error } = useResourceWatch(spec, folder);
-
-  const data = items.find((it) => it.metadata.uid === uid) as
-    | (Record<string, unknown> & { metadata: { uid: string } })
-    | undefined;
-
-  const restartMutation = useMutation({
-    mutationFn: () => post(`/v1/${spec.apiPath}/restart`, { uid }),
+  // Polling GET /v1/<plural>/{id}
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: [spec.id, "detail", uid],
+    queryFn: () => api.get<Record<string, unknown>>(`/v1/${spec.apiPath}/${uid}`),
+    refetchInterval: 3_000,
+    enabled: !!uid,
+    staleTime: 0,
   });
 
-  if (status === "listing" && !data) {
+  const [actionOpId, setActionOpId] = useState<string | null>(null);
+  const [actionTitle, setActionTitle] = useState("Action");
+  const [actionErr, setActionErr] = useState<string | null>(null);
+
+  const handleActionSuccess = useCallback(() => {
+    setActionOpId(null);
+    invalidate(spec.id, folder?.uid);
+  }, [invalidate, spec.id, folder?.uid]);
+
+  const handleActionClose = useCallback(() => {
+    setActionOpId(null);
+    invalidate(spec.id, folder?.uid);
+  }, [invalidate, spec.id, folder?.uid]);
+
+  const actionMutation = useMutation({
+    mutationFn: (verb: string) =>
+      api.action(`/v1/${spec.apiPath}/${uid}:${verb}`),
+    onSuccess: (resp) => {
+      setActionErr(null);
+      const id = extractOperationId(resp);
+      if (id) {
+        setActionOpId(id);
+      } else {
+        invalidate(spec.id, folder?.uid);
+      }
+    },
+    onError: (e) => {
+      setActionErr(
+        e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message,
+      );
+    },
+  });
+
+  const doAction = (verb: string, title: string) => {
+    setActionTitle(title);
+    setActionErr(null);
+    actionMutation.mutate(verb);
+  };
+
+  if (isLoading && !data) {
     return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
   }
 
-  if (status === "error" && !data) {
+  if (isError && !data) {
     return (
       <div className="p-6 space-y-3">
         <Button asChild variant="outline" size="sm">
@@ -47,7 +94,7 @@ export function ResourceDetailPage({ spec }: Props) {
           </Link>
         </Button>
         <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {error}
+          Ошибка: {(error as Error).message}
         </div>
       </div>
     );
@@ -68,11 +115,9 @@ export function ResourceDetailPage({ spec }: Props) {
     );
   }
 
-  const name = getByPath<string>(data, "metadata.name") ?? "";
-  const stateBadge = getByPath<string>(data, "status.state");
-  const meta = (data.metadata as Record<string, unknown>) ?? {};
-  const spec_ = data.spec as Record<string, unknown> | undefined;
-  const status_ = data.status as Record<string, unknown> | undefined;
+  const name = getByPath<string>(data, "name") ?? "";
+  const statusValue = getByPath<string>(data, "status");
+  const resourceId = getByPath<string>(data, "id") ?? uid ?? "";
 
   return (
     <div className="space-y-4">
@@ -85,90 +130,127 @@ export function ResourceDetailPage({ spec }: Props) {
           </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
-            {stateBadge && <StatusBadge state={stateBadge} />}
-            <WatchIndicator status={status} />
+            {statusValue && <StatusBadge state={statusValue} />}
           </div>
-          <div className="text-xs text-muted-foreground font-mono">{uid}</div>
+          <div className="text-xs text-muted-foreground font-mono">{resourceId}</div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {spec.ops.restart && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => restartMutation.mutate()}
-              disabled={restartMutation.isPending}
+              onClick={() => doAction("restart", "Restarting Instance")}
+              disabled={actionMutation.isPending}
             >
-              <RotateCw className={`h-4 w-4 ${restartMutation.isPending ? "animate-spin" : ""}`} />{" "}
+              <RotateCw
+                className={`h-4 w-4 ${actionMutation.isPending && actionMutation.variables === "restart" ? "animate-spin" : ""}`}
+              />{" "}
               Restart
             </Button>
           )}
-          {spec.ops.edit && (
+          {spec.ops.start && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => doAction("start", "Starting Instance")}
+              disabled={actionMutation.isPending}
+            >
+              <Play className="h-4 w-4" /> Start
+            </Button>
+          )}
+          {spec.ops.stop && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => doAction("stop", "Stopping Instance")}
+              disabled={actionMutation.isPending}
+            >
+              <Square className="h-4 w-4" /> Stop
+            </Button>
+          )}
+          {spec.ops.update && (
             <ResourceFormDialog
               mode="edit"
               title={`Edit ${spec.singular}`}
-              description="Upsert by uid (idempotent)."
-              endpoint={`/v1/${spec.apiPath}/upsert`}
-              payloadKey={spec.payloadKey}
+              description="Изменяет ресурс."
+              apiPath={`/v1/${spec.apiPath}/${resourceId}`}
+              resourceId={spec.id}
               template={data}
               fields={spec.fields}
-              invalidateQueryKeys={[]}
+              folderUid={folder?.uid}
             />
           )}
           {spec.ops.delete && (
             <DeleteButton
-              endpoint={`/v1/${spec.apiPath}/delete`}
-              uid={uid!}
+              apiPath={`/v1/${spec.apiPath}/${resourceId}`}
+              resourceId={spec.id}
               name={name}
               resourceLabel={spec.singular}
-              invalidateQueryKeys={[]}
+              folderUid={folder?.uid}
               navigateTo={() => navigate(`/${spec.route}`)}
             />
           )}
         </div>
       </div>
 
+      {actionErr && (
+        <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">
+          {actionErr}
+        </div>
+      )}
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="spec">Spec</TabsTrigger>
-          <TabsTrigger value="status">Status</TabsTrigger>
           <TabsTrigger value="raw">Raw JSON</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
           <div className="rounded-lg border border-border p-4 space-y-2">
-            <h3 className="font-semibold text-sm">Metadata</h3>
+            <h3 className="font-semibold text-sm">Resource fields</h3>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-              <KV k="UID" v={meta.uid as string} mono />
-              <KV k="Name" v={meta.name as string} />
-              <KV k="Resource Version" v={meta.resourceVersion as string} mono />
-              <KV k="Generation" v={meta.generation as string} mono />
-              {meta.creationTimestamp ? (
-                <KV k="Created" v={new Date(meta.creationTimestamp as string).toLocaleString()} />
-              ) : null}
-              {meta.deletionTimestamp ? (
+              <KV k="ID" v={resourceId} mono />
+              <KV k="Name" v={name} />
+              {statusValue ? <KV k="Status" v={statusValue} /> : null}
+              {getByPath<string>(data, "created_at") ? (
                 <KV
-                  k="Deletion"
-                  v={new Date(meta.deletionTimestamp as string).toLocaleString()}
+                  k="Created"
+                  v={new Date(getByPath<string>(data, "created_at")!).toLocaleString()}
                 />
               ) : null}
-              {meta.organizationId ? <KV k="Organization" v={meta.organizationId as string} mono /> : null}
-              {meta.cloudId ? <KV k="Cloud" v={meta.cloudId as string} mono /> : null}
-              {meta.folderId ? <KV k="Folder" v={meta.folderId as string} mono /> : null}
+              {getByPath<string>(data, "folder_id") ? (
+                <KV k="Folder" v={getByPath<string>(data, "folder_id")!} mono />
+              ) : null}
+              {getByPath<string>(data, "cloud_id") ? (
+                <KV k="Cloud" v={getByPath<string>(data, "cloud_id")!} mono />
+              ) : null}
+              {getByPath<string>(data, "organization_id") ? (
+                <KV k="Organization" v={getByPath<string>(data, "organization_id")!} mono />
+              ) : null}
+              {getByPath<string>(data, "zone_id") ? (
+                <KV k="Zone" v={getByPath<string>(data, "zone_id")!} />
+              ) : null}
+              {getByPath<string>(data, "display_name") ? (
+                <KV k="Display Name" v={getByPath<string>(data, "display_name")!} />
+              ) : null}
+              {getByPath<string>(data, "description") ? (
+                <KV k="Description" v={getByPath<string>(data, "description")!} />
+              ) : null}
             </dl>
           </div>
         </TabsContent>
 
-        <TabsContent value="spec">
-          <JsonView data={spec_ ?? {}} />
-        </TabsContent>
-        <TabsContent value="status">
-          <JsonView data={status_ ?? {}} />
-        </TabsContent>
         <TabsContent value="raw">
           <JsonView data={data} />
         </TabsContent>
       </Tabs>
+
+      <OperationDialog
+        opId={actionOpId}
+        title={actionTitle}
+        onSuccess={handleActionSuccess}
+        onClose={handleActionClose}
+      />
     </div>
   );
 }

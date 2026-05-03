@@ -39,16 +39,16 @@ function StatCard({ stat }: { stat: Stat }) {
 }
 
 export function DashboardPage() {
-  const orgs = useQuery({ queryKey: ["dash.orgs"], queryFn: () => orgsApi.list({}), refetchInterval: 30_000 });
-  const clouds = useQuery({ queryKey: ["dash.clouds"], queryFn: () => cloudsApi.list({}), refetchInterval: 30_000 });
-  const folders = useQuery({ queryKey: ["dash.folders"], queryFn: () => foldersApi.list({}), refetchInterval: 30_000 });
-  const networks = useQuery({ queryKey: ["dash.networks"], queryFn: () => networksApi.list({}), refetchInterval: 15_000 });
-  const subnets = useQuery({ queryKey: ["dash.subnets"], queryFn: () => subnetsApi.list({}), refetchInterval: 15_000 });
-  const instances = useQuery({ queryKey: ["dash.instances"], queryFn: () => instancesApi.list({}), refetchInterval: 5_000 });
-  const disks = useQuery({ queryKey: ["dash.disks"], queryFn: () => disksApi.list({}), refetchInterval: 10_000 });
-  const images = useQuery({ queryKey: ["dash.images"], queryFn: () => imagesApi.list({}), refetchInterval: 60_000 });
-  const nlbs = useQuery({ queryKey: ["dash.nlb"], queryFn: () => nlbApi.list({}), refetchInterval: 10_000 });
-  const tgs = useQuery({ queryKey: ["dash.tg"], queryFn: () => tgApi.list({}), refetchInterval: 10_000 });
+  const orgs = useQuery({ queryKey: ["dash.orgs"], queryFn: () => orgsApi.list(), refetchInterval: 30_000 });
+  const clouds = useQuery({ queryKey: ["dash.clouds"], queryFn: () => cloudsApi.list(), refetchInterval: 30_000 });
+  const folders = useQuery({ queryKey: ["dash.folders"], queryFn: () => foldersApi.list(), refetchInterval: 30_000 });
+  const networks = useQuery({ queryKey: ["dash.networks"], queryFn: () => networksApi.list(), refetchInterval: 15_000 });
+  const subnets = useQuery({ queryKey: ["dash.subnets"], queryFn: () => subnetsApi.list(), refetchInterval: 15_000 });
+  const instances = useQuery({ queryKey: ["dash.instances"], queryFn: () => instancesApi.list(), refetchInterval: 5_000 });
+  const disks = useQuery({ queryKey: ["dash.disks"], queryFn: () => disksApi.list(), refetchInterval: 10_000 });
+  const images = useQuery({ queryKey: ["dash.images"], queryFn: () => imagesApi.list(), refetchInterval: 60_000 });
+  const nlbs = useQuery({ queryKey: ["dash.nlb"], queryFn: () => nlbApi.list(), refetchInterval: 10_000 });
+  const tgs = useQuery({ queryKey: ["dash.tg"], queryFn: () => tgApi.list(), refetchInterval: 10_000 });
 
   const stats: Stat[] = [
     { label: "Organizations", value: orgs.data?.organizations.length ?? "—", to: "/organizations" },
@@ -81,10 +81,25 @@ export function DashboardPage() {
       <div className="rounded-lg border border-border p-5 bg-card">
         <h2 className="font-semibold mb-3">Подсказки</h2>
         <ul className="space-y-1.5 text-sm text-muted-foreground">
-          <li>• Все запросы идут напрямую через <code className="text-xs bg-muted px-1 py-0.5 rounded">/v1/&lt;resource&gt;/list</code> на api-gateway.</li>
-          <li>• Folder-scoped страницы (Networks, Instances и т.д.) требуют выбранный folder в шапке.</li>
-          <li>• Live-обновление: TanStack Query polling 3-30s в зависимости от ресурса.</li>
-          <li>• Для подробностей — смотрите <code className="text-xs bg-muted px-1 py-0.5 rounded">JSON view</code> на странице ресурса.</li>
+          <li>
+            • Get/List: синхронные{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /v1/&lt;resource&gt;</code> с query-параметрами.
+          </li>
+          <li>
+            • Create/Update/Delete возвращают{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">Operation</code> — UI поллит до{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">done=true</code>.
+          </li>
+          <li>
+            • Folder-scoped страницы (Networks, Instances и т.д.) требуют выбранный folder в шапке.
+          </li>
+          <li>
+            • Live-обновление: polling 3-30s в зависимости от ресурса.
+          </li>
+          <li>
+            • Для подробностей — смотрите{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">Raw JSON</code> на странице ресурса.
+          </li>
         </ul>
       </div>
     </div>

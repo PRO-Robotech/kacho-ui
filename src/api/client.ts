@@ -1,6 +1,14 @@
-// Базовый клиент: POST JSON на api-gateway REST endpoints.
+// Базовый клиент: REST JSON на api-gateway endpoints.
 // В dev: vite.config.ts проксирует /v1/* на http://localhost:8080.
 // В prod: same-origin, ingress рулит на api-gateway:8080.
+//
+// API mapping (sub-phase 1.0):
+//   GET     /v1/<plural>          → List
+//   GET     /v1/<plural>/{id}     → Get
+//   POST    /v1/<plural>          → Create  → Operation
+//   PATCH   /v1/<plural>/{id}     → Update  → Operation
+//   DELETE  /v1/<plural>/{id}     → Delete  → Operation
+//   POST    /v1/<plural>/{id}:verb → Custom verb → Operation
 
 const API_BASE = ""; // относительный путь, ingress/proxy сделают остальное
 
@@ -16,21 +24,19 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * post — POST JSON, ожидает JSON в ответ.
- * При не-2xx бросает ApiError со статусом, code (gRPC) и details.
- */
-export async function post<TReq, TResp>(path: string, body: TReq): Promise<TResp> {
+async function fetchJson<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
-    method: "POST",
+  const init: RequestInit = {
+    method,
     headers: {
       "Content-Type": "application/json",
       "X-Request-ID": crypto.randomUUID(),
     },
-    body: JSON.stringify(body ?? {}),
-  });
-
+  };
+  if (body !== undefined) {
+    init.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, init);
   const text = await res.text();
   let parsed: unknown = null;
   if (text) {
@@ -40,7 +46,6 @@ export async function post<TReq, TResp>(path: string, body: TReq): Promise<TResp
       // not json
     }
   }
-
   if (!res.ok) {
     const err = (parsed ?? {}) as { code?: string; message?: string; details?: unknown };
     throw new ApiError(
@@ -50,119 +55,41 @@ export async function post<TReq, TResp>(path: string, body: TReq): Promise<TResp
       err.message ?? res.statusText,
     );
   }
-
-  return parsed as TResp;
+  return parsed as T;
 }
 
-/**
- * watchStream — открывает WebSocket к streaming-эндпоинту (Watch RPC),
- * выполняет первый message с request body (как требует tmc/grpc-websocket-proxy
- * на стороне api-gateway), затем yield-ит каждое полученное сообщение как
- * парсенный JSON.
- *
- * Поведение:
- *   - один WS на одну подписку (НЕ переоткрывается на каждый event)
- *   - signal.abort() закрывает WS
- *   - server-close (nginx idle timeout / pod restart) → throws WsClosed,
- *     useResourceWatch ловит и делает reconnect с backoff
- */
-export async function* watchStream<TReq, TEvent>(
-  path: string,
-  body: TReq,
-  signal?: AbortSignal,
-): AsyncGenerator<TEvent> {
-  const wsUrl = buildWsUrl(path);
-  const ws = new WebSocket(wsUrl);
+export const api = {
+  /** GET /v1/<path> → данные */
+  get<T>(path: string): Promise<T> {
+    return fetchJson<T>("GET", path);
+  },
 
-  // Подписываемся на abort до open — чтобы корректно закрыть на cancel
-  const onAbort = () => {
-    try {
-      ws.close(1000, "client abort");
-    } catch {
-      // ignore
-    }
-  };
-  signal?.addEventListener("abort", onAbort);
+  /** GET /v1/<path>?k=v&… → список */
+  list<T>(path: string, query?: Record<string, string>): Promise<T> {
+    const qs =
+      query && Object.keys(query).length > 0
+        ? "?" + new URLSearchParams(query).toString()
+        : "";
+    return fetchJson<T>("GET", `${path}${qs}`);
+  },
 
-  // Очередь + promise resolver для async iteration
-  type Msg = { kind: "data"; data: TEvent } | { kind: "close" } | { kind: "error"; err: Error };
-  const queue: Msg[] = [];
-  let resolveNext: ((m: Msg) => void) | null = null;
+  /** POST /v1/<plural>  body=resource → Operation */
+  create(path: string, body: unknown): Promise<{ operation: import("./types").Operation }> {
+    return fetchJson("POST", path, body);
+  },
 
-  const enqueue = (m: Msg) => {
-    if (resolveNext) {
-      const r = resolveNext;
-      resolveNext = null;
-      r(m);
-    } else {
-      queue.push(m);
-    }
-  };
+  /** PATCH /v1/<plural>/{id}  body=resource → Operation */
+  update(path: string, body: unknown): Promise<{ operation: import("./types").Operation }> {
+    return fetchJson("PATCH", path, body);
+  },
 
-  ws.onopen = () => {
-    try {
-      ws.send(JSON.stringify(body ?? {}));
-    } catch (e) {
-      enqueue({ kind: "error", err: e as Error });
-    }
-  };
-  ws.onmessage = (ev) => {
-    let line: string;
-    if (typeof ev.data === "string") line = ev.data;
-    else if (ev.data instanceof ArrayBuffer) line = new TextDecoder().decode(ev.data);
-    else if (ev.data instanceof Blob) {
-      // Blob: read async, потом enqueue
-      ev.data.text().then((t) => {
-        try {
-          enqueue({ kind: "data", data: JSON.parse(t) as TEvent });
-        } catch {
-          // skip
-        }
-      });
-      return;
-    } else return;
-    try {
-      enqueue({ kind: "data", data: JSON.parse(line) as TEvent });
-    } catch {
-      // skip malformed
-    }
-  };
-  ws.onclose = () => enqueue({ kind: "close" });
-  ws.onerror = () => enqueue({ kind: "error", err: new Error("websocket error") });
+  /** DELETE /v1/<plural>/{id} → Operation */
+  delete(path: string): Promise<{ operation: import("./types").Operation }> {
+    return fetchJson("DELETE", path);
+  },
 
-  try {
-    while (true) {
-      const m: Msg = queue.length
-        ? (queue.shift() as Msg)
-        : await new Promise<Msg>((r) => {
-            resolveNext = r;
-          });
-      if (m.kind === "close") return;
-      if (m.kind === "error") throw m.err;
-      yield m.data;
-    }
-  } finally {
-    signal?.removeEventListener("abort", onAbort);
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-      try {
-        ws.close(1000, "iterator finalised");
-      } catch {
-        // ignore
-      }
-    }
-  }
-}
-
-function buildWsUrl(path: string): string {
-  // path: "/v1/networks/watch" → ws://<host>/v1/networks/watch?method=POST
-  // ?method=POST — override для tmc/grpc-websocket-proxy:
-  //   WebSocket initiation request приходит как HTTP GET, но grpc-gateway
-  //   зарегистрировал Watch RPC как POST. Без override wsproxy proxy-ит
-  //   internal request методом GET и grpc-gateway возвращает Method Not Allowed.
-  if (typeof window === "undefined") {
-    throw new Error("watchStream requires browser environment");
-  }
-  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const sep = path.includes("?") ? "&" : "?";
-  return `${proto}//${window.location.host}${path}${sep}method=POST`;
-}
+  /** POST /v1/<plural>/{id}:verb  body → Operation */
+  action(path: string, body?: unknown): Promise<{ operation: import("./types").Operation }> {
+    return fetchJson("POST", path, body ?? {});
+  },
+};

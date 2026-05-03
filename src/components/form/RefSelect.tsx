@@ -1,5 +1,9 @@
+// RefSelect — выбор ресурса по ID из выпадающего списка.
+// Загружает список через GET /v1/<apiPath>?folder_id=<uid>.
+// Flat API: ресурсы имеют поля id и name (не metadata.uid/metadata.name).
+
 import { useQuery } from "@tanstack/react-query";
-import { post } from "@/api/client";
+import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
 import { useFolderStore } from "@/lib/folder-store";
 
@@ -20,24 +24,24 @@ export function RefSelect({ refResource, refFolderScoped, value, onChange, place
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["ref", refResource, refFolderScoped ? folder?.uid : null],
-    queryFn: () =>
-      post<unknown, Record<string, unknown>>(`/v1/${spec!.apiPath}/list`, {
-        selectors:
-          refFolderScoped && folder
-            ? [{ field: "folder_id", op: "EQ", values: [folder.uid] }]
-            : [],
-      }),
+    queryFn: () => {
+      const q: Record<string, string> = {};
+      if (refFolderScoped && folder) q["folder_id"] = folder.uid;
+      return api.list<Record<string, Array<{ id: string; name: string }>>>(
+        `/v1/${spec!.apiPath}`,
+        q,
+      );
+    },
     enabled,
     staleTime: 30_000,
   });
 
   if (!spec) return <div className="text-xs text-rose-600">Unknown ref: {refResource}</div>;
 
-  const options =
-    ((data?.[spec.payloadKey] as Array<{ metadata: { uid: string; name: string } }>) ?? []).map((it) => ({
-      uid: it.metadata.uid,
-      name: it.metadata.name,
-    }));
+  const options = (data?.[spec.payloadKey] ?? []).map((it) => ({
+    uid: it.id,
+    name: it.name,
+  }));
 
   return (
     <div className="space-y-1">
@@ -58,10 +62,14 @@ export function RefSelect({ refResource, refFolderScoped, value, onChange, place
       {refFolderScoped && !folder && (
         <p className="text-xs text-amber-600">Выберите folder в шапке для загрузки.</p>
       )}
-      {isLoading && <p className="text-xs text-muted-foreground">Загрузка списка {spec.plural}…</p>}
+      {isLoading && (
+        <p className="text-xs text-muted-foreground">Загрузка списка {spec.plural}…</p>
+      )}
       {error && <p className="text-xs text-rose-600">Ошибка: {(error as Error).message}</p>}
       {value && options.length > 0 && !options.find((o) => o.uid === value) && (
-        <p className="text-xs text-amber-600">UID не найден в списке (возможно ресурс удалён).</p>
+        <p className="text-xs text-amber-600">
+          ID не найден в списке (возможно ресурс удалён).
+        </p>
       )}
     </div>
   );

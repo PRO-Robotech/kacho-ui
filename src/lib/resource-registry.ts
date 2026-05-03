@@ -1,5 +1,5 @@
 // Реестр ресурсов: метаданные для generic ListPage / DetailPage / Create-Edit.
-// Источник истины — proto definitions в kacho-proto/proto/kacho/cloud/.../v1/*.proto.
+// Flat API (sub-phase 1.0): все поля плоские, нет metadata/spec/status envelope.
 
 import type { ReactNode } from "react";
 import type { FormField } from "./form-schema";
@@ -7,7 +7,7 @@ import { setByPath } from "./path";
 
 export interface ResourceColumn {
   header: string;
-  // path в объекте: например "metadata.name", "spec.cidrBlock", "status.state"
+  // Путь в плоском объекте: "name", "status", "zone_id"
   path: string;
   format?: "text" | "uid-short" | "datetime" | "status" | "code" | "list";
   className?: string;
@@ -16,26 +16,33 @@ export interface ResourceColumn {
 
 export interface ResourceSpec {
   id: string;
-  // route path в SPA (без leading slash), например "networks", "network-load-balancers"
+  // route path в SPA (без leading slash)
   route: string;
-  // URL-segment в gateway REST (kebab-case, тот же что route)
+  // URL-segment в gateway REST (kebab-case)
   apiPath: string;
-  // ключ массива в payload upsert/list response: "networks", "instances"
+  // ключ массива в List response: "networks", "instances"
   payloadKey: string;
-  // singular label для UI: "Network", "Instance"
+  // singular label для UI
   singular: string;
-  // plural label: "Networks", "Instances"
+  // plural label
   plural: string;
   description?: string;
   // global = cluster-scoped, folder = только в выбранном folder
   scope: "global" | "folder";
   // поддерживаемые операции
-  ops: { create: boolean; edit: boolean; delete: boolean; restart?: boolean };
+  ops: {
+    create: boolean;
+    update: boolean;
+    delete: boolean;
+    restart?: boolean;
+    start?: boolean;
+    stop?: boolean;
+  };
   // колонки для list-таблицы
   columns: ResourceColumn[];
   // schema полей формы (если undefined — fallback к JSON-editor)
   fields?: FormField[];
-  // skeleton-объект для Create-формы (заполнение defaults)
+  // skeleton-объект для Create-формы
   template: (ctx: { folderId?: string; cloudId?: string; organizationId?: string }) => unknown;
 }
 
@@ -45,8 +52,31 @@ const ZONES = [
   { value: "kacho-zone-c", label: "kacho-zone-c" },
 ];
 
-const COMMON_NAME_FIELD: FormField = {
-  name: "metadata.name",
+// Общие колонки и поля
+const COL_NAME: ResourceColumn = {
+  header: "Name",
+  path: "name",
+  format: "text",
+  className: "font-medium",
+};
+const COL_STATUS: ResourceColumn = {
+  header: "Status",
+  path: "status",
+  format: "status",
+};
+const COL_CREATED: ResourceColumn = {
+  header: "Created",
+  path: "created_at",
+  format: "datetime",
+};
+const COL_ID: ResourceColumn = {
+  header: "ID",
+  path: "id",
+  format: "uid-short",
+};
+
+const FIELD_NAME: FormField = {
+  name: "name",
   label: "Name",
   type: "string",
   required: true,
@@ -55,18 +85,22 @@ const COMMON_NAME_FIELD: FormField = {
   pattern: "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$",
 };
 
-const COMMON_DESC: FormField[] = [
-  {
-    name: "spec.displayName",
-    label: "Display Name",
-    type: "string",
-    placeholder: "Human-readable label",
-  },
-  { name: "spec.description", label: "Description", type: "text", rows: 2 },
+const FIELDS_DISPLAY_DESC: FormField[] = [
+  { name: "display_name", label: "Display Name", type: "string", placeholder: "Human-readable label" },
+  { name: "description", label: "Description", type: "text", rows: 2 },
 ];
+
+// Hidden поля для folder-context
+const FIELD_FOLDER_ID: FormField = {
+  name: "folder_id",
+  label: "Folder",
+  type: "string",
+  hidden: true,
+};
 
 export const REGISTRY: Record<string, ResourceSpec> = {
   // ====== resourcemanager ======
+
   organizations: {
     id: "organizations",
     route: "organizations",
@@ -76,19 +110,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Organizations",
     description: "Корневой уровень иерархии. Cluster-scoped.",
     scope: "global",
-    ops: { create: true, edit: true, delete: false },
+    ops: { create: true, update: true, delete: false },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Display", path: "spec.displayName", format: "text" },
-      { header: "UID", path: "metadata.uid", format: "uid-short" },
-      { header: "Created", path: "metadata.creationTimestamp", format: "datetime" },
-      { header: "RV", path: "metadata.resourceVersion", format: "code" },
+      COL_NAME,
+      { header: "Display", path: "display_name", format: "text" },
+      COL_STATUS,
+      COL_CREATED,
+      COL_ID,
     ],
-    fields: [COMMON_NAME_FIELD, ...COMMON_DESC],
-    template: () => ({
-      metadata: { name: "" },
-      spec: { displayName: "", description: "" },
-    }),
+    fields: [FIELD_NAME, ...FIELDS_DISPLAY_DESC],
+    template: () => ({ name: "", display_name: "", description: "" }),
   },
 
   clouds: {
@@ -100,28 +131,26 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Clouds",
     description: "Billing-scope внутри Organization.",
     scope: "global",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Display", path: "spec.displayName", format: "text" },
-      { header: "Org", path: "metadata.organizationId", format: "uid-short" },
-      { header: "Created", path: "metadata.creationTimestamp", format: "datetime" },
+      COL_NAME,
+      { header: "Display", path: "display_name", format: "text" },
+      { header: "Org", path: "organization_id", format: "uid-short" },
+      COL_STATUS,
+      COL_CREATED,
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "metadata.organizationId",
+        name: "organization_id",
         label: "Organization",
         type: "ref",
         refResource: "organizations",
         required: true,
       },
-      ...COMMON_DESC,
+      ...FIELDS_DISPLAY_DESC,
     ],
-    template: ({ organizationId }) => ({
-      metadata: { name: "", organizationId: organizationId ?? "" },
-      spec: { displayName: "", description: "" },
-    }),
+    template: () => ({ name: "", organization_id: "", display_name: "", description: "" }),
   },
 
   folders: {
@@ -133,32 +162,30 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Folders",
     description: "Isolation-scope для domain-ресурсов.",
     scope: "global",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Display", path: "spec.displayName", format: "text" },
-      { header: "Cloud", path: "metadata.cloudId", format: "uid-short" },
-      { header: "Created", path: "metadata.creationTimestamp", format: "datetime" },
+      COL_NAME,
+      { header: "Display", path: "display_name", format: "text" },
+      { header: "Cloud", path: "cloud_id", format: "uid-short" },
+      COL_STATUS,
+      COL_CREATED,
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "metadata.cloudId",
+        name: "cloud_id",
         label: "Cloud",
         type: "ref",
         refResource: "clouds",
         required: true,
       },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
-      ...COMMON_DESC,
+      ...FIELDS_DISPLAY_DESC,
     ],
-    template: ({ cloudId, organizationId }) => ({
-      metadata: { name: "", cloudId: cloudId ?? "", organizationId: organizationId ?? "" },
-      spec: { displayName: "", description: "" },
-    }),
+    template: () => ({ name: "", cloud_id: "", display_name: "", description: "" }),
   },
 
   // ====== vpc ======
+
   networks: {
     id: "networks",
     route: "networks",
@@ -168,24 +195,24 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Networks",
     description: "VPC Networks.",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Display", path: "spec.displayName", format: "text" },
-      { header: "UID", path: "metadata.uid", format: "uid-short" },
-      { header: "Created", path: "metadata.creationTimestamp", format: "datetime" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Display", path: "display_name", format: "text" },
+      COL_CREATED,
+      COL_ID,
     ],
     fields: [
-      COMMON_NAME_FIELD,
-      ...COMMON_DESC,
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      FIELD_NAME,
+      ...FIELDS_DISPLAY_DESC,
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { displayName: "", description: "" },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      display_name: "",
+      description: "",
     }),
   },
 
@@ -198,18 +225,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Subnets",
     description: "VPC Subnets (folder-scoped).",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Network", path: "spec.networkId", format: "uid-short" },
-      { header: "Zone", path: "spec.zoneId", format: "text" },
-      { header: "CIDR", path: "spec.cidrBlock", format: "code" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Network", path: "network_id", format: "uid-short" },
+      { header: "Zone", path: "zone_id", format: "text" },
+      { header: "CIDR", path: "cidr_block", format: "code" },
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.networkId",
+        name: "network_id",
         label: "Network",
         type: "ref",
         refResource: "networks",
@@ -217,28 +244,29 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         required: true,
       },
       {
-        name: "spec.zoneId",
+        name: "zone_id",
         label: "Zone",
         type: "enum",
         options: ZONES,
         required: true,
       },
       {
-        name: "spec.cidrBlock",
+        name: "cidr_block",
         label: "CIDR Block",
         type: "string",
         placeholder: "10.0.0.0/24",
         required: true,
-        description: "RFC 1918, host-bits cleared (для /24 — последний октет 0).",
+        description: "RFC 1918, host-bits cleared.",
       },
-      ...COMMON_DESC,
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      ...FIELDS_DISPLAY_DESC,
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { networkId: "", zoneId: "kacho-zone-a", cidrBlock: "10.0.0.0/24" },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      network_id: "",
+      zone_id: "kacho-zone-a",
+      cidr_block: "10.0.0.0/24",
     }),
   },
 
@@ -250,35 +278,37 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Security Group",
     plural: "Security Groups",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Network", path: "spec.networkId", format: "uid-short" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Network", path: "network_id", format: "uid-short" },
+      COL_CREATED,
+      COL_ID,
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.networkId",
+        name: "network_id",
         label: "Network",
         type: "ref",
         refResource: "networks",
         refFolderScoped: true,
         required: true,
       },
-      { name: "spec.displayName", label: "Display Name", type: "string" },
+      { name: "display_name", label: "Display Name", type: "string" },
       {
-        name: "spec.rules",
+        name: "rules",
         label: "Rules",
         type: "array",
         itemLabel: "Rule",
-        description: "Full-replace при Upsert. Server-side IDs регенерируются.",
+        description: "Full-replace при Update.",
         newItem: () => ({
           direction: "INGRESS",
           protocol: "TCP",
-          portRangeMin: 80,
-          portRangeMax: 80,
-          cidrBlocks: ["0.0.0.0/0"],
+          port_range_min: 80,
+          port_range_max: 80,
+          cidr_blocks: ["0.0.0.0/0"],
         }),
         itemFields: [
           {
@@ -302,24 +332,20 @@ export const REGISTRY: Record<string, ResourceSpec> = {
               { value: "ICMP", label: "ICMP" },
             ],
           },
-          { name: "portRangeMin", label: "Port from", type: "int", min: 0, max: 65535 },
-          { name: "portRangeMax", label: "Port to", type: "int", min: 0, max: 65535 },
-          {
-            name: "cidrBlocks[0]",
-            label: "CIDR",
-            type: "string",
-            placeholder: "0.0.0.0/0",
-          },
+          { name: "port_range_min", label: "Port from", type: "int", min: 0, max: 65535 },
+          { name: "port_range_max", label: "Port to", type: "int", min: 0, max: 65535 },
+          { name: "cidr_blocks[0]", label: "CIDR", type: "string", placeholder: "0.0.0.0/0" },
           { name: "description", label: "Description", type: "string" },
         ],
       },
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { networkId: "", displayName: "", rules: [] },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      network_id: "",
+      display_name: "",
+      rules: [],
     }),
   },
 
@@ -331,40 +357,42 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Route Table",
     plural: "Route Tables",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Network", path: "spec.networkId", format: "uid-short" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Network", path: "network_id", format: "uid-short" },
+      COL_CREATED,
+      COL_ID,
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.networkId",
+        name: "network_id",
         label: "Network",
         type: "ref",
         refResource: "networks",
         refFolderScoped: true,
         required: true,
       },
-      { name: "spec.displayName", label: "Display Name", type: "string" },
+      { name: "display_name", label: "Display Name", type: "string" },
       {
-        name: "spec.staticRoutes",
+        name: "static_routes",
         label: "Static Routes",
         type: "array",
         itemLabel: "Route",
-        description: "Full-replace при Upsert.",
-        newItem: () => ({ destinationPrefix: "10.10.0.0/16", nextHopAddress: "10.0.0.1" }),
+        description: "Full-replace при Update.",
+        newItem: () => ({ destination_prefix: "10.10.0.0/16", next_hop_address: "10.0.0.1" }),
         itemFields: [
           {
-            name: "destinationPrefix",
+            name: "destination_prefix",
             label: "Destination CIDR",
             type: "string",
             required: true,
             placeholder: "10.10.0.0/16",
           },
           {
-            name: "nextHopAddress",
+            name: "next_hop_address",
             label: "Next Hop",
             type: "string",
             required: true,
@@ -373,13 +401,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           { name: "description", label: "Description", type: "string" },
         ],
       },
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { networkId: "", displayName: "", staticRoutes: [] },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      network_id: "",
+      display_name: "",
+      static_routes: [],
     }),
   },
 
@@ -391,42 +420,44 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Address",
     plural: "Addresses",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "IPv4", path: "status.allocatedIpv4", format: "code" },
-      { header: "Type", path: "spec.addressType", format: "text" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "IPv4", path: "allocated_ipv4", format: "code" },
+      { header: "Type", path: "address_type", format: "text" },
+      { header: "Zone", path: "zone_id", format: "text" },
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.addressType",
+        name: "address_type",
         label: "Address Type",
         type: "enum",
         required: true,
         options: [{ value: "EXTERNAL", label: "EXTERNAL" }],
-        description: "В 0.x только EXTERNAL.",
+        description: "В 1.x только EXTERNAL.",
       },
       {
-        name: "spec.zoneId",
+        name: "zone_id",
         label: "Zone",
         type: "enum",
         required: true,
         options: ZONES,
       },
-      ...COMMON_DESC,
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      ...FIELDS_DISPLAY_DESC,
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { addressType: "EXTERNAL", zoneId: "kacho-zone-a" },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      address_type: "EXTERNAL",
+      zone_id: "kacho-zone-a",
     }),
   },
 
   // ====== compute ======
+
   instances: {
     id: "instances",
     route: "instances",
@@ -436,18 +467,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Instances",
     description: "VM-instances.",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true, restart: true },
+    ops: { create: true, update: true, delete: true, restart: true, start: true, stop: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Platform", path: "spec.platformId", format: "text" },
-      { header: "Zone", path: "spec.zoneId", format: "text" },
-      { header: "Internal IPs", path: "status.ips.internal", format: "list" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Platform", path: "platform_id", format: "text" },
+      { header: "Zone", path: "zone_id", format: "text" },
+      { header: "Internal IPs", path: "ips.internal", format: "list" },
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.platformId",
+        name: "platform_id",
         label: "Platform",
         type: "enum",
         required: true,
@@ -459,22 +490,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
       },
       {
-        name: "spec.zoneId",
+        name: "zone_id",
         label: "Zone",
         type: "enum",
         options: ZONES,
         required: true,
       },
-      { name: "spec.resources.cores", label: "vCPU cores", type: "int", min: 1, max: 32, default: 2 },
+      { name: "resources.cores", label: "vCPU cores", type: "int", min: 1, max: 32, default: 2 },
+      { name: "resources.memory", label: "Memory", type: "string", placeholder: "4Gi", default: "4Gi" },
       {
-        name: "spec.resources.memory",
-        label: "Memory",
-        type: "string",
-        placeholder: "4Gi",
-        default: "4Gi",
-      },
-      {
-        name: "spec.resources.coreFraction",
+        name: "resources.core_fraction",
         label: "Core Fraction (%)",
         type: "int",
         min: 5,
@@ -482,24 +507,29 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         default: 100,
       },
       {
-        name: "spec.bootDisk.diskId",
+        name: "boot_disk.disk_id",
         label: "Boot Disk",
         type: "ref",
         refResource: "disks",
         refFolderScoped: true,
         required: true,
       },
-      { name: "spec.bootDisk.autoDelete", label: "Auto-delete boot disk", type: "bool", default: true },
       {
-        name: "spec.networkInterfaces",
+        name: "boot_disk.auto_delete",
+        label: "Auto-delete boot disk",
+        type: "bool",
+        default: true,
+      },
+      {
+        name: "network_interfaces",
         label: "Network Interfaces",
         type: "array",
         itemLabel: "NIC",
         minItems: 1,
-        newItem: () => ({ subnetId: "" }),
+        newItem: () => ({ subnet_id: "" }),
         itemFields: [
           {
-            name: "subnetId",
+            name: "subnet_id",
             label: "Subnet",
             type: "ref",
             refResource: "subnets",
@@ -507,7 +537,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             required: true,
           },
           {
-            name: "primaryV4Address",
+            name: "primary_v4_address",
             label: "Primary IPv4 (optional)",
             type: "string",
             placeholder: "10.0.0.5 — пусто для auto",
@@ -515,7 +545,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
       },
       {
-        name: "spec.desiredPowerState",
+        name: "desired_power_state",
         label: "Desired Power State",
         type: "enum",
         default: "POWER_RUNNING",
@@ -524,22 +554,19 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           { value: "POWER_STOPPED", label: "POWER_STOPPED" },
         ],
       },
-      ...COMMON_DESC,
-      { name: "spec.fqdn", label: "FQDN", type: "string", placeholder: "vm.example.local" },
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      ...FIELDS_DISPLAY_DESC,
+      { name: "fqdn", label: "FQDN", type: "string", placeholder: "vm.example.local" },
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: {
-        platformId: "standard-v3",
-        zoneId: "kacho-zone-a",
-        resources: { cores: 2, memory: "4Gi", coreFraction: 100 },
-        bootDisk: { diskId: "", autoDelete: true },
-        networkInterfaces: [{ subnetId: "" }],
-        desiredPowerState: "POWER_RUNNING",
-      },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      platform_id: "standard-v3",
+      zone_id: "kacho-zone-a",
+      resources: { cores: 2, memory: "4Gi", core_fraction: 100 },
+      boot_disk: { disk_id: "", auto_delete: true },
+      network_interfaces: [{ subnet_id: "" }],
+      desired_power_state: "POWER_RUNNING",
     }),
   },
 
@@ -551,18 +578,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Disk",
     plural: "Disks",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Type", path: "spec.diskTypeId", format: "text" },
-      { header: "Size", path: "spec.size", format: "text" },
-      { header: "Zone", path: "spec.zoneId", format: "text" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Type", path: "disk_type_id", format: "text" },
+      { header: "Size", path: "size", format: "text" },
+      { header: "Zone", path: "zone_id", format: "text" },
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.diskTypeId",
+        name: "disk_type_id",
         label: "Disk Type",
         type: "enum",
         required: true,
@@ -572,35 +599,24 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           { value: "network-hdd", label: "network-hdd" },
         ],
       },
+      { name: "size", label: "Size", type: "string", placeholder: "10Gi", required: true },
+      { name: "zone_id", label: "Zone", type: "enum", options: ZONES, required: true },
       {
-        name: "spec.size",
-        label: "Size",
-        type: "string",
-        placeholder: "10Gi",
-        required: true,
-      },
-      {
-        name: "spec.zoneId",
-        label: "Zone",
-        type: "enum",
-        options: ZONES,
-        required: true,
-      },
-      {
-        name: "spec.imageId",
+        name: "image_id",
         label: "Source Image (optional)",
         type: "ref",
         refResource: "images",
         placeholder: "пусто = пустой диск",
       },
-      ...COMMON_DESC,
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      ...FIELDS_DISPLAY_DESC,
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { diskTypeId: "network-ssd", size: "10Gi", zoneId: "kacho-zone-a" },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      disk_type_id: "network-ssd",
+      size: "10Gi",
+      zone_id: "kacho-zone-a",
     }),
   },
 
@@ -613,12 +629,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     plural: "Images",
     description: "Read-only catalog.",
     scope: "global",
-    ops: { create: false, edit: false, delete: false },
+    ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Family", path: "spec.family", format: "text" },
-      { header: "OS", path: "spec.osType", format: "text" },
-      { header: "Description", path: "spec.description", format: "text" },
+      COL_NAME,
+      { header: "Family", path: "family", format: "text" },
+      { header: "OS", path: "os_type", format: "text" },
+      { header: "Description", path: "description", format: "text" },
+      COL_STATUS,
     ],
     template: () => ({}),
   },
@@ -631,35 +648,35 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Snapshot",
     plural: "Snapshots",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Disk", path: "spec.diskId", format: "uid-short" },
-      { header: "Progress", path: "status.progressPercent", format: "text" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Disk", path: "disk_id", format: "uid-short" },
+      { header: "Progress", path: "progress_percent", format: "text" },
     ],
     fields: [
-      COMMON_NAME_FIELD,
+      FIELD_NAME,
       {
-        name: "spec.diskId",
+        name: "disk_id",
         label: "Source Disk",
         type: "ref",
         refResource: "disks",
         refFolderScoped: true,
         required: true,
       },
-      ...COMMON_DESC,
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      ...FIELDS_DISPLAY_DESC,
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { diskId: "", displayName: "" },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      disk_id: "",
     }),
   },
 
   // ====== loadbalancer ======
+
   "network-load-balancers": {
     id: "network-load-balancers",
     route: "network-load-balancers",
@@ -668,23 +685,25 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Network Load Balancer",
     plural: "Network Load Balancers",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "External IPs", path: "status.externalIps", format: "list" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Region", path: "region_id", format: "text" },
+      { header: "External IPs", path: "external_ips", format: "list" },
+      COL_CREATED,
     ],
     fields: [
-      COMMON_NAME_FIELD,
-      { name: "spec.regionId", label: "Region", type: "string", default: "kacho-region-a" },
-      ...COMMON_DESC,
+      FIELD_NAME,
+      { name: "region_id", label: "Region", type: "string", default: "kacho-region-a" },
+      ...FIELDS_DISPLAY_DESC,
       {
-        name: "spec.listeners",
+        name: "listeners",
         label: "Listeners",
         type: "array",
         itemLabel: "Listener",
         minItems: 1,
-        newItem: () => ({ name: "web", port: 80, protocol: "PROTOCOL_TCP", targetPort: 80 }),
+        newItem: () => ({ name: "web", port: 80, protocol: "PROTOCOL_TCP", target_port: 80 }),
         itemFields: [
           { name: "name", label: "Name", type: "string", required: true, placeholder: "web" },
           { name: "port", label: "Port", type: "int", required: true, min: 1, max: 65535 },
@@ -698,18 +717,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
               { value: "PROTOCOL_UDP", label: "UDP" },
             ],
           },
-          { name: "targetPort", label: "Target Port", type: "int", min: 1, max: 65535 },
+          { name: "target_port", label: "Target Port", type: "int", min: 1, max: 65535 },
         ],
       },
       {
-        name: "spec.attachedTargetGroups",
+        name: "attached_target_groups",
         label: "Attached Target Groups",
         type: "array",
         itemLabel: "TG",
-        newItem: () => ({ targetGroupId: "" }),
+        newItem: () => ({ target_group_id: "" }),
         itemFields: [
           {
-            name: "targetGroupId",
+            name: "target_group_id",
             label: "Target Group",
             type: "ref",
             refResource: "target-groups",
@@ -718,17 +737,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           },
         ],
       },
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: {
-        regionId: "kacho-region-a",
-        listeners: [{ name: "web", port: 80, protocol: "PROTOCOL_TCP", targetPort: 80 }],
-        attachedTargetGroups: [],
-      },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      region_id: "kacho-region-a",
+      listeners: [{ name: "web", port: 80, protocol: "PROTOCOL_TCP", target_port: 80 }],
+      attached_target_groups: [],
     }),
   },
 
@@ -740,25 +756,27 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Target Group",
     plural: "Target Groups",
     scope: "folder",
-    ops: { create: true, edit: true, delete: true },
+    ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "Name", path: "metadata.name", format: "text", className: "font-medium" },
-      { header: "Status", path: "status.state", format: "status" },
-      { header: "Region", path: "spec.regionId", format: "text" },
+      COL_NAME,
+      COL_STATUS,
+      { header: "Region", path: "region_id", format: "text" },
+      COL_CREATED,
+      COL_ID,
     ],
     fields: [
-      COMMON_NAME_FIELD,
-      { name: "spec.regionId", label: "Region", type: "string", default: "kacho-region-a" },
-      ...COMMON_DESC,
+      FIELD_NAME,
+      { name: "region_id", label: "Region", type: "string", default: "kacho-region-a" },
+      ...FIELDS_DISPLAY_DESC,
       {
-        name: "spec.targets",
+        name: "targets",
         label: "Targets",
         type: "array",
         itemLabel: "Target",
-        newItem: () => ({ subnetId: "", address: "" }),
+        newItem: () => ({ subnet_id: "", address: "" }),
         itemFields: [
           {
-            name: "subnetId",
+            name: "subnet_id",
             label: "Subnet",
             type: "ref",
             refResource: "subnets",
@@ -773,7 +791,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             required: true,
           },
           {
-            name: "instanceId",
+            name: "instance_id",
             label: "Instance (optional)",
             type: "ref",
             refResource: "instances",
@@ -781,13 +799,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           },
         ],
       },
-      { name: "metadata.folderId", label: "Folder", type: "string", hidden: true },
-      { name: "metadata.cloudId", label: "Cloud", type: "string", hidden: true },
-      { name: "metadata.organizationId", label: "Organization", type: "string", hidden: true },
+      FIELD_FOLDER_ID,
     ],
-    template: ({ folderId, cloudId, organizationId }) => ({
-      metadata: { name: "", folderId, cloudId, organizationId },
-      spec: { regionId: "kacho-region-a", targets: [] },
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      region_id: "kacho-region-a",
+      targets: [],
     }),
   },
 };

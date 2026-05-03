@@ -4,17 +4,18 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { foldersApi } from "@/api/resources";
 import { folderStoreApi, useFolderStore } from "@/lib/folder-store";
 import { cn } from "@/lib/utils";
+import type { Folder } from "@/api/types";
 
 export function FolderSelector() {
   const folder = useFolderStore((s) => s.folder);
 
   const { data, isLoading } = useQuery({
     queryKey: ["folders.list"],
-    queryFn: () => foldersApi.list({}),
+    queryFn: () => foldersApi.list(),
     refetchInterval: 30_000,
   });
 
-  const folders = data?.folders ?? [];
+  const folders: Folder[] = data?.folders ?? [];
 
   return (
     <DropdownMenu.Root>
@@ -37,21 +38,23 @@ export function FolderSelector() {
           sideOffset={4}
           className="z-30 min-w-[260px] rounded-md border border-border bg-popover bg-background shadow-md p-1"
         >
-          {isLoading && <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>}
+          {isLoading && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
+          )}
           {!isLoading && folders.length === 0 && (
             <div className="px-3 py-2 text-sm text-muted-foreground">Нет folder-ов</div>
           )}
           {folders.map((f) => {
-            const selected = folder?.uid === f.metadata.uid;
+            const selected = folder?.uid === f.id;
             return (
               <DropdownMenu.Item
-                key={f.metadata.uid}
+                key={f.id}
                 onSelect={() =>
                   folderStoreApi.set({
-                    uid: f.metadata.uid,
-                    name: f.metadata.name,
-                    cloudId: f.metadata.cloudId,
-                    organizationId: f.metadata.organizationId,
+                    uid: f.id,
+                    name: f.name,
+                    cloudId: f.cloudId,
+                    organizationId: f.organizationId,
                   })
                 }
                 className={cn(
@@ -60,9 +63,9 @@ export function FolderSelector() {
                 )}
               >
                 <Check className={cn("h-4 w-4", selected ? "opacity-100" : "opacity-0")} />
-                <span className="truncate flex-1">{f.metadata.name}</span>
+                <span className="truncate flex-1">{f.name}</span>
                 <span className="text-xs text-muted-foreground font-mono">
-                  {f.metadata.uid.slice(0, 8)}
+                  {f.id.slice(0, 8)}
                 </span>
               </DropdownMenu.Item>
             );

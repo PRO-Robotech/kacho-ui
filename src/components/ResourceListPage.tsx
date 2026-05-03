@@ -1,6 +1,9 @@
+// ResourceListPage — generic страница списка ресурсов.
+// Использует polling (3 сек) вместо Watch/WebSocket.
+
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Eye, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Eye, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -9,7 +12,7 @@ import { DeleteButton } from "@/components/DeleteButton";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
-import { useResourceWatch, type WatchStatus } from "@/lib/use-resource-watch";
+import { useResourceList } from "@/lib/use-resource-list";
 
 interface Props {
   spec: ResourceSpec;
@@ -19,11 +22,11 @@ export function ResourceListPage({ spec }: Props) {
   const folder = useFolderStore((s) => s.folder);
   const folderRequired = spec.scope === "folder";
 
-  const { items, status, error } = useResourceWatch(spec, folder);
+  const { data, isLoading, isError, error, isFetching } = useResourceList(spec, folder);
 
   if (folderRequired && !folder) return <FolderRequiredEmpty resource={spec.plural} />;
 
-  const rows = items as Record<string, unknown>[];
+  const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
   const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
     header: c.header,
@@ -31,39 +34,39 @@ export function ResourceListPage({ spec }: Props) {
     cell: (row) => formatCell(c, row),
   }));
 
-  // Action column
+  // Колонка действий
   columns.push({
     header: "",
     className: "text-right whitespace-nowrap",
     cell: (row) => {
-      const uid = getByPath<string>(row, "metadata.uid") ?? "";
-      const name = getByPath<string>(row, "metadata.name") ?? uid;
+      const id = getByPath<string>(row, "id") ?? "";
+      const name = getByPath<string>(row, "name") ?? id;
       return (
         <div className="flex items-center justify-end gap-1">
           <Button asChild variant="ghost" size="sm">
-            <Link to={`/${spec.route}/${uid}`}>
+            <Link to={`/${spec.route}/${id}`}>
               <Eye className="h-4 w-4" /> View
             </Link>
           </Button>
-          {spec.ops.edit && (
+          {spec.ops.update && (
             <ResourceFormDialog
               mode="edit"
               title={`Edit ${spec.singular}`}
-              description={`Upsert by uid (idempotent). Изменяет spec; status пишется только сервером.`}
-              endpoint={`/v1/${spec.apiPath}/upsert`}
-              payloadKey={spec.payloadKey}
+              description="Изменяет ресурс; status пишется только сервером."
+              apiPath={`/v1/${spec.apiPath}/${id}`}
+              resourceId={spec.id}
               template={row}
               fields={spec.fields}
-              invalidateQueryKeys={[]}
+              folderUid={folder?.uid}
             />
           )}
           {spec.ops.delete && (
             <DeleteButton
-              endpoint={`/v1/${spec.apiPath}/delete`}
-              uid={uid}
+              apiPath={`/v1/${spec.apiPath}/${id}`}
+              resourceId={spec.id}
               name={name}
               resourceLabel={spec.singular}
-              invalidateQueryKeys={[]}
+              folderUid={folder?.uid}
               triggerLabel=""
             />
           )}
@@ -78,9 +81,11 @@ export function ResourceListPage({ spec }: Props) {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
-            <WatchIndicator status={status} />
+            <PollingIndicator isFetching={isFetching} isError={isError} />
           </div>
-          {spec.description && <p className="text-sm text-muted-foreground">{spec.description}</p>}
+          {spec.description && (
+            <p className="text-sm text-muted-foreground">{spec.description}</p>
+          )}
           {folderRequired && folder && (
             <p className="text-xs text-muted-foreground mt-1">
               Folder:{" "}
@@ -92,81 +97,60 @@ export function ResourceListPage({ spec }: Props) {
           <ResourceFormDialog
             mode="create"
             title={`Create ${spec.singular}`}
-            description="Upsert: server-side генерирует UID если не задан."
-            endpoint={`/v1/${spec.apiPath}/upsert`}
-            payloadKey={spec.payloadKey}
+            apiPath={`/v1/${spec.apiPath}`}
+            resourceId={spec.id}
             template={spec.template({
               folderId: folder?.uid,
               cloudId: folder?.cloudId,
               organizationId: folder?.organizationId,
             })}
             fields={spec.fields}
-            invalidateQueryKeys={[]}
+            folderUid={folder?.uid}
           />
         )}
       </div>
 
-      {error && status === "error" && (
+      {isError && (
         <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {error}
-        </div>
-      )}
-      {error && status === "reconnecting" && (
-        <div className="rounded-md bg-amber-50 text-amber-800 p-3 text-sm flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Переподключение к Watch-стриму… ({error})
+          Ошибка: {(error as Error).message}
         </div>
       )}
 
       <ResourceTable
-        rows={rows}
-        loading={status === "listing" && rows.length === 0}
-        rowKey={(r) => getByPath<string>(r, "metadata.uid") ?? Math.random().toString()}
+        rows={items}
+        loading={isLoading && items.length === 0}
+        rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
         columns={columns}
       />
     </div>
   );
 }
 
-function WatchIndicator({ status }: { status: WatchStatus }) {
-  if (status === "watching") {
-    return (
-      <span
-        className="inline-flex items-center gap-1 text-xs text-emerald-600"
-        title="Live: подписаны на Watch-стрим"
-      >
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
-        </span>
-        live
-      </span>
-    );
-  }
-  if (status === "listing") {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> listing
-      </span>
-    );
-  }
-  if (status === "reconnecting") {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-        <WifiOff className="h-3 w-3" /> reconnecting
-      </span>
-    );
-  }
-  if (status === "error") {
+function PollingIndicator({
+  isFetching,
+  isError,
+}: {
+  isFetching: boolean;
+  isError: boolean;
+}) {
+  if (isError) {
     return (
       <span className="inline-flex items-center gap-1 text-xs text-rose-600">
-        <WifiOff className="h-3 w-3" /> offline
+        <RefreshCw className="h-3 w-3" /> offline
+      </span>
+    );
+  }
+  if (isFetching) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> polling
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-      <Wifi className="h-3 w-3" /> idle
+    <span className="inline-flex items-center gap-1 text-xs text-emerald-600" title="Данные актуальны">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+      live
     </span>
   );
 }
@@ -205,5 +189,3 @@ function formatCell(c: { path: string; format?: string }, row: Record<string, un
       return String(v);
   }
 }
-
-export { WatchIndicator };

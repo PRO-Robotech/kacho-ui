@@ -1,235 +1,321 @@
-// Минимальные TS-типы под наш envelope. Соответствуют kacho-proto/proto/.../v1/*.proto.
-// Поля в camelCase — grpc-gateway сериализует proto snake_case → JSON camelCase.
+// TS-типы для flat API (sub-phase 1.0).
+// Ресурсы — плоские объекты (нет metadata/spec/status envelope).
+// grpc-gateway сериализует proto snake_case → JSON camelCase.
 
-export interface ResourceMeta {
-  uid: string;
-  name: string;
-  organizationId?: string;
-  cloudId?: string;
+// ====== Operations ======
+
+export type OperationStatus =
+  | "OPERATION_STATUS_UNSPECIFIED"
+  | "OPERATION_STATUS_RUNNING"
+  | "OPERATION_STATUS_DONE"
+  | "OPERATION_STATUS_CANCELLED"
+  | "OPERATION_STATUS_FAILED"
+  | string;
+
+export interface OperationError {
+  code?: number;
+  message?: string;
+  details?: unknown;
+}
+
+export interface Operation {
+  id: string;
+  description?: string;
+  createdAt?: string;
+  createdBy?: string;
+  modifiedAt?: string;
+  done: boolean;
+  resourceId?: string;
+  resourceType?: string;
   folderId?: string;
-  labels?: Record<string, string>;
-  annotations?: Record<string, string>;
-  creationTimestamp?: string;
-  resourceVersion?: string;
-  generation?: string;
-  deletionTimestamp?: string;
-  finalizers?: string[];
+  status?: OperationStatus;
+  response?: Record<string, unknown>;
+  error?: OperationError;
 }
 
-export interface Selector {
-  field?: string;
-  op?: "EQ" | "NEQ" | "IN" | "NOT_IN" | "EXISTS" | "NOT_EXISTS";
-  values?: string[];
-}
-
-export interface ListRequest {
-  selectors?: Selector[];
-  pageSize?: number;
-  pageToken?: string;
+export interface OperationList {
+  operations: Operation[];
+  nextPageToken?: string;
 }
 
 // ====== resourcemanager ======
 
-export interface OrganizationSpec {
+export interface Organization {
+  id: string;
+  name: string;
   displayName?: string;
   description?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface Organization {
-  metadata: ResourceMeta;
-  spec?: OrganizationSpec;
-}
+
 export interface OrganizationList {
   organizations: Organization[];
-  resourceVersion?: string;
   nextPageToken?: string;
 }
 
-export interface CloudSpec {
+export interface Cloud {
+  id: string;
+  organizationId?: string;
+  name: string;
   displayName?: string;
   description?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface Cloud {
-  metadata: ResourceMeta;
-  spec?: CloudSpec;
-}
+
 export interface CloudList {
   clouds: Cloud[];
-  resourceVersion?: string;
   nextPageToken?: string;
 }
 
-export interface FolderSpec {
+export interface Folder {
+  id: string;
+  cloudId?: string;
+  organizationId?: string;
+  name: string;
   displayName?: string;
   description?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface Folder {
-  metadata: ResourceMeta;
-  spec?: FolderSpec;
-}
+
 export interface FolderList {
   folders: Folder[];
-  resourceVersion?: string;
   nextPageToken?: string;
 }
 
 // ====== vpc ======
 
-export type LifecycleState = "ACTIVE" | "CREATING" | "DELETING" | "ERROR" | string;
-
-export interface NetworkSpec {
+export interface Network {
+  id: string;
+  folderId?: string;
+  name: string;
   displayName?: string;
   description?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface NetworkStatus {
-  state?: LifecycleState;
-}
-export interface Network {
-  metadata: ResourceMeta;
-  spec?: NetworkSpec;
-  status?: NetworkStatus;
-}
+
 export interface NetworkList {
   networks: Network[];
-  resourceVersion?: string;
   nextPageToken?: string;
 }
 
-export interface SubnetSpec {
+export interface Subnet {
+  id: string;
+  folderId?: string;
   networkId?: string;
-  zoneId?: string;
-  cidrBlock?: string;
+  name: string;
   displayName?: string;
   description?: string;
+  zoneId?: string;
+  cidrBlock?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface Subnet {
-  metadata: ResourceMeta;
-  spec?: SubnetSpec;
-  status?: { state?: LifecycleState };
-}
+
 export interface SubnetList {
   subnets: Subnet[];
-  resourceVersion?: string;
+  nextPageToken?: string;
+}
+
+export interface SecurityGroup {
+  id: string;
+  folderId?: string;
+  networkId?: string;
+  name: string;
+  displayName?: string;
+  createdAt?: string;
+  status?: string;
+  rules?: Array<{
+    id?: string;
+    direction?: string;
+    protocol?: string;
+    portRangeMin?: number;
+    portRangeMax?: number;
+    cidrBlocks?: string[];
+    description?: string;
+  }>;
+}
+
+export interface SecurityGroupList {
+  securityGroups: SecurityGroup[];
+  nextPageToken?: string;
+}
+
+export interface RouteTable {
+  id: string;
+  folderId?: string;
+  networkId?: string;
+  name: string;
+  displayName?: string;
+  createdAt?: string;
+  status?: string;
+  staticRoutes?: Array<{
+    destinationPrefix?: string;
+    nextHopAddress?: string;
+    description?: string;
+  }>;
+}
+
+export interface RouteTableList {
+  routeTables: RouteTable[];
+  nextPageToken?: string;
+}
+
+export interface Address {
+  id: string;
+  folderId?: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  zoneId?: string;
+  addressType?: string;
+  createdAt?: string;
+  status?: string;
+  allocatedIpv4?: string;
+}
+
+export interface AddressList {
+  addresses: Address[];
+  nextPageToken?: string;
 }
 
 // ====== compute ======
 
-export type ComputeState =
-  | "STATE_UNSPECIFIED"
-  | "STATE_PROVISIONING"
-  | "STATE_RUNNING"
-  | "STATE_STOPPING"
-  | "STATE_STOPPED"
-  | "STATE_STARTING"
-  | "STATE_ERROR"
-  | "STATE_DELETING"
-  | "STATE_CREATING"
-  | "STATE_READY"
-  | "STATE_ATTACHING"
-  | "STATE_DETACHING"
-  | string;
-
-export interface InstanceSpec {
+export interface Instance {
+  id: string;
+  folderId?: string;
+  name: string;
   displayName?: string;
   description?: string;
-  platformId?: string;
   zoneId?: string;
-  desiredPowerState?: "POWER_RUNNING" | "POWER_STOPPED" | string;
-}
-export interface Instance {
-  metadata: ResourceMeta;
-  spec?: InstanceSpec;
-  status?: {
-    state?: ComputeState;
-    stateLastTransitionAt?: string;
-    ips?: { internal?: string[]; external?: string[] };
-    fqdn?: string;
-    observedGeneration?: string;
+  platformId?: string;
+  createdAt?: string;
+  status?: string;
+  resources?: {
+    cores?: number;
+    memory?: string;
+    coreFraction?: number;
+  };
+  bootDisk?: {
+    diskId?: string;
+    autoDelete?: boolean;
+  };
+  networkInterfaces?: Array<{
+    subnetId?: string;
+    primaryV4Address?: string;
+  }>;
+  desiredPowerState?: string;
+  fqdn?: string;
+  ips?: {
+    internal?: string[];
+    external?: string[];
   };
 }
+
 export interface InstanceList {
   instances: Instance[];
-  resourceVersion?: string;
+  nextPageToken?: string;
 }
 
-export interface DiskSpec {
-  diskTypeId?: string;
-  zoneId?: string;
-  size?: string;
-  imageId?: string;
+export interface Disk {
+  id: string;
+  folderId?: string;
+  name: string;
   displayName?: string;
   description?: string;
-}
-export interface Disk {
-  metadata: ResourceMeta;
-  spec?: DiskSpec;
-  status?: { state?: ComputeState };
-}
-export interface DiskList {
-  disks: Disk[];
-  resourceVersion?: string;
+  zoneId?: string;
+  diskTypeId?: string;
+  size?: string;
+  imageId?: string;
+  createdAt?: string;
+  status?: string;
 }
 
-export interface ImageSpec {
-  description?: string;
+export interface DiskList {
+  disks: Disk[];
+  nextPageToken?: string;
+}
+
+export interface Image {
+  id: string;
+  name: string;
   family?: string;
   osType?: string;
+  description?: string;
+  createdAt?: string;
+  status?: string;
 }
-export interface Image {
-  metadata: ResourceMeta;
-  spec?: ImageSpec;
-  status?: { state?: string };
-}
+
 export interface ImageList {
   images: Image[];
-  resourceVersion?: string;
+  nextPageToken?: string;
+}
+
+export interface Snapshot {
+  id: string;
+  folderId?: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  diskId?: string;
+  createdAt?: string;
+  status?: string;
+  progressPercent?: number;
+}
+
+export interface SnapshotList {
+  snapshots: Snapshot[];
+  nextPageToken?: string;
 }
 
 // ====== loadbalancer ======
 
-export interface NlbSpec {
+export interface NetworkLoadBalancer {
+  id: string;
+  folderId?: string;
+  name: string;
   displayName?: string;
   description?: string;
   regionId?: string;
-  listeners?: Array<{ name?: string; port?: number; protocol?: string; targetPort?: number }>;
-  attachedTargetGroups?: Array<{ targetGroupId?: string }>;
+  createdAt?: string;
+  status?: string;
+  externalIps?: string[];
+  listeners?: Array<{
+    name?: string;
+    port?: number;
+    protocol?: string;
+    targetPort?: number;
+  }>;
+  attachedTargetGroups?: Array<{
+    targetGroupId?: string;
+  }>;
 }
-export interface NetworkLoadBalancer {
-  metadata: ResourceMeta;
-  spec?: NlbSpec;
-  status?: {
-    state?: ComputeState;
-    externalIps?: string[];
-    observedGeneration?: string;
-  };
-}
+
 export interface NlbList {
   networkLoadBalancers: NetworkLoadBalancer[];
-  resourceVersion?: string;
+  nextPageToken?: string;
 }
 
 export interface TargetGroup {
-  metadata: ResourceMeta;
-  spec?: {
-    displayName?: string;
-    regionId?: string;
-    targets?: Array<{ subnetId?: string; address?: string; instanceId?: string }>;
-  };
-  status?: { state?: ComputeState };
+  id: string;
+  folderId?: string;
+  name: string;
+  displayName?: string;
+  description?: string;
+  regionId?: string;
+  createdAt?: string;
+  status?: string;
+  targets?: Array<{
+    subnetId?: string;
+    address?: string;
+    instanceId?: string;
+  }>;
 }
-export interface TgList {
+
+export interface TargetGroupList {
   targetGroups: TargetGroup[];
-  resourceVersion?: string;
-}
-
-// ====== Watch ======
-
-export type WatchEventType = "ADDED" | "MODIFIED" | "DELETED" | string;
-export interface WatchEvent<T = unknown> {
-  type: WatchEventType;
-  resourceVersion?: string;
-  resource?: T;
-}
-export interface StreamEnvelope<T> {
-  result?: T;
-  error?: { code?: string; message?: string };
+  nextPageToken?: string;
 }

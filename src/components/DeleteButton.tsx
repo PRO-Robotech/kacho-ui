@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+// DeleteButton — DELETE /v1/<plural>/{id} → Operation → poll до done.
+
+import { useCallback, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,78 +13,120 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ApiError, post } from "@/api/client";
+import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
+import { ApiError, api } from "@/api/client";
+import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
-  endpoint: string; // POST /v1/<resource>/delete
-  uid: string;
+  /** /v1/<plural>/{id} */
+  apiPath: string;
+  /** ID ресурса в registry — для инвалидации кэша */
+  resourceId: string;
   name: string;
-  resourceLabel: string; // "Network", "Instance"
-  invalidateQueryKeys?: unknown[][];
+  resourceLabel: string;
+  folderUid?: string | null;
   triggerLabel?: string;
-  navigateTo?: () => void; // после удаления (на detail page — вернуть на список)
+  /** После успешного удаления (например, navigate на список) */
+  navigateTo?: () => void;
 }
 
 export function DeleteButton({
-  endpoint,
-  uid,
+  apiPath,
+  resourceId,
   name,
   resourceLabel,
-  invalidateQueryKeys,
+  folderUid,
   triggerLabel,
   navigateTo,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const qc = useQueryClient();
+  const [opId, setOpId] = useState<string | null>(null);
+
+  const invalidate = useInvalidateResourceList();
 
   const mutation = useMutation({
-    mutationFn: () => post(endpoint, { uids: [uid] }),
-    onSuccess: () => {
+    mutationFn: () => api.delete(apiPath),
+    onSuccess: (resp) => {
       setErr(null);
       setOpen(false);
-      (invalidateQueryKeys ?? []).forEach((k) => qc.invalidateQueries({ queryKey: k as never }));
-      navigateTo?.();
+      const id = extractOperationId(resp);
+      if (id) {
+        setOpId(id);
+      } else {
+        handleAfterDelete();
+      }
     },
     onError: (e) => {
       setErr(e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message);
     },
   });
 
+  const handleAfterDelete = useCallback(() => {
+    invalidate(resourceId, folderUid ?? null);
+    navigateTo?.();
+  }, [invalidate, resourceId, folderUid, navigateTo]);
+
+  const handleOperationSuccess = useCallback(() => {
+    setOpId(null);
+    handleAfterDelete();
+  }, [handleAfterDelete]);
+
+  const handleOperationClose = useCallback(() => {
+    setOpId(null);
+    invalidate(resourceId, folderUid ?? null);
+  }, [invalidate, resourceId, folderUid]);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="destructive" size="sm">
-          <Trash2 className="h-4 w-4" />
-          {triggerLabel ?? "Delete"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Удалить {resourceLabel}?</DialogTitle>
-          <DialogDescription>
-            <span className="font-medium text-foreground">{name}</span>
-            <br />
-            <code className="text-xs text-muted-foreground">{uid}</code>
-            <br />
-            Действие необратимо. Запускается soft-delete (deletionTimestamp), затем
-            finalizers + физическое удаление.
-          </DialogDescription>
-        </DialogHeader>
-        {err && <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">{err}</div>}
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={mutation.isPending}>
-            Cancel
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="destructive" size="sm">
+            <Trash2 className="h-4 w-4" />
+            {triggerLabel ?? "Delete"}
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() => mutation.mutate()}
-            disabled={mutation.isPending}
-          >
-            {mutation.isPending ? "Deleting…" : "Delete"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Удалить {resourceLabel}?</DialogTitle>
+            <DialogDescription>
+              <span className="font-medium text-foreground">{name}</span>
+              <br />
+              <code className="text-xs text-muted-foreground">{apiPath}</code>
+              <br />
+              Действие необратимо.
+            </DialogDescription>
+          </DialogHeader>
+          {err && (
+            <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">
+              {err}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => setOpen(false)}
+              disabled={mutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <OperationDialog
+        opId={opId}
+        title={`Deleting ${resourceLabel}`}
+        onSuccess={handleOperationSuccess}
+        onClose={handleOperationClose}
+      />
+    </>
   );
 }

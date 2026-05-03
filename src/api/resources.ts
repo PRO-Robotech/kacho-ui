@@ -1,107 +1,75 @@
-// Per-resource API helpers. Каждая функция — обёртка над api/client.post.
+// Per-resource API helpers. Обёртки над api/client.api.list/get.
+// Используются FolderSelector, DashboardPage и другими компонентами,
+// которые не могут пользоваться generic registry.
 
-import { post } from "./client";
+import { api } from "./client";
 import type {
   CloudList,
   DiskList,
   FolderList,
   ImageList,
   InstanceList,
-  ListRequest,
   NetworkList,
   NlbList,
-  Organization,
   OrganizationList,
-  Cloud,
-  Folder,
-  Network,
-  Subnet,
   SubnetList,
-  TgList,
-  Instance,
-  Disk,
-  NetworkLoadBalancer,
-  TargetGroup,
+  TargetGroupList,
 } from "./types";
 
 // ====== resourcemanager ======
 
 export const orgsApi = {
-  list: (req: ListRequest = {}) =>
-    post<ListRequest, OrganizationList>("/v1/organizations/list", req),
-  upsert: (organizations: Organization[]) =>
-    post<{ organizations: Organization[] }, { organizations: Organization[] }>(
-      "/v1/organizations/upsert",
-      { organizations },
-    ),
+  list: (q?: Record<string, string>) =>
+    api.list<OrganizationList>("/v1/organizations", q),
 };
 
 export const cloudsApi = {
-  list: (req: ListRequest = {}) =>
-    post<ListRequest, CloudList>("/v1/clouds/list", req),
-  upsert: (clouds: Cloud[]) =>
-    post<{ clouds: Cloud[] }, { clouds: Cloud[] }>("/v1/clouds/upsert", { clouds }),
+  list: (q?: Record<string, string>) =>
+    api.list<CloudList>("/v1/clouds", q),
 };
 
 export const foldersApi = {
-  list: (req: ListRequest = {}) =>
-    post<ListRequest, FolderList>("/v1/folders/list", req),
-  upsert: (folders: Folder[]) =>
-    post<{ folders: Folder[] }, { folders: Folder[] }>("/v1/folders/upsert", { folders }),
+  list: (q?: Record<string, string>) =>
+    api.list<FolderList>("/v1/folders", q),
 };
 
 // ====== vpc ======
 
 export const networksApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, NetworkList>("/v1/networks/list", req),
-  upsert: (networks: Network[]) =>
-    post<{ networks: Network[] }, { networks: Network[] }>("/v1/networks/upsert", { networks }),
-  delete: (uids: string[]) =>
-    post<{ uids: string[] }, unknown>("/v1/networks/delete", { uids }),
+  list: (q?: Record<string, string>) =>
+    api.list<NetworkList>("/v1/networks", q),
 };
 
 export const subnetsApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, SubnetList>("/v1/subnets/list", req),
-  upsert: (subnets: Subnet[]) =>
-    post<{ subnets: Subnet[] }, { subnets: Subnet[] }>("/v1/subnets/upsert", { subnets }),
+  list: (q?: Record<string, string>) =>
+    api.list<SubnetList>("/v1/subnets", q),
 };
 
 // ====== compute ======
 
 export const instancesApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, InstanceList>("/v1/instances/list", req),
-  upsert: (instances: Instance[]) =>
-    post<{ instances: Instance[] }, { instances: Instance[] }>("/v1/instances/upsert", { instances }),
-  restart: (uid: string) =>
-    post<{ uid: string }, unknown>("/v1/instances/restart", { uid }),
+  list: (q?: Record<string, string>) =>
+    api.list<InstanceList>("/v1/instances", q),
 };
 
 export const disksApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, DiskList>("/v1/disks/list", req),
-  upsert: (disks: Disk[]) =>
-    post<{ disks: Disk[] }, { disks: Disk[] }>("/v1/disks/upsert", { disks }),
+  list: (q?: Record<string, string>) =>
+    api.list<DiskList>("/v1/disks", q),
 };
 
 export const imagesApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, ImageList>("/v1/images/list", req),
+  list: (q?: Record<string, string>) =>
+    api.list<ImageList>("/v1/images", q),
 };
 
 // ====== loadbalancer ======
 
 export const nlbApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, NlbList>("/v1/network-load-balancers/list", req),
-  upsert: (nlbs: NetworkLoadBalancer[]) =>
-    post<{ networkLoadBalancers: NetworkLoadBalancer[] }, { networkLoadBalancers: NetworkLoadBalancer[] }>(
-      "/v1/network-load-balancers/upsert",
-      { networkLoadBalancers: nlbs },
-    ),
+  list: (q?: Record<string, string>) =>
+    api.list<NlbList>("/v1/network-load-balancers", q),
 };
 
 export const tgApi = {
-  list: (req: ListRequest = {}) => post<ListRequest, TgList>("/v1/target-groups/list", req),
-  upsert: (tgs: TargetGroup[]) =>
-    post<{ targetGroups: TargetGroup[] }, { targetGroups: TargetGroup[] }>(
-      "/v1/target-groups/upsert",
-      { targetGroups: tgs },
-    ),
+  list: (q?: Record<string, string>) =>
+    api.list<TargetGroupList>("/v1/target-groups", q),
 };
