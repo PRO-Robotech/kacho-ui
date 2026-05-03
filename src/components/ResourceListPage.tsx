@@ -1,5 +1,6 @@
 // ResourceListPage — generic страница списка ресурсов.
 // Использует polling (3 сек) вместо Watch/WebSocket.
+// spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
 
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -53,16 +54,17 @@ export function ResourceListPage({ spec }: Props) {
               mode="edit"
               title={`Edit ${spec.singular}`}
               description="Изменяет ресурс; status пишется только сервером."
-              apiPath={`/v1/${spec.apiPath}/${id}`}
+              apiPath={`${spec.apiPath}/${id}`}
               resourceId={spec.id}
               template={row}
               fields={spec.fields}
               folderUid={folder?.uid}
+              sanitize={spec.sanitize}
             />
           )}
           {spec.ops.delete && (
             <DeleteButton
-              apiPath={`/v1/${spec.apiPath}/${id}`}
+              apiPath={`${spec.apiPath}/${id}`}
               resourceId={spec.id}
               name={name}
               resourceLabel={spec.singular}
@@ -97,7 +99,7 @@ export function ResourceListPage({ spec }: Props) {
           <ResourceFormDialog
             mode="create"
             title={`Create ${spec.singular}`}
-            apiPath={`/v1/${spec.apiPath}`}
+            apiPath={spec.apiPath}
             resourceId={spec.id}
             template={spec.template({
               folderId: folder?.uid,
@@ -106,6 +108,7 @@ export function ResourceListPage({ spec }: Props) {
             })}
             fields={spec.fields}
             folderUid={folder?.uid}
+            sanitize={spec.sanitize}
           />
         )}
       </div>

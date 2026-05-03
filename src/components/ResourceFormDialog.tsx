@@ -30,7 +30,7 @@ interface Props {
   mode: Mode;
   title: string;
   description?: string;
-  /** Для create: /v1/<plural> ; для edit: /v1/<plural>/{id} */
+  /** Для create: /<domain>/v1/<plural> ; для edit: /<domain>/v1/<plural>/{id} */
   apiPath: string;
   /** ID ресурса в registry — для инвалидации query-кэша */
   resourceId: string;
@@ -39,6 +39,8 @@ interface Props {
   folderUid?: string | null;
   trigger?: React.ReactNode;
   onSuccess?: () => void;
+  /** Опциональная нормализация payload перед отправкой (sanitize из ResourceSpec). */
+  sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
 }
 
 export function ResourceFormDialog({
@@ -52,6 +54,7 @@ export function ResourceFormDialog({
   folderUid,
   trigger,
   onSuccess,
+  sanitize,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"form" | "json">(fields ? "form" : "json");
@@ -122,6 +125,10 @@ export function ResourceFormDialog({
         setSubmitErr(`JSON parse: ${(e as Error).message}`);
         return;
       }
+    }
+    // Применяем sanitize (oneof strip, array flatten и т.д.)
+    if (sanitize && typeof parsed === "object" && parsed !== null) {
+      parsed = sanitize(parsed as Record<string, unknown>);
     }
     mutation.mutate(parsed);
   };

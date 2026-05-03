@@ -5,13 +5,6 @@ import {
   FolderOpen,
   Network,
   Layers,
-  Server,
-  HardDrive,
-  Image as ImageIcon,
-  Camera,
-  Scale,
-  Target,
-  ShieldCheck,
   Route,
   MapPin,
 } from "lucide-react";
@@ -40,25 +33,8 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: "/networks", label: "Networks", icon: Network, scope: "folder" },
       { to: "/subnets", label: "Subnets", icon: Layers, scope: "folder" },
-      { to: "/security-groups", label: "Security Groups", icon: ShieldCheck, scope: "folder" },
       { to: "/route-tables", label: "Route Tables", icon: Route, scope: "folder" },
       { to: "/addresses", label: "Addresses", icon: MapPin, scope: "folder" },
-    ],
-  },
-  {
-    group: "Compute",
-    items: [
-      { to: "/instances", label: "Instances", icon: Server, scope: "folder" },
-      { to: "/disks", label: "Disks", icon: HardDrive, scope: "folder" },
-      { to: "/images", label: "Images", icon: ImageIcon, scope: "global" },
-      { to: "/snapshots", label: "Snapshots", icon: Camera, scope: "folder" },
-    ],
-  },
-  {
-    group: "Load Balancer",
-    items: [
-      { to: "/network-load-balancers", label: "Load Balancers", icon: Scale, scope: "folder" },
-      { to: "/target-groups", label: "Target Groups", icon: Target, scope: "folder" },
     ],
   },
 ];

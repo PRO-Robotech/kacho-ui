@@ -53,8 +53,8 @@ export function FolderSelector() {
                   folderStoreApi.set({
                     uid: f.id,
                     name: f.name,
-                    cloudId: f.cloudId,
-                    organizationId: f.organizationId,
+                    cloudId: f.cloud_id,
+                    organizationId: undefined,
                   })
                 }
                 className={cn(

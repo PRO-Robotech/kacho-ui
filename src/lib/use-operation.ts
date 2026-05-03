@@ -1,13 +1,14 @@
 // Hook для polling Operation до завершения.
 // После Create/Update/Delete/action backend возвращает {operation: Operation}.
-// Этот hook поллит GET /v1/operations/{id} каждые 1 сек до done=true.
+// Этот hook поллит GET /operations/{id} каждые 1 сек до done=true.
+// URL verbatim из proto: operation/operation_service.proto → GET /operations/{operation_id}
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import type { Operation } from "@/api/types";
 
 /**
- * useOperation — поллит /v1/operations/{opId} каждые 1 сек.
+ * useOperation — поллит /operations/{opId} каждые 1 сек.
  * Останавливается когда done=true.
  *
  * Передайте null чтобы деактивировать hook.
@@ -15,7 +16,7 @@ import type { Operation } from "@/api/types";
 export function useOperation(opId: string | null) {
   return useQuery({
     queryKey: ["operation", opId],
-    queryFn: () => api.get<Operation>(`/v1/operations/${opId}`),
+    queryFn: () => api.get<Operation>(`/operations/${opId}`),
     refetchInterval: (query) =>
       query.state.data?.done ? false : 1_000,
     enabled: !!opId,

@@ -2,15 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   cloudsApi,
-  disksApi,
   foldersApi,
-  imagesApi,
-  instancesApi,
   networksApi,
-  nlbApi,
   orgsApi,
   subnetsApi,
-  tgApi,
+  addressesApi,
+  routeTablesApi,
 } from "@/api/resources";
 import { cn } from "@/lib/utils";
 
@@ -44,11 +41,8 @@ export function DashboardPage() {
   const folders = useQuery({ queryKey: ["dash.folders"], queryFn: () => foldersApi.list(), refetchInterval: 30_000 });
   const networks = useQuery({ queryKey: ["dash.networks"], queryFn: () => networksApi.list(), refetchInterval: 15_000 });
   const subnets = useQuery({ queryKey: ["dash.subnets"], queryFn: () => subnetsApi.list(), refetchInterval: 15_000 });
-  const instances = useQuery({ queryKey: ["dash.instances"], queryFn: () => instancesApi.list(), refetchInterval: 5_000 });
-  const disks = useQuery({ queryKey: ["dash.disks"], queryFn: () => disksApi.list(), refetchInterval: 10_000 });
-  const images = useQuery({ queryKey: ["dash.images"], queryFn: () => imagesApi.list(), refetchInterval: 60_000 });
-  const nlbs = useQuery({ queryKey: ["dash.nlb"], queryFn: () => nlbApi.list(), refetchInterval: 10_000 });
-  const tgs = useQuery({ queryKey: ["dash.tg"], queryFn: () => tgApi.list(), refetchInterval: 10_000 });
+  const addresses = useQuery({ queryKey: ["dash.addresses"], queryFn: () => addressesApi.list(), refetchInterval: 15_000 });
+  const routeTables = useQuery({ queryKey: ["dash.route-tables"], queryFn: () => routeTablesApi.list(), refetchInterval: 15_000 });
 
   const stats: Stat[] = [
     { label: "Organizations", value: orgs.data?.organizations.length ?? "—", to: "/organizations" },
@@ -56,11 +50,8 @@ export function DashboardPage() {
     { label: "Folders", value: folders.data?.folders.length ?? "—", to: "/folders" },
     { label: "Networks", value: networks.data?.networks.length ?? "—", to: "/networks", hint: "VPC layer" },
     { label: "Subnets", value: subnets.data?.subnets.length ?? "—", to: "/subnets" },
-    { label: "Instances", value: instances.data?.instances.length ?? "—", to: "/instances", hint: "Compute layer" },
-    { label: "Disks", value: disks.data?.disks.length ?? "—", to: "/disks" },
-    { label: "Images", value: images.data?.images.length ?? "—", to: "/images", hint: "Read-only catalog" },
-    { label: "NLBs", value: nlbs.data?.networkLoadBalancers.length ?? "—", to: "/network-load-balancers" },
-    { label: "Target Groups", value: tgs.data?.targetGroups.length ?? "—", to: "/target-groups" },
+    { label: "Addresses", value: addresses.data?.addresses.length ?? "—", to: "/addresses" },
+    { label: "Route Tables", value: routeTables.data?.route_tables.length ?? "—", to: "/route-tables" },
   ];
 
   return (
@@ -72,7 +63,7 @@ export function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {stats.map((s) => (
           <StatCard key={s.label} stat={s} />
         ))}
@@ -83,18 +74,19 @@ export function DashboardPage() {
         <ul className="space-y-1.5 text-sm text-muted-foreground">
           <li>
             • Get/List: синхронные{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /v1/&lt;resource&gt;</code> с query-параметрами.
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /&lt;domain&gt;/v1/&lt;resource&gt;</code> с query-параметрами.
           </li>
           <li>
             • Create/Update/Delete возвращают{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">Operation</code> — UI поллит до{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">done=true</code>.
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">Operation</code> — UI поллит{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /operations/{"{id}"}</code>{" "}
+            до <code className="text-xs bg-muted px-1 py-0.5 rounded">done=true</code>.
           </li>
           <li>
-            • Folder-scoped страницы (Networks, Instances и т.д.) требуют выбранный folder в шапке.
+            • Folder-scoped страницы (Networks, Subnets и т.д.) требуют выбранный folder в шапке.
           </li>
           <li>
-            • Live-обновление: polling 3-30s в зависимости от ресурса.
+            • Live-обновление: polling 3–30s в зависимости от ресурса.
           </li>
           <li>
             • Для подробностей — смотрите{" "}

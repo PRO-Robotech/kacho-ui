@@ -1,14 +1,20 @@
 // Базовый клиент: REST JSON на api-gateway endpoints.
-// В dev: vite.config.ts проксирует /v1/* на http://localhost:8080.
+// В dev: vite.config.ts проксирует /<domain>/v1/* на http://localhost:8080.
 // В prod: same-origin, ingress рулит на api-gateway:8080.
 //
-// API mapping (sub-phase 1.0):
-//   GET     /v1/<plural>          → List
-//   GET     /v1/<plural>/{id}     → Get
-//   POST    /v1/<plural>          → Create  → Operation
-//   PATCH   /v1/<plural>/{id}     → Update  → Operation
-//   DELETE  /v1/<plural>/{id}     → Delete  → Operation
-//   POST    /v1/<plural>/{id}:verb → Custom verb → Operation
+// URL-ы verbatim из proto google.api.http annotations:
+//   organization-manager: /organization-manager/v1/organizations
+//   resource-manager:     /resource-manager/v1/clouds, /resource-manager/v1/folders
+//   vpc:                  /vpc/v1/networks, /vpc/v1/subnets, /vpc/v1/addresses, /vpc/v1/route-tables
+//   operations:           /operations/{id}
+//
+// API mapping:
+//   GET    /<domain>/v1/<plural>          → List
+//   GET    /<domain>/v1/<plural>/{id}     → Get
+//   POST   /<domain>/v1/<plural>          → Create  → Operation
+//   PATCH  /<domain>/v1/<plural>/{id}     → Update  → Operation
+//   DELETE /<domain>/v1/<plural>/{id}     → Delete  → Operation
+//   POST   /<domain>/v1/<plural>/{id}:verb → Custom verb → Operation
 
 const API_BASE = ""; // относительный путь, ingress/proxy сделают остальное
 
@@ -59,12 +65,12 @@ async function fetchJson<T>(method: string, path: string, body?: unknown): Promi
 }
 
 export const api = {
-  /** GET /v1/<path> → данные */
+  /** GET <path> → данные */
   get<T>(path: string): Promise<T> {
     return fetchJson<T>("GET", path);
   },
 
-  /** GET /v1/<path>?k=v&… → список */
+  /** GET <path>?k=v&… → список */
   list<T>(path: string, query?: Record<string, string>): Promise<T> {
     const qs =
       query && Object.keys(query).length > 0
@@ -73,22 +79,22 @@ export const api = {
     return fetchJson<T>("GET", `${path}${qs}`);
   },
 
-  /** POST /v1/<plural>  body=resource → Operation */
+  /** POST <path>  body=resource → Operation */
   create(path: string, body: unknown): Promise<{ operation: import("./types").Operation }> {
     return fetchJson("POST", path, body);
   },
 
-  /** PATCH /v1/<plural>/{id}  body=resource → Operation */
+  /** PATCH <path>/{id}  body=resource → Operation */
   update(path: string, body: unknown): Promise<{ operation: import("./types").Operation }> {
     return fetchJson("PATCH", path, body);
   },
 
-  /** DELETE /v1/<plural>/{id} → Operation */
+  /** DELETE <path>/{id} → Operation */
   delete(path: string): Promise<{ operation: import("./types").Operation }> {
     return fetchJson("DELETE", path);
   },
 
-  /** POST /v1/<plural>/{id}:verb  body → Operation */
+  /** POST <path>/{id}:verb  body → Operation */
   action(path: string, body?: unknown): Promise<{ operation: import("./types").Operation }> {
     return fetchJson("POST", path, body ?? {});
   },

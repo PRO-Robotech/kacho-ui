@@ -1,6 +1,6 @@
 // ResourceDetailPage — детальная страница ресурса (flat API, 1.0).
-// Поллит GET /v1/<plural>/{id} каждые 3 сек.
-// Restart/Start/Stop → POST /v1/<plural>/{id}:verb → Operation.
+// Поллит GET <spec.apiPath>/{id} каждые 3 сек.
+// Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
 import { useCallback, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
@@ -36,7 +36,7 @@ export function ResourceDetailPage({ spec }: Props) {
     error,
   } = useQuery({
     queryKey: [spec.id, "detail", uid],
-    queryFn: () => api.get<Record<string, unknown>>(`/v1/${spec.apiPath}/${uid}`),
+    queryFn: () => api.get<Record<string, unknown>>(`${spec.apiPath}/${uid}`),
     refetchInterval: 3_000,
     enabled: !!uid,
     staleTime: 0,
@@ -58,7 +58,7 @@ export function ResourceDetailPage({ spec }: Props) {
 
   const actionMutation = useMutation({
     mutationFn: (verb: string) =>
-      api.action(`/v1/${spec.apiPath}/${uid}:${verb}`),
+      api.action(`${spec.apiPath}/${uid}:${verb}`),
     onSuccess: (resp) => {
       setActionErr(null);
       const id = extractOperationId(resp);
@@ -173,16 +173,17 @@ export function ResourceDetailPage({ spec }: Props) {
               mode="edit"
               title={`Edit ${spec.singular}`}
               description="Изменяет ресурс."
-              apiPath={`/v1/${spec.apiPath}/${resourceId}`}
+              apiPath={`${spec.apiPath}/${resourceId}`}
               resourceId={spec.id}
               template={data}
               fields={spec.fields}
               folderUid={folder?.uid}
+              sanitize={spec.sanitize}
             />
           )}
           {spec.ops.delete && (
             <DeleteButton
-              apiPath={`/v1/${spec.apiPath}/${resourceId}`}
+              apiPath={`${spec.apiPath}/${resourceId}`}
               resourceId={spec.id}
               name={name}
               resourceLabel={spec.singular}

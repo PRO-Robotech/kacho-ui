@@ -12,9 +12,21 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // dev: проксируем /v1/* на api-gateway (port-forward на 8080).
-      // ws: true убран — Watch/WebSocket не используются с 1.0.
-      "/v1": {
+      // dev: проксируем domain-prefixed paths на api-gateway (port-forward на 8080).
+      // URL-ы verbatim из proto google.api.http annotations.
+      "/organization-manager": {
+        target: process.env.KACHO_API_BASE || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/resource-manager": {
+        target: process.env.KACHO_API_BASE || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/vpc": {
+        target: process.env.KACHO_API_BASE || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/operations": {
         target: process.env.KACHO_API_BASE || "http://localhost:8080",
         changeOrigin: true,
       },
