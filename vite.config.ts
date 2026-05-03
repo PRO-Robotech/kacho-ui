@@ -12,10 +12,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // dev: проксируем /v1/* на api-gateway (port-forward на 8080)
+      // dev: проксируем /v1/* на api-gateway (port-forward на 8080).
+      // ws: true — vite пропускает WebSocket Upgrade (Watch endpoints).
       "/v1": {
         target: process.env.KACHO_API_BASE || "http://localhost:8080",
         changeOrigin: true,
+        ws: true,
       },
       "/healthz": {
         target: process.env.KACHO_API_BASE || "http://localhost:8080",

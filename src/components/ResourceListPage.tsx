@@ -1,16 +1,15 @@
 import { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { Eye, RefreshCw } from "lucide-react";
+import { Eye, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
-import { post } from "@/api/client";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { useResourceWatch, type WatchStatus } from "@/lib/use-resource-watch";
 
 interface Props {
   spec: ResourceSpec;
@@ -20,23 +19,11 @@ export function ResourceListPage({ spec }: Props) {
   const folder = useFolderStore((s) => s.folder);
   const folderRequired = spec.scope === "folder";
 
-  const queryKey = [`${spec.id}.list`, folder?.uid ?? null];
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey,
-    queryFn: () =>
-      post<unknown, Record<string, unknown>>(`/v1/${spec.apiPath}/list`, {
-        selectors:
-          folderRequired && folder
-            ? [{ field: "folder_id", op: "EQ", values: [folder.uid] }]
-            : [],
-      }),
-    refetchInterval: 5_000,
-    enabled: !folderRequired || !!folder,
-  });
+  const { items, status, error } = useResourceWatch(spec, folder);
 
   if (folderRequired && !folder) return <FolderRequiredEmpty resource={spec.plural} />;
 
-  const rows = ((data?.[spec.payloadKey] as unknown[]) ?? []) as Record<string, unknown>[];
+  const rows = items as Record<string, unknown>[];
 
   const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
     header: c.header,
@@ -66,7 +53,8 @@ export function ResourceListPage({ spec }: Props) {
               endpoint={`/v1/${spec.apiPath}/upsert`}
               payloadKey={spec.payloadKey}
               template={row}
-              invalidateQueryKeys={[queryKey]}
+              fields={spec.fields}
+              invalidateQueryKeys={[]}
             />
           )}
           {spec.ops.delete && (
@@ -75,7 +63,7 @@ export function ResourceListPage({ spec }: Props) {
               uid={uid}
               name={name}
               resourceLabel={spec.singular}
-              invalidateQueryKeys={[queryKey]}
+              invalidateQueryKeys={[]}
               triggerLabel=""
             />
           )}
@@ -88,7 +76,10 @@ export function ResourceListPage({ spec }: Props) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
+            <WatchIndicator status={status} />
+          </div>
           {spec.description && <p className="text-sm text-muted-foreground">{spec.description}</p>}
           {folderRequired && folder && (
             <p className="text-xs text-muted-foreground mt-1">
@@ -97,47 +88,86 @@ export function ResourceListPage({ spec }: Props) {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
-          </Button>
-          {spec.ops.create && (
-            <ResourceFormDialog
-              mode="create"
-              title={`Create ${spec.singular}`}
-              description="Upsert: server-side genarates UID если не задан."
-              endpoint={`/v1/${spec.apiPath}/upsert`}
-              payloadKey={spec.payloadKey}
-              template={spec.template({
-                folderId: folder?.uid,
-                cloudId: folder?.cloudId,
-                organizationId: folder?.organizationId,
-              })}
-              invalidateQueryKeys={[queryKey]}
-            />
-          )}
-        </div>
+        {spec.ops.create && (
+          <ResourceFormDialog
+            mode="create"
+            title={`Create ${spec.singular}`}
+            description="Upsert: server-side генерирует UID если не задан."
+            endpoint={`/v1/${spec.apiPath}/upsert`}
+            payloadKey={spec.payloadKey}
+            template={spec.template({
+              folderId: folder?.uid,
+              cloudId: folder?.cloudId,
+              organizationId: folder?.organizationId,
+            })}
+            fields={spec.fields}
+            invalidateQueryKeys={[]}
+          />
+        )}
       </div>
 
-      {error && (
+      {error && status === "error" && (
         <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {(error as Error).message}
+          Ошибка: {error}
+        </div>
+      )}
+      {error && status === "reconnecting" && (
+        <div className="rounded-md bg-amber-50 text-amber-800 p-3 text-sm flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Переподключение к Watch-стриму… ({error})
         </div>
       )}
 
       <ResourceTable
         rows={rows}
-        loading={isLoading}
+        loading={status === "listing" && rows.length === 0}
         rowKey={(r) => getByPath<string>(r, "metadata.uid") ?? Math.random().toString()}
         columns={columns}
       />
     </div>
+  );
+}
+
+function WatchIndicator({ status }: { status: WatchStatus }) {
+  if (status === "watching") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-xs text-emerald-600"
+        title="Live: подписаны на Watch-стрим"
+      >
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+        </span>
+        live
+      </span>
+    );
+  }
+  if (status === "listing") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" /> listing
+      </span>
+    );
+  }
+  if (status === "reconnecting") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+        <WifiOff className="h-3 w-3" /> reconnecting
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-rose-600">
+        <WifiOff className="h-3 w-3" /> offline
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <Wifi className="h-3 w-3" /> idle
+    </span>
   );
 }
 
@@ -175,3 +205,5 @@ function formatCell(c: { path: string; format?: string }, row: Record<string, un
       return String(v);
   }
 }
+
+export { WatchIndicator };

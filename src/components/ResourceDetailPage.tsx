@@ -1,14 +1,17 @@
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw, RotateCw } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { ArrowLeft, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
-import { ApiError, post } from "@/api/client";
+import { WatchIndicator } from "@/components/ResourceListPage";
+import { post } from "@/api/client";
+import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { useResourceWatch } from "@/lib/use-resource-watch";
 
 interface Props {
   spec: ResourceSpec;
@@ -17,33 +20,25 @@ interface Props {
 export function ResourceDetailPage({ spec }: Props) {
   const { uid } = useParams();
   const navigate = useNavigate();
-  const qc = useQueryClient();
+  const folder = useFolderStore((s) => s.folder);
 
-  const queryKey = [`${spec.id}.detail`, uid];
+  // Подписываемся на ту же list-watch (через folder-scope), потом выбираем
+  // нужный uid в memory. Это даёт live-updates без отдельного watch-stream.
+  const { items, status, error } = useResourceWatch(spec, folder);
 
-  const { data, isLoading, error, refetch, isRefetching } = useQuery({
-    queryKey,
-    queryFn: async () => {
-      const resp = await post<unknown, Record<string, unknown>>(`/v1/${spec.apiPath}/list`, {
-        selectors: [{ field: "uid", op: "EQ", values: [uid] }],
-      });
-      const list = (resp[spec.payloadKey] as unknown[]) ?? [];
-      return (list[0] as Record<string, unknown>) ?? null;
-    },
-    refetchInterval: 3_000,
-    enabled: !!uid,
-  });
+  const data = items.find((it) => it.metadata.uid === uid) as
+    | (Record<string, unknown> & { metadata: { uid: string } })
+    | undefined;
 
   const restartMutation = useMutation({
     mutationFn: () => post(`/v1/${spec.apiPath}/restart`, { uid }),
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
   });
 
-  if (isLoading) {
+  if (status === "listing" && !data) {
     return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
   }
 
-  if (error) {
+  if (status === "error" && !data) {
     return (
       <div className="p-6 space-y-3">
         <Button asChild variant="outline" size="sm">
@@ -52,7 +47,7 @@ export function ResourceDetailPage({ spec }: Props) {
           </Link>
         </Button>
         <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {error instanceof ApiError ? `${error.code}: ${error.message}` : (error as Error).message}
+          Ошибка: {error}
         </div>
       </div>
     );
@@ -74,7 +69,7 @@ export function ResourceDetailPage({ spec }: Props) {
   }
 
   const name = getByPath<string>(data, "metadata.name") ?? "";
-  const status = getByPath<string>(data, "status.state");
+  const stateBadge = getByPath<string>(data, "status.state");
   const meta = (data.metadata as Record<string, unknown>) ?? {};
   const spec_ = data.spec as Record<string, unknown> | undefined;
   const status_ = data.status as Record<string, unknown> | undefined;
@@ -90,20 +85,12 @@ export function ResourceDetailPage({ spec }: Props) {
           </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
-            {status && <StatusBadge state={status} />}
+            {stateBadge && <StatusBadge state={stateBadge} />}
+            <WatchIndicator status={status} />
           </div>
           <div className="text-xs text-muted-foreground font-mono">{uid}</div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            title="Refresh"
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
-          </Button>
           {spec.ops.restart && (
             <Button
               variant="outline"
@@ -123,7 +110,8 @@ export function ResourceDetailPage({ spec }: Props) {
               endpoint={`/v1/${spec.apiPath}/upsert`}
               payloadKey={spec.payloadKey}
               template={data}
-              invalidateQueryKeys={[queryKey, [`${spec.id}.list`, null]]}
+              fields={spec.fields}
+              invalidateQueryKeys={[]}
             />
           )}
           {spec.ops.delete && (
@@ -132,7 +120,7 @@ export function ResourceDetailPage({ spec }: Props) {
               uid={uid!}
               name={name}
               resourceLabel={spec.singular}
-              invalidateQueryKeys={[[`${spec.id}.list`, null]]}
+              invalidateQueryKeys={[]}
               navigateTo={() => navigate(`/${spec.route}`)}
             />
           )}

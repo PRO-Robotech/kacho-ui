@@ -55,48 +55,114 @@ export async function post<TReq, TResp>(path: string, body: TReq): Promise<TResp
 }
 
 /**
- * postStream — POST + читать NDJSON-стрим (Watch endpoint от grpc-gateway).
- * Возвращает AsyncGenerator событий вида { result: WatchEvent } | { error: Status }.
+ * watchStream — открывает WebSocket к streaming-эндпоинту (Watch RPC),
+ * выполняет первый message с request body (как требует tmc/grpc-websocket-proxy
+ * на стороне api-gateway), затем yield-ит каждое полученное сообщение как
+ * парсенный JSON.
+ *
+ * Поведение:
+ *   - один WS на одну подписку (НЕ переоткрывается на каждый event)
+ *   - signal.abort() закрывает WS
+ *   - server-close (nginx idle timeout / pod restart) → throws WsClosed,
+ *     useResourceWatch ловит и делает reconnect с backoff
  */
-export async function* postStream<TReq, TEvent>(
+export async function* watchStream<TReq, TEvent>(
   path: string,
   body: TReq,
   signal?: AbortSignal,
 ): AsyncGenerator<TEvent> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Request-ID": crypto.randomUUID(),
-    },
-    body: JSON.stringify(body ?? {}),
-    signal,
-  });
+  const wsUrl = buildWsUrl(path);
+  const ws = new WebSocket(wsUrl);
 
-  if (!res.ok || !res.body) {
-    const text = await res.text();
-    throw new ApiError(res.status, String(res.status), text, res.statusText);
-  }
+  // Подписываемся на abort до open — чтобы корректно закрыть на cancel
+  const onAbort = () => {
+    try {
+      ws.close(1000, "client abort");
+    } catch {
+      // ignore
+    }
+  };
+  signal?.addEventListener("abort", onAbort);
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
+  // Очередь + promise resolver для async iteration
+  type Msg = { kind: "data"; data: TEvent } | { kind: "close" } | { kind: "error"; err: Error };
+  const queue: Msg[] = [];
+  let resolveNext: ((m: Msg) => void) | null = null;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
+  const enqueue = (m: Msg) => {
+    if (resolveNext) {
+      const r = resolveNext;
+      resolveNext = null;
+      r(m);
+    } else {
+      queue.push(m);
+    }
+  };
 
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) >= 0) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line) continue;
+  ws.onopen = () => {
+    try {
+      ws.send(JSON.stringify(body ?? {}));
+    } catch (e) {
+      enqueue({ kind: "error", err: e as Error });
+    }
+  };
+  ws.onmessage = (ev) => {
+    let line: string;
+    if (typeof ev.data === "string") line = ev.data;
+    else if (ev.data instanceof ArrayBuffer) line = new TextDecoder().decode(ev.data);
+    else if (ev.data instanceof Blob) {
+      // Blob: read async, потом enqueue
+      ev.data.text().then((t) => {
+        try {
+          enqueue({ kind: "data", data: JSON.parse(t) as TEvent });
+        } catch {
+          // skip
+        }
+      });
+      return;
+    } else return;
+    try {
+      enqueue({ kind: "data", data: JSON.parse(line) as TEvent });
+    } catch {
+      // skip malformed
+    }
+  };
+  ws.onclose = () => enqueue({ kind: "close" });
+  ws.onerror = () => enqueue({ kind: "error", err: new Error("websocket error") });
+
+  try {
+    while (true) {
+      const m: Msg = queue.length
+        ? (queue.shift() as Msg)
+        : await new Promise<Msg>((r) => {
+            resolveNext = r;
+          });
+      if (m.kind === "close") return;
+      if (m.kind === "error") throw m.err;
+      yield m.data;
+    }
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
       try {
-        yield JSON.parse(line) as TEvent;
+        ws.close(1000, "iterator finalised");
       } catch {
-        // skip malformed
+        // ignore
       }
     }
   }
+}
+
+function buildWsUrl(path: string): string {
+  // path: "/v1/networks/watch" → ws://<host>/v1/networks/watch?method=POST
+  // ?method=POST — override для tmc/grpc-websocket-proxy:
+  //   WebSocket initiation request приходит как HTTP GET, но grpc-gateway
+  //   зарегистрировал Watch RPC как POST. Без override wsproxy proxy-ит
+  //   internal request методом GET и grpc-gateway возвращает Method Not Allowed.
+  if (typeof window === "undefined") {
+    throw new Error("watchStream requires browser environment");
+  }
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const sep = path.includes("?") ? "&" : "?";
+  return `${proto}//${window.location.host}${path}${sep}method=POST`;
 }
