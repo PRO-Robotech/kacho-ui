@@ -1,6 +1,8 @@
 // RefSelect — выбор ресурса по ID из выпадающего списка.
-// Загружает список через GET /v1/<apiPath>?folder_id=<uid>.
-// Flat API: ресурсы имеют поля id и name (не metadata.uid/metadata.name).
+// Загружает список через GET <apiPath>?folder_id=<uid>.
+// apiPath уже содержит полный путь (e.g. "/resource-manager/v1/organizations"),
+// никакого "/v1/" префикса не добавляем.
+// Flat API: ресурсы имеют поля id и name.
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -28,7 +30,7 @@ export function RefSelect({ refResource, refFolderScoped, value, onChange, place
       const q: Record<string, string> = {};
       if (refFolderScoped && folder) q["folder_id"] = folder.uid;
       return api.list<Record<string, Array<{ id: string; name: string }>>>(
-        `/v1/${spec!.apiPath}`,
+        spec!.apiPath,
         q,
       );
     },

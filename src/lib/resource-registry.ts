@@ -112,9 +112,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "organizations",
     singular: "Organization",
     plural: "Organizations",
-    description: "Корневой уровень иерархии. Cluster-scoped.",
+    description:
+      "Корневой уровень иерархии. У YC OrganizationManagerService поддерживает только Get/List/Update — Create/Delete недоступны через API (Org создаётся billing-flow-ом).",
     scope: "global",
-    ops: { create: true, update: true, delete: false },
+    ops: { create: false, update: true, delete: false },
     columns: [
       COL_NAME,
       { header: "Title", path: "title", format: "text" },
@@ -402,12 +403,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
   },
 
-  // proto: GET /vpc/v1/route-tables
+  // proto: GET /vpc/v1/routeTables (YC использует camelCase в URL)
 
   "route-tables": {
     id: "route-tables",
     route: "route-tables",
-    apiPath: "/vpc/v1/route-tables",
+    apiPath: "/vpc/v1/routeTables",
     payloadKey: "route_tables",
     singular: "Route Table",
     plural: "Route Tables",

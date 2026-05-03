@@ -3,7 +3,7 @@
 // Update: PATCH /v1/<plural>/{id} → Operation
 // После получения Operation — поллит до done=true через OperationDialog.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Plus, Pencil, Code2, FormInput } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,16 +65,23 @@ export function ResourceFormDialog({
 
   const invalidate = useInvalidateResourceList();
 
-  // При открытии — reset
+  // Snapshot template/fields в ref — иначе polling parent-страницы переcоздаёт
+  // template prop каждые 3 сек, useEffect видит "изменение" и обнуляет форму
+  // прямо во время ввода. Reset делаем только когда диалог open false→true.
+  const snapshotRef = useRef({ template, fields });
+  snapshotRef.current = { template, fields };
+
   useEffect(() => {
     if (open) {
-      setObj(normalize(template, fields));
-      setText(JSON.stringify(template, null, 2));
+      const snap = snapshotRef.current;
+      setObj(normalize(snap.template, snap.fields));
+      setText(JSON.stringify(snap.template, null, 2));
       setSubmitErr(null);
       setOpId(null);
-      setView(fields ? "form" : "json");
+      setView(snap.fields ? "form" : "json");
     }
-  }, [open, template, fields]);
+    // ВАЖНО: только [open] — НЕ template/fields, иначе reset при каждом polling-update.
+  }, [open]);
 
   const mutation = useMutation({
     mutationFn: async (item: unknown) => {
