@@ -52,10 +52,14 @@ export interface ResourceSpec {
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
 }
 
+// Zone whitelist должен совпадать с kacho-corelib/validate.ZoneId.
+// Verbatim YC: ru-central1-{a,b,c,d}. Backend отклонит любой другой
+// zone_id с InvalidArgument.
 const ZONES = [
-  { value: "kacho-zone-a", label: "kacho-zone-a" },
-  { value: "kacho-zone-b", label: "kacho-zone-b" },
-  { value: "kacho-zone-c", label: "kacho-zone-c" },
+  { value: "ru-central1-a", label: "ru-central1-a" },
+  { value: "ru-central1-b", label: "ru-central1-b" },
+  { value: "ru-central1-c", label: "ru-central1-c" },
+  { value: "ru-central1-d", label: "ru-central1-d" },
 ];
 
 // Общие колонки
@@ -286,7 +290,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       folder_id: folderId ?? "",
       name: "",
       network_id: "",
-      zone_id: "kacho-zone-a",
+      zone_id: "ru-central1-a",
       v4_cidr_blocks: [{ value: "10.0.0.0/24" }],
       description: "",
     }),
@@ -385,7 +389,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       name: "",
       description: "",
       _address_kind: "external",
-      external_ipv4_address_spec: { zone_id: "kacho-zone-a", address: "" },
+      external_ipv4_address_spec: { zone_id: "ru-central1-a", address: "" },
       deletion_protection: false,
     }),
     // Убирает поле-переключатель _address_kind и неактивный oneof из payload.
