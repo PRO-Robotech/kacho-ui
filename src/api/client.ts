@@ -16,6 +16,8 @@
 //   DELETE /<domain>/v1/<plural>/{id}     → Delete  → Operation
 //   POST   /<domain>/v1/<plural>/{id}:verb → Custom verb → Operation
 
+import { snakeToCamel, camelToSnake } from "@/lib/case";
+
 const API_BASE = ""; // относительный путь, ingress/proxy сделают остальное
 
 export class ApiError extends Error {
@@ -40,7 +42,8 @@ async function fetchJson<T>(method: string, path: string, body?: unknown): Promi
     },
   };
   if (body !== undefined) {
-    init.body = JSON.stringify(body);
+    // UI работает в snake_case; YC contract = camelCase. Convert на отправке.
+    init.body = JSON.stringify(snakeToCamel(body));
   }
   const res = await fetch(url, init);
   const text = await res.text();
@@ -61,7 +64,8 @@ async function fetchJson<T>(method: string, path: string, body?: unknown): Promi
       err.message ?? res.statusText,
     );
   }
-  return parsed as T;
+  // На приёме: camelCase → snake_case (UI ожидает proto-style ключи).
+  return camelToSnake(parsed) as T;
 }
 
 export const api = {

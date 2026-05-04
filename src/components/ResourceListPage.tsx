@@ -3,7 +3,7 @@
 // spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
 
 import { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { Eye, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
@@ -11,21 +11,36 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
-import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
 import { useResourceList } from "@/lib/use-resource-list";
 
 interface Props {
   spec: ResourceSpec;
+  /** API field name для фильтрации списка (organization_id / cloud_id / folder_id). */
+  parentField?: string;
+  /** URL-param name (orgId / cloudId / folderId) откуда брать значение filter. */
+  parentParam?: string;
 }
 
-export function ResourceListPage({ spec }: Props) {
-  const folder = useFolderStore((s) => s.folder);
-  const folderRequired = spec.scope === "folder";
+export function ResourceListPage({ spec, parentField, parentParam }: Props) {
+  const params = useParams();
+  const location = useLocation();
+  const filterValue = parentParam ? (params[parentParam] ?? null) : null;
 
-  const { data, isLoading, isError, error, isFetching } = useResourceList(spec, folder);
+  const { data, isLoading, isError, error, isFetching } = useResourceList(
+    spec,
+    parentField ?? null,
+    filterValue,
+  );
 
-  if (folderRequired && !folder) return <FolderRequiredEmpty resource={spec.plural} />;
+  // Если ресурс требует parent (например, /folders/:folderId/networks без folderId)
+  if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
+
+  // Текущий path-prefix — для построения link на detail (preserve nested path).
+  // Например, /folders/X/networks → detail на /folders/X/networks/{id}.
+  const basePath = location.pathname.endsWith("/")
+    ? location.pathname.slice(0, -1)
+    : location.pathname;
 
   const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
@@ -45,7 +60,7 @@ export function ResourceListPage({ spec }: Props) {
       return (
         <div className="flex items-center justify-end gap-1">
           <Button asChild variant="ghost" size="sm">
-            <Link to={`/${spec.route}/${id}`}>
+            <Link to={`${basePath}/${id}`}>
               <Eye className="h-4 w-4" /> View
             </Link>
           </Button>
@@ -58,7 +73,7 @@ export function ResourceListPage({ spec }: Props) {
               resourceId={spec.id}
               template={row}
               fields={spec.fields}
-              folderUid={folder?.uid}
+              folderUid={filterValue ?? null}
               sanitize={spec.sanitize}
             />
           )}
@@ -68,7 +83,7 @@ export function ResourceListPage({ spec }: Props) {
               resourceId={spec.id}
               name={name}
               resourceLabel={spec.singular}
-              folderUid={folder?.uid}
+              folderUid={filterValue ?? null}
               triggerLabel=""
             />
           )}
@@ -88,10 +103,9 @@ export function ResourceListPage({ spec }: Props) {
           {spec.description && (
             <p className="text-sm text-muted-foreground">{spec.description}</p>
           )}
-          {folderRequired && folder && (
+          {parentField && filterValue && (
             <p className="text-xs text-muted-foreground mt-1">
-              Folder:{" "}
-              <code className="bg-muted px-1 py-0.5 rounded">{folder.name}</code>
+              {parentField}: <code className="bg-muted px-1 py-0.5 rounded">{filterValue.slice(0, 8)}…</code>
             </p>
           )}
         </div>
@@ -102,12 +116,13 @@ export function ResourceListPage({ spec }: Props) {
             apiPath={spec.apiPath}
             resourceId={spec.id}
             template={spec.template({
-              folderId: folder?.uid,
-              cloudId: folder?.cloudId,
-              organizationId: folder?.organizationId,
+              folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
+              cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
+              organizationId:
+                parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
             })}
             fields={spec.fields}
-            folderUid={folder?.uid}
+            folderUid={filterValue ?? null}
             sanitize={spec.sanitize}
           />
         )}

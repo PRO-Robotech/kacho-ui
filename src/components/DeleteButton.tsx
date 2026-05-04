@@ -13,9 +13,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
+import { extractOperationId } from "@/components/OperationDialog";
+import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { ApiError, api } from "@/api/client";
 import { useInvalidateResourceList } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
 
 interface Props {
   /** /v1/<plural>/{id} */
@@ -54,28 +56,26 @@ export function DeleteButton({
       if (id) {
         setOpId(id);
       } else {
-        handleAfterDelete();
+        // Без Operation — синхронный success
+        invalidate(resourceId, folderUid ?? null);
+        navigateTo?.();
       }
     },
     onError: (e) => {
-      setErr(e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message);
+      const m = e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message;
+      setErr(m);
+      toast.error(`Delete ${resourceLabel} ${name}: ${m}`);
     },
   });
 
-  const handleAfterDelete = useCallback(() => {
-    invalidate(resourceId, folderUid ?? null);
-    navigateTo?.();
-  }, [invalidate, resourceId, folderUid, navigateTo]);
-
-  const handleOperationSuccess = useCallback(() => {
-    setOpId(null);
-    handleAfterDelete();
-  }, [handleAfterDelete]);
-
-  const handleOperationClose = useCallback(() => {
-    setOpId(null);
-    invalidate(resourceId, folderUid ?? null);
-  }, [invalidate, resourceId, folderUid]);
+  const handleOperationDone = useCallback(
+    (success: boolean) => {
+      setOpId(null);
+      invalidate(resourceId, folderUid ?? null);
+      if (success) navigateTo?.();
+    },
+    [invalidate, resourceId, folderUid, navigateTo],
+  );
 
   return (
     <>
@@ -121,11 +121,10 @@ export function DeleteButton({
         </DialogContent>
       </Dialog>
 
-      <OperationDialog
+      <OperationToastWatcher
         opId={opId}
-        title={`Deleting ${resourceLabel}`}
-        onSuccess={handleOperationSuccess}
-        onClose={handleOperationClose}
+        title={`Deleting ${resourceLabel} ${name}`}
+        onDone={handleOperationDone}
       />
     </>
   );

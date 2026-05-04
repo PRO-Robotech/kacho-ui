@@ -97,10 +97,19 @@ export function OperationDialog({ opId, title, onSuccess, onClose }: Props) {
 }
 
 /**
- * Хелпер: получает Operation из ответа на Create/Update/Delete/action.
+ * Хелпер: достаёт Operation.id из ответа на Create/Update/Delete/action.
+ *
+ * Backend (через grpc-gateway) возвращает Operation как top-level JSON:
+ * `{id, description, done, metadata, ...}` — БЕЗ обёртки `{operation: ...}`.
+ * (api.create/update/delete TS-типы исторически указывали обёртку — она ошибочна.)
  */
 export function extractOperationId(
-  resp: { operation?: Operation } | null | undefined,
+  resp: Partial<Operation> | { operation?: Operation } | null | undefined,
 ): string | null {
-  return resp?.operation?.id ?? null;
+  if (!resp) return null;
+  // Top-level Operation (текущий формат).
+  if ("id" in resp && typeof resp.id === "string") return resp.id;
+  // Legacy обёртка — на всякий случай.
+  if ("operation" in resp && resp.operation) return resp.operation.id ?? null;
+  return null;
 }

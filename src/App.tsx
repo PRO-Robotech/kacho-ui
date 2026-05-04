@@ -4,6 +4,7 @@ import { Layout } from "@/components/Layout";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 
 const queryClient = new QueryClient({
@@ -16,7 +17,10 @@ const queryClient = new QueryClient({
   },
 });
 
-const RESOURCES = Object.values(REGISTRY);
+// Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
+const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables"]
+  .map((id) => REGISTRY[id])
+  .filter(Boolean);
 
 export default function App() {
   return (
@@ -25,16 +29,88 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<DashboardPage />} />
-            {RESOURCES.map((r) => (
-              <Route key={r.id}>
-                <Route path={`/${r.route}`} element={<ResourceListPage spec={r} />} />
-                <Route path={`/${r.route}/:uid`} element={<ResourceDetailPage spec={r} />} />
+
+            {/* === Resource Manager hierarchy (через path) === */}
+
+            {/* /organizations — список org (cluster-scoped) */}
+            <Route
+              path="/organizations"
+              element={<ResourceListPage spec={REGISTRY.organizations} />}
+            />
+
+            {/* /organizations/:orgId/clouds — список clouds в orgId */}
+            <Route
+              path="/organizations/:orgId/clouds"
+              element={
+                <ResourceListPage
+                  spec={REGISTRY.clouds}
+                  parentField="organization_id"
+                  parentParam="orgId"
+                />
+              }
+            />
+
+            {/* /clouds/:cloudId/folders — список folders в cloudId */}
+            <Route
+              path="/clouds/:cloudId/folders"
+              element={
+                <ResourceListPage
+                  spec={REGISTRY.folders}
+                  parentField="cloud_id"
+                  parentParam="cloudId"
+                />
+              }
+            />
+
+            {/* === Folder-scoped VPC ресурсы === */}
+            {/* /folders/:folderId/{networks|subnets|addresses|route-tables} */}
+            {FOLDER_SCOPED.map((spec) => (
+              <Route key={spec.id}>
+                <Route
+                  path={`/folders/:folderId/${spec.route}`}
+                  element={
+                    <ResourceListPage
+                      spec={spec}
+                      parentField="folder_id"
+                      parentParam="folderId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/folders/:folderId/${spec.route}/:uid`}
+                  element={<ResourceDetailPage spec={spec} />}
+                />
               </Route>
             ))}
+
+            {/* /folders/:folderId — пока редирект на networks (default landing) */}
+            <Route
+              path="/folders/:folderId"
+              element={<FolderDefaultRedirect />}
+            />
+
+            {/* Detail-страницы для Resource Manager */}
+            <Route
+              path="/organizations/:orgId"
+              element={<ResourceDetailPage spec={REGISTRY.organizations} />}
+            />
+            <Route
+              path="/clouds/:cloudId"
+              element={<ResourceDetailPage spec={REGISTRY.clouds} />}
+            />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </QueryClientProvider>
   );
+}
+
+// FolderDefaultRedirect: /folders/:folderId → /folders/:folderId/networks
+import { useParams } from "react-router-dom";
+function FolderDefaultRedirect() {
+  const { folderId } = useParams();
+  return <Navigate to={`/folders/${folderId}/networks`} replace />;
 }

@@ -3,7 +3,7 @@
 // Update: PATCH /v1/<plural>/{id} → Operation
 // После получения Operation — поллит до done=true через OperationDialog.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Plus, Pencil, Code2, FormInput } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/dialog";
 import { JsonEditor } from "@/components/JsonEditor";
 import { FormFieldRenderer } from "@/components/form/FormField";
-import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
+import { extractOperationId } from "@/components/OperationDialog";
+import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
 import type { FormField } from "@/lib/form-schema";
 
 type Mode = "create" | "edit";
@@ -93,32 +95,28 @@ export function ResourceFormDialog({
     },
     onSuccess: (resp) => {
       setSubmitErr(null);
+      // НЕ закрываем форму немедленно — ждём done операции.
+      // OperationToastWatcher вызовет onDone(success): закроем форму
+      // только при success; при error форма остаётся открытой чтобы пользователь
+      // мог поправить значения и попробовать снова.
       const id = extractOperationId(resp);
       if (id) {
         setOpId(id);
       } else {
-        // Если backend не вернул operation — закрываем сразу
-        handleOperationSuccess();
+        // Backend не вернул Operation — синхронный success: закрываем.
+        setOpen(false);
+        invalidate(resourceId, folderUid ?? null);
+        onSuccess?.();
       }
     },
     onError: (err) => {
+      // Submit-уровневая ошибка (network / 4xx / 5xx до создания Operation) —
+      // показываем сразу прямо в форме, форма НЕ закрывается.
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
       setSubmitErr(m);
+      toast.error(`${title}: ${m}`);
     },
   });
-
-  const handleOperationSuccess = useCallback(() => {
-    setOpId(null);
-    setOpen(false);
-    invalidate(resourceId, folderUid ?? null);
-    onSuccess?.();
-  }, [invalidate, resourceId, folderUid, onSuccess]);
-
-  const handleOperationClose = useCallback(() => {
-    setOpId(null);
-    // Инвалидируем в любом случае — операция могла частично выполниться
-    invalidate(resourceId, folderUid ?? null);
-  }, [invalidate, resourceId, folderUid]);
 
   const submit = () => {
     setSubmitErr(null);
@@ -238,9 +236,11 @@ export function ResourceFormDialog({
             >
               Cancel
             </Button>
-            <Button onClick={submit} disabled={mutation.isPending}>
+            <Button onClick={submit} disabled={mutation.isPending || opId !== null}>
               {mutation.isPending
                 ? "Отправка…"
+                : opId !== null
+                ? "Выполнение…"
                 : mode === "create"
                 ? "Create"
                 : "Save"}
@@ -249,11 +249,23 @@ export function ResourceFormDialog({
         </DialogContent>
       </Dialog>
 
-      <OperationDialog
+      {/*
+        OperationToastWatcher живёт пока opId != null: показывает loading-toast,
+        обновляет его на success/error по результату polling /operations/{id}.
+        Форма уже закрыта — пользователь видит только toast.
+      */}
+      <OperationToastWatcher
         opId={opId}
         title={opTitle}
-        onSuccess={handleOperationSuccess}
-        onClose={handleOperationClose}
+        onDone={(success) => {
+          setOpId(null);
+          invalidate(resourceId, folderUid ?? null);
+          if (success) {
+            setOpen(false);
+            onSuccess?.();
+          }
+          // При error форма остаётся открытой; пользователь правит поля и шлёт заново.
+        }}
       />
     </>
   );
