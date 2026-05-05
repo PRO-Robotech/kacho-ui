@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
+import { SubnetCidrManager } from "@/components/SubnetCidrManager";
 import { api, ApiError } from "@/api/client";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
@@ -20,10 +21,14 @@ import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
   spec: ResourceSpec;
+  // Имя URL-параметра в роуте (default "uid"). Org/Cloud detail используют
+  // "orgId"/"cloudId", потому что эти же ключи фигурируют в дочерних list-роутах.
+  paramKey?: string;
 }
 
-export function ResourceDetailPage({ spec }: Props) {
-  const { uid } = useParams();
+export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
+  const params = useParams();
+  const uid = params[paramKey];
   const navigate = useNavigate();
   const folder = useFolderStore((s) => s.folder);
   const invalidate = useInvalidateResourceList();
@@ -207,6 +212,12 @@ export function ResourceDetailPage({ spec }: Props) {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {spec.id === "subnets" && (
+            <SubnetCidrManager
+              subnetId={resourceId}
+              blocks={(getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[]}
+            />
+          )}
           <div className="rounded-lg border border-border p-4 space-y-2">
             <h3 className="font-semibold text-sm">Resource fields</h3>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">

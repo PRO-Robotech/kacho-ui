@@ -16,9 +16,10 @@ interface Props {
   onChange: (uid: string) => void;
   placeholder?: string;
   id?: string;
+  disabled?: boolean;
 }
 
-export function RefSelect({ refResource, refFolderScoped, value, onChange, placeholder, id }: Props) {
+export function RefSelect({ refResource, refFolderScoped, value, onChange, placeholder, id, disabled }: Props) {
   const folder = useFolderStore((s) => s.folder);
   const spec = getResource(refResource);
 
@@ -51,8 +52,8 @@ export function RefSelect({ refResource, refFolderScoped, value, onChange, place
         id={id}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="flex h-9 w-full rounded-md border border-border bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-        disabled={!enabled}
+        className="flex h-9 w-full rounded-md border border-border bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={disabled || !enabled}
       >
         <option value="">{placeholder ?? `Выбрать ${spec.singular}…`}</option>
         {options.map((o) => (

@@ -44,6 +44,10 @@ export interface ResourceSpec {
   columns: ResourceColumn[];
   // schema полей формы (если undefined — fallback к JSON-editor)
   fields?: FormField[];
+  // Path-template для drill-down link при клике на строку (плейсхолдер `:id`).
+  // Если задан — кнопка в строке ведёт сюда вместо DetailPage. Используется
+  // для иерархического drill-flow Org → Clouds → Folders → VPC.
+  childRoute?: string;
   // skeleton-объект для Create-формы
   template: (ctx: { folderId?: string; cloudId?: string; organizationId?: string }) => unknown;
   // Опциональная нормализация payload перед отправкой на API.
@@ -80,14 +84,28 @@ const COL_ID: ResourceColumn = {
   format: "uid-short",
 };
 
+// Strict — для resource-manager/organization-manager (Cloud, Folder, Organization).
+// Совпадает с backend validate.Name (verbatim YC `/[a-z]([-a-z0-9]{0,61}[a-z0-9])?/`).
 const FIELD_NAME: FormField = {
   name: "name",
   label: "Name",
   type: "string",
   required: true,
   placeholder: "my-resource",
-  description: "Уникальное в рамках folder. Lowercase + дефисы (RFC 1123).",
+  description: "Lowercase, цифры, дефисы. Начинается с буквы, длина 2..63.",
   pattern: "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$",
+};
+
+// Permissive — для VPC ресурсов (Network/Subnet/Address/RouteTable).
+// Совпадает с backend validate.NameVPC (verbatim YC `/|[a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?/`).
+// YC принимает empty / uppercase / underscore — UI не должен блокировать заранее.
+const FIELD_NAME_VPC: FormField = {
+  name: "name",
+  label: "Name",
+  type: "string",
+  placeholder: "my-network",
+  description: "Буквы (любой регистр), цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  pattern: "^([a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?)?$",
 };
 
 const FIELD_DESCRIPTION: FormField = {
@@ -130,6 +148,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       { name: "title", label: "Title", type: "string", placeholder: "My Organization" },
       FIELD_DESCRIPTION,
     ],
+    childRoute: "/organizations/:id/clouds",
     template: () => ({ name: "", title: "", description: "" }),
   },
 
@@ -163,6 +182,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       FIELD_DESCRIPTION,
     ],
+    childRoute: "/clouds/:id/folders",
     template: () => ({ name: "", organization_id: "", description: "" }),
   },
 
@@ -196,6 +216,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       FIELD_DESCRIPTION,
     ],
+    // Folder drill-down → /folders/:id; FolderDefaultRedirect там перебрасывает
+    // дальше на /folders/:id/networks (первый VPC-ресурс).
+    childRoute: "/folders/:id",
     template: () => ({ name: "", cloud_id: "", description: "" }),
   },
 
@@ -214,12 +237,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
+      { header: "Default SG", path: "default_security_group_id", format: "uid-short" },
       { header: "Description", path: "description", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
     fields: [
-      FIELD_NAME,
+      FIELD_NAME_VPC,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
@@ -247,10 +271,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       { header: "Network", path: "network_id", format: "uid-short" },
       { header: "Zone", path: "zone_id", format: "text" },
       { header: "CIDRs", path: "v4_cidr_blocks", format: "list" },
+      { header: "Route Table", path: "route_table_id", format: "uid-short" },
       COL_ID,
     ],
     fields: [
-      FIELD_NAME,
+      FIELD_NAME_VPC,
       {
         name: "network_id",
         label: "Network",
@@ -258,6 +283,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "networks",
         refFolderScoped: true,
         required: true,
+        immutable: true, // backend: applySubnetMask immutable check
       },
       {
         name: "zone_id",
@@ -265,13 +291,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "enum",
         options: ZONES,
         required: true,
+        immutable: true,
       },
       {
         name: "v4_cidr_blocks",
         label: "IPv4 CIDR Blocks",
         type: "array",
         itemLabel: "CIDR",
-        description: "Массив IPv4 CIDR-блоков (RFC 1918). Например: 10.0.0.0/24",
+        description: "Массив IPv4 CIDR-блоков (RFC 1918). После Create — только через :add-cidr-blocks / :remove-cidr-blocks.",
+        immutable: true,
         newItem: () => ({ value: "10.0.0.0/24" }),
         itemFields: [
           {
@@ -282,6 +310,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             placeholder: "10.0.0.0/24",
           },
         ],
+      },
+      {
+        name: "route_table_id",
+        label: "Route Table",
+        type: "ref",
+        refResource: "route-tables",
+        refFolderScoped: true,
+        placeholder: "— без таблицы —",
+        description: "Опционально. Если задано, маршрутизация подсети идёт через этот RT.",
       },
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
@@ -331,7 +368,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       COL_ID,
     ],
     fields: [
-      FIELD_NAME,
+      FIELD_NAME_VPC,
       {
         name: "_address_kind",
         label: "Address Kind",
@@ -424,7 +461,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       COL_ID,
     ],
     fields: [
-      FIELD_NAME,
+      FIELD_NAME_VPC,
       {
         name: "network_id",
         label: "Network",
@@ -468,7 +505,111 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       static_routes: [],
     }),
   },
+
+  // proto: GET /vpc/v1/securityGroups (YC использует camelCase в URL)
+
+  "security-groups": {
+    id: "security-groups",
+    route: "security-groups",
+    apiPath: "/vpc/v1/securityGroups",
+    payloadKey: "security_groups",
+    singular: "Security Group",
+    plural: "Security Groups",
+    description: "VPC Security Groups (folder-scoped, привязаны к Network).",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      COL_NAME,
+      { header: "Network", path: "network_id", format: "uid-short" },
+      { header: "Status", path: "status", format: "status" },
+      { header: "Default", path: "default_for_network", format: "text" },
+      COL_CREATED,
+      COL_ID,
+    ],
+    fields: [
+      FIELD_NAME_VPC,
+      {
+        name: "network_id",
+        label: "Network",
+        type: "ref",
+        refResource: "networks",
+        refFolderScoped: true,
+        required: true,
+      },
+      FIELD_DESCRIPTION,
+      {
+        name: "rules",
+        label: "Rules",
+        type: "sg-rules",
+        description: "Direction + protocol/ports + target (cidr | другая SG | predefined). Без правил — default-deny.",
+      },
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      network_id: "",
+      description: "",
+      rules: [],
+    }),
+    // Чистит UI-дискриминаторы (_protocol_mode/_ports_any/_target_kind) и
+    // неактивные ветки oneof перед PATCH/POST. См. SgRulesEditor.
+    sanitize: (obj) => {
+      const raw = obj["rules"];
+      if (!Array.isArray(raw)) return obj;
+      const clean = raw.map((r) => sanitizeSgRule(r as Record<string, unknown>));
+      return { ...obj, rules: clean };
+    },
+  },
 };
+
+// Экспортирована для тестов.
+export function sanitizeSgRule(r: Record<string, unknown>): Record<string, unknown> {
+  const protoMode = (r._protocol_mode as string | undefined)
+    ?? (r.protocol_name ? "name"
+      : typeof r.protocol_number === "number" ? "number"
+      : "any");
+  const portsAny = typeof r._ports_any === "boolean"
+    ? r._ports_any
+    : !r.ports;
+  const targetKind = (r._target_kind as string | undefined)
+    ?? (r.cidr_blocks ? "cidr"
+      : r.security_group_id ? "sg"
+      : r.predefined_target ? "predefined"
+      : "cidr");
+
+  const out: Record<string, unknown> = {};
+  // copy non-discriminator persistent fields
+  for (const [k, v] of Object.entries(r)) {
+    if (k.startsWith("_")) continue;
+    out[k] = v;
+  }
+  // protocol oneof-like
+  if (protoMode === "any") {
+    delete out.protocol_name;
+    delete out.protocol_number;
+  } else if (protoMode === "name") {
+    delete out.protocol_number;
+  } else if (protoMode === "number") {
+    delete out.protocol_name;
+  }
+  // ports
+  if (portsAny) {
+    delete out.ports;
+  }
+  // target oneof — оставляем только нужный
+  if (targetKind === "cidr") {
+    delete out.security_group_id;
+    delete out.predefined_target;
+  } else if (targetKind === "sg") {
+    delete out.cidr_blocks;
+    delete out.predefined_target;
+  } else if (targetKind === "predefined") {
+    delete out.cidr_blocks;
+    delete out.security_group_id;
+  }
+  return out;
+}
 
 export function getResource(id: string): ResourceSpec | undefined {
   return REGISTRY[id];

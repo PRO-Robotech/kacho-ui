@@ -146,3 +146,41 @@ export interface RouteTableList {
   route_tables: RouteTable[];
   next_page_token?: string;
 }
+
+export interface SecurityGroupRule {
+  id?: string;
+  description?: string;
+  labels?: Record<string, string>;
+  direction?: "DIRECTION_UNSPECIFIED" | "INGRESS" | "EGRESS" | string;
+  ports?: { from_port?: number; to_port?: number };
+  protocol_name?: string;
+  protocol_number?: number;
+  // oneof target
+  cidr_blocks?: { v4_cidr_blocks?: string[]; v6_cidr_blocks?: string[] };
+  security_group_id?: string;
+  predefined_target?: string;
+}
+
+export interface SecurityGroup {
+  id: string;
+  folder_id?: string;
+  created_at?: string;
+  name: string;
+  description?: string;
+  labels?: Record<string, string>;
+  network_id?: string;
+  status?:
+    | "STATUS_UNSPECIFIED"
+    | "CREATING"
+    | "ACTIVE"
+    | "UPDATING"
+    | "DELETING"
+    | string;
+  rules?: SecurityGroupRule[];
+  default_for_network?: boolean;
+}
+
+export interface SecurityGroupList {
+  security_groups: SecurityGroup[];
+  next_page_token?: string;
+}

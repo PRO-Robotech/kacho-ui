@@ -4,7 +4,7 @@
 
 import { ReactNode } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { Eye, Loader2, RefreshCw } from "lucide-react";
+import { ChevronRight, Eye, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -57,11 +57,23 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     cell: (row) => {
       const id = getByPath<string>(row, "id") ?? "";
       const name = getByPath<string>(row, "name") ?? id;
+      // Иерархический drill-down: для Org/Cloud/Folder ведёт в дочерний список.
+      // Leaf-ресурсы (VPC) идут в DetailPage.
+      const drill = spec.childRoute ? spec.childRoute.replace(":id", id) : null;
+      const target = drill ?? `${basePath}/${id}`;
       return (
         <div className="flex items-center justify-end gap-1">
           <Button asChild variant="ghost" size="sm">
-            <Link to={`${basePath}/${id}`}>
-              <Eye className="h-4 w-4" /> View
+            <Link to={target}>
+              {drill ? (
+                <>
+                  <ChevronRight className="h-4 w-4" /> Open
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4" /> View
+                </>
+              )}
             </Link>
           </Button>
           {spec.ops.update && (

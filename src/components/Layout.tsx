@@ -5,6 +5,7 @@ import {
   Layers,
   Route,
   MapPin,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
@@ -27,6 +28,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { segment: "subnets", label: "Subnets", icon: Layers, scope: "folder" },
       { segment: "route-tables", label: "Route Tables", icon: Route, scope: "folder" },
       { segment: "addresses", label: "Addresses", icon: MapPin, scope: "folder" },
+      { segment: "security-groups", label: "Security Groups", icon: Shield, scope: "folder" },
     ],
   },
 ];

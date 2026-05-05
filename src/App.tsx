@@ -1,7 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
-import { DashboardPage } from "@/pages/DashboardPage";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { Toaster } from "@/components/Toaster";
@@ -18,7 +17,7 @@ const queryClient = new QueryClient({
 });
 
 // Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
-const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables"]
+const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 
@@ -28,7 +27,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<DashboardPage />} />
+            {/* Root → drill-flow от Organizations вниз. */}
+            <Route index element={<Navigate to="/organizations" replace />} />
 
             {/* === Resource Manager hierarchy (через path) === */}
 
@@ -92,11 +92,11 @@ export default function App() {
             {/* Detail-страницы для Resource Manager */}
             <Route
               path="/organizations/:orgId"
-              element={<ResourceDetailPage spec={REGISTRY.organizations} />}
+              element={<ResourceDetailPage spec={REGISTRY.organizations} paramKey="orgId" />}
             />
             <Route
               path="/clouds/:cloudId"
-              element={<ResourceDetailPage spec={REGISTRY.clouds} />}
+              element={<ResourceDetailPage spec={REGISTRY.clouds} paramKey="cloudId" />}
             />
 
             <Route path="*" element={<Navigate to="/" replace />} />

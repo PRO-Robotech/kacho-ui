@@ -22,6 +22,7 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults } from "@/lib/resource-registry";
+import { getByPath } from "@/lib/path";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import type { FormField } from "@/lib/form-schema";
@@ -73,6 +74,12 @@ export function ResourceFormDialog({
   const snapshotRef = useRef({ template, fields });
   snapshotRef.current = { template, fields };
 
+  // В edit-режиме — снимок оригинала на момент открытия для diff'а update_mask.
+  // Backend без mask делает full-replace mutable полей: если в body какое-то ref-
+  // поле прилетит как "" / отсутствует, оно сотрётся. Mask указывает, какие
+  // поля реально менять (verbatim YC семантика PATCH).
+  const originalRef = useRef<Record<string, unknown> | null>(null);
+
   useEffect(() => {
     if (open) {
       const snap = snapshotRef.current;
@@ -81,9 +88,13 @@ export function ResourceFormDialog({
       setSubmitErr(null);
       setOpId(null);
       setView(snap.fields ? "form" : "json");
+      originalRef.current =
+        mode === "edit" && typeof snap.template === "object" && snap.template !== null
+          ? (snap.template as Record<string, unknown>)
+          : null;
     }
     // ВАЖНО: только [open] — НЕ template/fields, иначе reset при каждом polling-update.
-  }, [open]);
+  }, [open, mode]);
 
   const mutation = useMutation({
     mutationFn: async (item: unknown) => {
@@ -135,6 +146,33 @@ export function ResourceFormDialog({
     if (sanitize && typeof parsed === "object" && parsed !== null) {
       parsed = sanitize(parsed as Record<string, unknown>);
     }
+
+    // Edit: вычисляем update_mask = поля spec.fields, реально изменившиеся
+    // относительно snapshot. Без mask backend делает full-replace mutable
+    // (см. applySubnetMask и т.п.) и стирает не-переданные ссылки.
+    if (
+      mode === "edit" &&
+      originalRef.current &&
+      fields &&
+      typeof parsed === "object" &&
+      parsed !== null
+    ) {
+      const mask = computeUpdateMask(originalRef.current, parsed as Record<string, unknown>, fields);
+      if (mask.length === 0) {
+        // Нет изменений — закрываем без вызова PATCH, чтобы не плодить пустые operations.
+        setOpen(false);
+        return;
+      }
+      // proto3 JSON mapping для FieldMask: comma-separated camelCase string
+      // (см. https://protobuf.dev/programming-guides/proto3/#json — FieldMask).
+      // Объектная форма {paths:[...]} НЕ принимается protojson grpc-gateway-ем
+      // (вылетает `proto: syntax error … unexpected token {`).
+      parsed = {
+        ...(parsed as Record<string, unknown>),
+        update_mask: mask.map(snakeToCamelPath).join(","),
+      };
+    }
+
     mutation.mutate(parsed);
   };
 
@@ -215,6 +253,7 @@ export function ResourceFormDialog({
                   pathPrefix=""
                   value={obj}
                   onChange={setObj}
+                  editMode={mode === "edit"}
                 />
               ))}
             </div>
@@ -277,4 +316,36 @@ function normalize(tpl: unknown, fields: FormField[] | undefined): Record<string
       ? { ...(tpl as Record<string, unknown>) }
       : ({} as Record<string, unknown>);
   return applyFieldDefaults(fields, obj);
+}
+
+// Возвращает proto-paths полей spec.fields, чьи значения отличаются от
+// snapshot оригинала. Hidden и UI-internal (`_*`) поля исключаются.
+// Сравнение через JSON.stringify — достаточно для primitives/arrays/maps,
+// которые всегда возвращаются API в стабильном порядке (ключи snake_case).
+//
+// Экспортирована для тестов (regress-guard от потери ссылок при PATCH).
+export function computeUpdateMask(
+  original: Record<string, unknown>,
+  current: Record<string, unknown>,
+  fields: FormField[],
+): string[] {
+  const out: string[] = [];
+  for (const f of fields) {
+    if (f.hidden) continue;
+    if (f.immutable) continue; // backend reject через update_mask, и мы не пытаемся
+    if (f.name.startsWith("_")) continue;
+    const o = getByPath(original, f.name);
+    const c = getByPath(current, f.name);
+    if (JSON.stringify(o) !== JSON.stringify(c)) out.push(f.name);
+  }
+  return out;
+}
+
+// snake_case → camelCase для FieldMask path. Поддерживает dotted-pathи
+// (`external_ipv4_address_spec.zone_id` → `externalIpv4AddressSpec.zoneId`):
+// regex `_x` → `X` точку не трогает.
+//
+// Экспортирована для тестов.
+export function snakeToCamelPath(p: string): string {
+  return p.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 }
