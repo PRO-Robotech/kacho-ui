@@ -10,6 +10,7 @@ import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
+import { DashboardPage } from "@/pages/DashboardPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,8 +33,9 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<Layout />}>
-            {/* Root → drill-flow от Organizations вниз. */}
-            <Route index element={<Navigate to="/organizations" replace />} />
+            {/* Root → dashboard. */}
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
 
             {/* === Resource Manager hierarchy (через path) === */}
 
