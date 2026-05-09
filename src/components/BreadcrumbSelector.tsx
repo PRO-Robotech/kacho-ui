@@ -9,10 +9,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Building2,
   Cloud,
   ChevronDown,
-  ChevronRight,
   FolderOpen,
   Check,
   Plus,
@@ -27,7 +25,6 @@ import {
   useContext,
   type CloudRef,
   type FolderRef,
-  type OrgRef,
 } from "@/lib/context-store";
 import { cn } from "@/lib/utils";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
@@ -76,10 +73,6 @@ export function BreadcrumbSelector() {
   // navigation actions: сначала обновляем context-store (со side-effect-ом
   // сброса дочерних уровней), затем навигируем. ContextUrlSync не повредит —
   // он не сбрасывает context при отсутствии IDs в URL.
-  const goOrg = (id: string, name: string) => {
-    contextApi.setOrg({ id, name }); // сбрасывает cloud+folder
-    navigate(`/organizations/${id}/clouds`);
-  };
   const goCloud = (id: string, name: string, orgId: string) => {
     contextApi.setCloud({ id, name, organizationId: orgId }); // сбрасывает folder
     navigate(`/clouds/${id}/folders`);
@@ -91,21 +84,9 @@ export function BreadcrumbSelector() {
     const tail = m && m[1] ? m[1] : "/networks";
     navigate(`/folders/${id}${tail}`);
   };
-  const goRoot = () => {
-    contextApi.setOrg(null);
-    navigate("/organizations");
-  };
 
   return (
-    <div className="flex items-center text-sm">
-      <OrgCrumb
-        selected={org}
-        onSelect={(it) => goOrg(it.id, it.name)}
-        onClear={goRoot}
-        onForm={setFormAction}
-        onDelete={setDeleteAction}
-      />
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground mx-1 shrink-0" />
+    <div className="flex items-center gap-2 text-sm">
       <CloudCrumb
         selected={cloud}
         parentOrgId={org?.id ?? null}
@@ -113,7 +94,6 @@ export function BreadcrumbSelector() {
         onForm={setFormAction}
         onDelete={setDeleteAction}
       />
-      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground mx-1 shrink-0" />
       <FolderCrumb
         selected={folder}
         parentCloudId={cloud?.id ?? null}
@@ -137,13 +117,6 @@ export function BreadcrumbSelector() {
 
 // ====== Row data shapes (verbatim YC) ======
 
-interface OrgRow {
-  id: string;
-  name: string;
-  description?: string;
-  title?: string;
-  labels?: Record<string, string>;
-}
 interface CloudRow {
   id: string;
   name: string;
@@ -157,66 +130,6 @@ interface FolderRow {
   description?: string;
   cloud_id: string;
   labels?: Record<string, string>;
-}
-
-// ====== Org crumb ======
-
-function OrgCrumb({
-  selected,
-  onSelect,
-  onClear,
-  onForm,
-  onDelete,
-}: {
-  selected: OrgRef | null;
-  onSelect: (row: OrgRow) => void;
-  onClear: () => void;
-  onForm: (s: FormDialogState) => void;
-  onDelete: (s: DeleteDialogState) => void;
-}) {
-  const { data, isLoading } = useQuery({
-    queryKey: ["bc.orgs"],
-    queryFn: () => api.list<{ organizations: OrgRow[] }>("/organization-manager/v1/organizations"),
-    refetchInterval: 30_000,
-  });
-  const items = data?.organizations ?? [];
-  // Если selected пришёл из URL без name — найди в загруженном списке.
-  const resolvedName =
-    selected?.name || items.find((it) => it.id === selected?.id)?.name;
-
-  return (
-    <Crumb
-      icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
-      label={resolvedName ?? (selected ? selected.id : "Organization")}
-      placeholder={!selected}
-      loading={isLoading && items.length === 0}
-      items={items.map((it) => ({
-        id: it.id,
-        label: it.name,
-        sub: it.id,
-        selected: selected?.id === it.id,
-        onSelect: () => onSelect(it),
-        onEdit: () => onForm({ level: "org", action: "edit", template: it }),
-        onDelete: () =>
-          onDelete({
-            level: "org",
-            apiPath: `/organization-manager/v1/organizations/${it.id}`,
-            name: it.name,
-            resourceLabel: "Organization",
-            onSuccess: () => {
-              if (selected?.id === it.id) onClear();
-            },
-          }),
-      }))}
-      onCreate={() =>
-        onForm({
-          level: "org",
-          action: "create",
-          template: { name: "", title: "", description: "" },
-        })
-      }
-    />
-  );
 }
 
 // ====== Cloud crumb ======
@@ -321,6 +234,13 @@ function FolderCrumb({
   return (
     <Crumb
       icon={<FolderOpen className="h-4 w-4 text-muted-foreground" />}
+      beforeLabel={
+        selected ? (
+          <span className="inline-flex h-4 items-center px-1 rounded text-[10px] font-bold tracking-wider bg-blue-700/40 text-blue-300 border border-blue-500/30">
+            IN
+          </span>
+        ) : null
+      }
       label={
         selected?.name ||
         items.find((it) => it.id === selected?.id)?.name ||
@@ -378,6 +298,7 @@ interface CrumbItem {
 interface CrumbProps {
   icon: ReactNode;
   label: string;
+  beforeLabel?: ReactNode;
   placeholder?: boolean;
   disabled?: boolean;
   loading?: boolean;
@@ -389,6 +310,7 @@ interface CrumbProps {
 function Crumb({
   icon,
   label,
+  beforeLabel,
   placeholder,
   disabled,
   loading,
@@ -408,6 +330,7 @@ function Crumb({
           title={disabled ? disabledHint : label}
         >
           {icon}
+          {beforeLabel}
           <span className={cn("truncate", placeholder && "text-muted-foreground italic")}>
             {label}
           </span>

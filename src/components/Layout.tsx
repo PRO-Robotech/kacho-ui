@@ -1,6 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  Building2,
   Network,
   Layers,
   Route,
@@ -10,107 +9,129 @@ import {
   Cloud,
   Boxes,
   Search,
+  LayoutGrid,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
 import { useFolderStore } from "@/lib/folder-store";
+import {
+  HeaderRightSlot,
+  HeaderBreadcrumbSlot,
+  PageHeaderSlotProvider,
+} from "@/components/PageHeaderSlot";
 
 interface NavItem {
-  // segment под /folders/{folderId}/<segment>
   segment: string;
   label: string;
-  icon: typeof Building2;
+  icon: typeof Network;
   scope: "global" | "folder";
 }
 
-const NAV: { group: string; items: NavItem[] }[] = [
-  {
-    group: "VPC",
-    items: [
-      { segment: "networks", label: "Networks", icon: Network, scope: "folder" },
-      { segment: "subnets", label: "Subnets", icon: Layers, scope: "folder" },
-      { segment: "route-tables", label: "Route Tables", icon: Route, scope: "folder" },
-      { segment: "addresses", label: "Addresses", icon: MapPin, scope: "folder" },
-      { segment: "security-groups", label: "Security Groups", icon: Shield, scope: "folder" },
-    ],
-  },
-  // System group — global admin-only ресурсы (Region/Zone/AddressPool + Search).
-  // Path-prefix: /system/<segment>. Не зависят от выбранного folder.
-  {
-    group: "System",
-    items: [
-      { segment: "search", label: "Search", icon: Search, scope: "global" },
-      { segment: "regions", label: "Regions", icon: Globe, scope: "global" },
-      { segment: "zones", label: "Zones", icon: Cloud, scope: "global" },
-      { segment: "address-pools", label: "Address Pools", icon: Boxes, scope: "global" },
-    ],
-  },
+const NAV: NavItem[] = [
+  { segment: "networks", label: "Облачные сети", icon: Network, scope: "folder" },
+  { segment: "subnets", label: "Подсети", icon: Layers, scope: "folder" },
+  { segment: "addresses", label: "Публичные IP-адреса", icon: MapPin, scope: "folder" },
+  { segment: "route-tables", label: "Таблицы маршрутизации", icon: Route, scope: "folder" },
+  { segment: "security-groups", label: "Группы безопасности", icon: Shield, scope: "folder" },
+  // System (admin-only)
+  { segment: "search", label: "Поиск", icon: Search, scope: "global" },
+  { segment: "regions", label: "Регионы", icon: Globe, scope: "global" },
+  { segment: "zones", label: "Зоны", icon: Cloud, scope: "global" },
+  { segment: "address-pools", label: "Пулы адресов", icon: Boxes, scope: "global" },
 ];
 
-// Building2 импортирован, но используется в типе NavItem.icon. Pre-empt unused-warning:
-const _building2Ref = Building2;
-void _building2Ref;
-
 export function Layout() {
+  return (
+    <PageHeaderSlotProvider>
+      <LayoutInner />
+    </PageHeaderSlotProvider>
+  );
+}
+
+function LayoutInner() {
   const location = useLocation();
   const folder = useFolderStore((s) => s.folder);
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <ContextUrlSync />
-      <header className="h-14 border-b border-border flex items-center px-6 gap-6 bg-background sticky top-0 z-20">
-        <NavLink to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white text-xs font-bold">
+
+      <header className="h-12 border-b border-border flex items-center px-3 gap-2 bg-background sticky top-0 z-20">
+        <NavLink
+          to="/"
+          className="flex items-center justify-center h-7 w-7 shrink-0"
+          title="Kachō Console"
+        >
+          <div className="h-6 w-6 rounded-md bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center text-white text-[11px] font-bold">
             K
           </div>
-          <span>Kachō Console</span>
         </NavLink>
-        <div className="flex-1" />
+
         <BreadcrumbSelector />
+
+        <button
+          className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground"
+          title="Все сервисы"
+          aria-label="Все сервисы"
+        >
+          <LayoutGrid className="h-4 w-4" />
+        </button>
+        <NavLink
+          to={folder ? `/folders/${folder.id}` : "/"}
+          className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground"
+          title="Главная"
+          aria-label="Главная"
+        >
+          <Home className="h-4 w-4" />
+        </NavLink>
+
+        <div className="text-muted-foreground/40 px-1">/</div>
+        <div className="flex items-center gap-2 text-sm min-w-0 flex-1 truncate">
+          <HeaderBreadcrumbSlot />
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <HeaderRightSlot />
+        </div>
       </header>
 
       <div className="flex-1 flex">
-        <aside className="w-60 shrink-0 border-r border-border py-4 px-3 overflow-y-auto sticky top-14 self-start max-h-[calc(100vh-3.5rem)]">
-          {NAV.map((group) => (
-            <div key={group.group} className="mb-4">
-              <div className="px-3 mb-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-                {group.group}
-              </div>
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const disabled = item.scope === "folder" && !folder;
-                const to = item.scope === "global"
-                  ? `/system/${item.segment}`
-                  : folder
-                    ? `/folders/${folder.id}/${item.segment}`
-                    : "#";
-                const active = item.scope === "global"
-                  ? location.pathname.startsWith(`/system/${item.segment}`)
-                  : location.pathname.startsWith(`/folders/`) &&
-                    location.pathname.includes(`/${item.segment}`);
-                return (
-                  <NavLink
-                    key={item.segment}
-                    to={to}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md mb-0.5 transition-colors",
-                      active && "bg-secondary font-medium",
-                      !active && "hover:bg-muted",
-                      disabled && "opacity-40 pointer-events-none",
-                    )}
-                    title={disabled ? "Выберите Folder в крошках" : undefined}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {item.label}
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
+        <aside className="w-14 shrink-0 border-r border-border py-2 flex flex-col items-center gap-1 sticky top-12 self-start max-h-[calc(100vh-3rem)] overflow-y-auto">
+          {NAV.map((item) => {
+            const Icon = item.icon;
+            const disabled = item.scope === "folder" && !folder;
+            const to =
+              item.scope === "global"
+                ? `/system/${item.segment}`
+                : folder
+                ? `/folders/${folder.id}/${item.segment}`
+                : "#";
+            const active =
+              item.scope === "global"
+                ? location.pathname.startsWith(`/system/${item.segment}`)
+                : location.pathname.startsWith(`/folders/`) &&
+                  location.pathname.includes(`/${item.segment}`);
+            return (
+              <NavLink
+                key={item.segment}
+                to={to}
+                title={disabled ? `${item.label} — выберите Folder` : item.label}
+                className={cn(
+                  "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
+                  active && "bg-secondary text-primary",
+                  !active && "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  disabled && "opacity-30 pointer-events-none",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </NavLink>
+            );
+          })}
         </aside>
 
-        <main className="flex-1 p-6 max-w-[1400px] mx-auto w-full">
+        <main className="flex-1 px-6 py-5 min-w-0">
           <Outlet />
         </main>
       </div>
