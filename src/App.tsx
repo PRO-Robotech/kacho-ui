@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { ResourceCreatePage } from "@/components/ResourceCreatePage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
@@ -74,6 +75,16 @@ export default function App() {
                   path={`/folders/:folderId/${spec.route}`}
                   element={
                     <ResourceListPage
+                      spec={spec}
+                      parentField="folder_id"
+                      parentParam="folderId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/folders/:folderId/${spec.route}/create`}
+                  element={
+                    <ResourceCreatePage
                       spec={spec}
                       parentField="folder_id"
                       parentParam="folderId"

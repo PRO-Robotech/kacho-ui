@@ -3,8 +3,9 @@
 // spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
 
 import { ReactNode, useMemo, useState } from "react";
-import { useParams, useLocation } from "react-router-dom";
-import { Loader2, RefreshCw, Search } from "lucide-react";
+import { Link, useParams, useLocation } from "react-router-dom";
+import { Loader2, Plus, RefreshCw, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
@@ -43,30 +44,46 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   );
   useBreadcrumb(breadcrumb);
 
-  const ctaTemplate = useMemo(() => {
+  // Create CTA — navigation на full-page форму /<basePath>/create.
+  // Если у ресурса нет form-schema (fields), используем legacy modal с JSON-editor.
+  const createBase = location.pathname.endsWith("/")
+    ? location.pathname.slice(0, -1)
+    : location.pathname;
+
+  const cta = useMemo(() => {
     if (!spec.ops.create) return null;
-    return spec.template({
+    if (spec.fields) {
+      return (
+        <Button asChild size="sm">
+          <Link to={`${createBase}/create`}>
+            <Plus className="h-4 w-4" /> Создать {spec.singular.toLowerCase()}
+          </Link>
+        </Button>
+      );
+    }
+    // Fallback на modal — для admin ресурсов (regions/zones/address-pools)
+    // на этом этапе page-mode формы ещё не подняты под /system/*.
+    const tpl = spec.template({
       folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
       cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
       organizationId:
         parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
     });
-  }, [spec, parentField, filterValue]);
-
-  useHeaderRight(
-    spec.ops.create && ctaTemplate !== null ? (
+    return (
       <ResourceFormDialog
         mode="create"
         title={`Создать ${spec.singular.toLowerCase()}`}
         apiPath={spec.apiPath}
         resourceId={spec.id}
-        template={ctaTemplate}
+        template={tpl}
         fields={spec.fields}
         folderUid={filterValue ?? null}
         sanitize={spec.sanitize}
       />
-    ) : null,
-  );
+    );
+  }, [spec, createBase, parentField, filterValue]);
+
+  useHeaderRight(cta);
 
   // Если ресурс требует parent (например, /folders/:folderId/networks без folderId)
   if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
