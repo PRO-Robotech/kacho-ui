@@ -5,8 +5,15 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, RotateCw, Play, Square } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Alert, Button, Descriptions, Space, Spin, Typography } from "antd";
+import {
+  ArrowLeftOutlined,
+  ReloadOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons";
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
@@ -23,10 +30,7 @@ import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
   spec: ResourceSpec;
-  // Имя URL-параметра в роуте (default "uid"). Org/Cloud detail используют
-  // "orgId"/"cloudId", потому что эти же ключи фигурируют в дочерних list-роутах.
   paramKey?: string;
-  /** Дополнительные tabs (Subnet "IP-адреса", SG "Входящий/Исходящий"). */
   extraTabs?: (data: Record<string, unknown>) => DetailTab[];
 }
 
@@ -40,13 +44,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props)
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Polling GET /v1/<plural>/{id}
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],
     queryFn: () => api.get<Record<string, unknown>>(`${spec.apiPath}/${uid}`),
     refetchInterval: 3_000,
@@ -87,7 +85,6 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props)
   const resourceId = data ? (getByPath<string>(data, "id") ?? uid ?? "") : uid ?? "";
   const editPath = `${spec.apiPath}/${resourceId}`;
 
-  // Back-link учитывает parent-context из URL.
   const backHref = useMemo(() => {
     const folderId = params.folderId;
     if (folderId) return `/folders/${folderId}/${spec.route}`;
@@ -102,159 +99,164 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props)
     return "/organizations";
   }, [params.folderId, spec.id, spec.route, data]);
 
-  // Breadcrumb: <Plural> / <Name>
   const breadcrumb = useMemo(
     () => (
-      <>
-        <Link to={backHref} className="text-muted-foreground hover:text-foreground">
-          {spec.plural}
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <Link to={backHref}>
+          <Typography.Text type="secondary">{spec.plural}</Typography.Text>
         </Link>
-        <span className="text-muted-foreground/40">/</span>
-        <span className="text-foreground truncate">{name || resourceId}</span>
-      </>
+        <Typography.Text type="secondary">/</Typography.Text>
+        <Typography.Text strong style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
+          {name || resourceId}
+        </Typography.Text>
+      </span>
     ),
     [backHref, spec.plural, name, resourceId],
   );
   useBreadcrumb(breadcrumb);
 
-  // Header CTA: Edit / Restart / Start / Stop / Delete
   const headerActions = useMemo(
     () => (
-      <>
+      <Space size="small">
         {spec.ops.restart && (
           <Button
-            variant="outline"
-            size="sm"
+            size="small"
+            icon={<ReloadOutlined spin={actionMutation.isPending && actionMutation.variables === "restart"} />}
             onClick={() => doAction("restart", "Restarting")}
             disabled={actionMutation.isPending}
           >
-            <RotateCw
-              className={`h-4 w-4 ${actionMutation.isPending && actionMutation.variables === "restart" ? "animate-spin" : ""}`}
-            />
-            Restart
+            Перезапустить
           </Button>
         )}
         {spec.ops.start && (
           <Button
-            variant="outline"
-            size="sm"
+            size="small"
+            icon={<PlayCircleOutlined />}
             onClick={() => doAction("start", "Starting")}
             disabled={actionMutation.isPending}
           >
-            <Play className="h-4 w-4" /> Start
+            Запустить
           </Button>
         )}
         {spec.ops.stop && (
           <Button
-            variant="outline"
-            size="sm"
+            size="small"
+            icon={<PauseCircleOutlined />}
             onClick={() => doAction("stop", "Stopping")}
             disabled={actionMutation.isPending}
           >
-            <Square className="h-4 w-4" /> Stop
+            Остановить
           </Button>
         )}
         {spec.ops.update && data && (
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Button size="small" icon={<EditOutlined />} onClick={() => setEditOpen(true)}>
             Редактировать
           </Button>
         )}
         {spec.ops.delete && data && (
-          <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => setDeleteOpen(true)}>
             Удалить
           </Button>
         )}
-      </>
+      </Space>
     ),
-    // doAction / actionMutation стабильны через useCallback в реальности? нет —
-    // пересоздаются каждый рендер. Но ReactNode сравнивается shallow в провайдере
-    // через setState, лишний rerender провайдера тривиален.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [spec, data, actionMutation.isPending, actionMutation.variables],
   );
   useHeaderRight(headerActions);
 
   if (isLoading && !data) {
-    return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
+    return (
+      <div style={{ padding: 24 }}>
+        <Spin tip="Загрузка…" />
+      </div>
+    );
   }
 
   if (isError && !data) {
     return (
-      <div className="p-6 space-y-3">
-        <Button asChild variant="outline" size="sm">
-          <Link to={backHref}>
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Link>
-        </Button>
-        <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {(error as Error).message}
-        </div>
-      </div>
+      <Space direction="vertical" style={{ width: "100%" }} size={12}>
+        <Link to={backHref}>
+          <Button size="small" icon={<ArrowLeftOutlined />}>Назад</Button>
+        </Link>
+        <Alert type="error" message={`Ошибка: ${(error as Error).message}`} />
+      </Space>
     );
   }
 
   if (!data) {
     return (
-      <div className="space-y-4">
-        <Button asChild variant="outline" size="sm">
-          <Link to={backHref}>
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Link>
-        </Button>
-        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Ресурс не найден.
-        </div>
-      </div>
+      <Space direction="vertical" style={{ width: "100%" }} size={12}>
+        <Link to={backHref}>
+          <Button size="small" icon={<ArrowLeftOutlined />}>Назад</Button>
+        </Link>
+        <Alert type="warning" message="Ресурс не найден." />
+      </Space>
     );
   }
+
+  const overviewItems = [
+    { label: "ID", value: <CopyableId id={resourceId} /> },
+    { label: "Имя", value: name || "—" },
+    statusValue ? { label: "Статус", value: <StatusBadge state={statusValue} /> } : null,
+    getByPath<string>(data, "created_at")
+      ? {
+          label: "Дата создания",
+          value: new Date(getByPath<string>(data, "created_at")!).toLocaleString(),
+        }
+      : null,
+    getByPath<string>(data, "folder_id")
+      ? { label: "Folder", value: <CopyableId id={getByPath<string>(data, "folder_id")!} /> }
+      : null,
+    getByPath<string>(data, "cloud_id")
+      ? { label: "Cloud", value: <CopyableId id={getByPath<string>(data, "cloud_id")!} /> }
+      : null,
+    getByPath<string>(data, "organization_id")
+      ? {
+          label: "Organization",
+          value: <CopyableId id={getByPath<string>(data, "organization_id")!} />,
+        }
+      : null,
+    getByPath<string>(data, "zone_id")
+      ? {
+          label: "Зона",
+          value: <Typography.Text code>{getByPath<string>(data, "zone_id")!}</Typography.Text>,
+        }
+      : null,
+    getByPath<string>(data, "network_id")
+      ? { label: "Сеть", value: <CopyableId id={getByPath<string>(data, "network_id")!} /> }
+      : null,
+    getByPath<string>(data, "description")
+      ? { label: "Описание", value: getByPath<string>(data, "description")! }
+      : null,
+  ].filter(Boolean) as { label: string; value: React.ReactNode }[];
 
   const tabs: DetailTab[] = [
     {
       id: "overview",
       label: "Обзор",
       render: () => (
-        <div className="space-y-4">
-          {actionErr && (
-            <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">
-              {actionErr}
-            </div>
-          )}
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          {actionErr && <Alert type="error" message={actionErr} />}
           {spec.id === "subnets" && (
             <SubnetCidrManager
               subnetId={resourceId}
               blocks={(getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[]}
             />
           )}
-          <Section title="Общее">
-            <KV k="ID" v={resourceId} copyId />
-            <KV k="Имя" v={name} />
-            {statusValue ? <KV k="Статус" v={statusValue} /> : null}
-            {getByPath<string>(data, "created_at") ? (
-              <KV
-                k="Дата создания"
-                v={new Date(getByPath<string>(data, "created_at")!).toLocaleString()}
-              />
-            ) : null}
-            {getByPath<string>(data, "folder_id") ? (
-              <KV k="Folder" v={getByPath<string>(data, "folder_id")!} copyId />
-            ) : null}
-            {getByPath<string>(data, "cloud_id") ? (
-              <KV k="Cloud" v={getByPath<string>(data, "cloud_id")!} copyId />
-            ) : null}
-            {getByPath<string>(data, "organization_id") ? (
-              <KV k="Organization" v={getByPath<string>(data, "organization_id")!} copyId />
-            ) : null}
-            {getByPath<string>(data, "zone_id") ? (
-              <KV k="Зона" v={getByPath<string>(data, "zone_id")!} mono />
-            ) : null}
-            {getByPath<string>(data, "network_id") ? (
-              <KV k="Сеть" v={getByPath<string>(data, "network_id")!} copyId />
-            ) : null}
-            {getByPath<string>(data, "description") ? (
-              <KV k="Описание" v={getByPath<string>(data, "description")!} />
-            ) : null}
-          </Section>
-        </div>
+          <Descriptions
+            title="Общее"
+            bordered
+            column={1}
+            size="small"
+            labelStyle={{ width: 200 }}
+            items={overviewItems.map((it, i) => ({
+              key: String(i),
+              label: it.label,
+              children: it.value,
+            }))}
+          />
+        </Space>
       ),
     },
     ...(extraTabs ? extraTabs(data) : []),
@@ -307,38 +309,6 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props)
     </>
   );
 
-  // Suppress unused-warning на navigate — оставляем для будущих delete-flows.
+  // Suppress unused
   void navigate;
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-border bg-card">
-      <div className="px-4 py-2.5 border-b border-border text-sm font-medium">{title}</div>
-      <dl className="grid grid-cols-[200px_1fr] gap-x-6 gap-y-2 px-4 py-3 text-sm">
-        {children}
-      </dl>
-    </div>
-  );
-}
-
-function KV({
-  k,
-  v,
-  mono,
-  copyId,
-}: {
-  k: string;
-  v?: string;
-  mono?: boolean;
-  copyId?: boolean;
-}) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{k}</dt>
-      <dd className={mono ? "font-mono text-xs" : ""}>
-        {copyId && v ? <CopyableId id={v} /> : v || "—"}
-      </dd>
-    </>
-  );
 }

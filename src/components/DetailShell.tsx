@@ -1,24 +1,18 @@
-// DetailShell — общая обёртка detail-страницы под YC look-and-feel.
+// DetailShell — обёртка detail-страницы под YC look-and-feel на antd.
 //
 // Структура:
-//   ┌─────────────────────────────────────────────────────────────┐
-//   │ <header слот через useBreadcrumb / useHeaderRight уже там>  │
-//   ├──────────────┬──────────────────────────────────────────────┤
+//   ┌──────────────┬──────────────────────────────────────────────┐
 //   │  resource    │                                              │
-//   │  name+badge  │                                              │
-//   │              │           main content (per tab)             │
-//   │  vertical    │                                              │
-//   │  tabs        │                                              │
-//   │              │                                              │
+//   │  name+badge  │           main content (per tab)             │
+//   │  Menu (tabs) │                                              │
 //   │  Документация│                                              │
 //   └──────────────┴──────────────────────────────────────────────┘
 //
 // Tab выбирается через ?tab=<id>. Дефолт — первый tab.
 
 import { useMemo, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Link, useSearchParams } from "react-router-dom";
+import { Menu, Typography, Badge } from "antd";
 
 export interface DetailTab {
   id: string;
@@ -33,13 +27,11 @@ export interface DocLink {
 }
 
 interface Props {
-  // Header info внутри left sub-nav (сверху над tabs).
-  resourceLabel: string;          // singular: "Группа безопасности"
-  resourceName: string;           // имя ресурса (или "(unnamed)")
-  badges?: ReactNode;             // <Badge>Default</Badge>, статус и т.п.
+  resourceLabel: string;
+  resourceName: string;
+  badges?: ReactNode;
   tabs: DetailTab[];
   docLinks?: DocLink[];
-  /** Дефолтный tab id — берём первый, если не задан. */
   defaultTab?: string;
 }
 
@@ -66,59 +58,63 @@ export function DetailShell({
   const docs = useMemo(() => docLinks ?? DEFAULT_VPC_DOCS, [docLinks]);
 
   return (
-    <div className="flex gap-6 -mt-2">
-      <aside className="w-64 shrink-0 flex flex-col">
-        <div className="px-2 py-3 border-b border-border space-y-1">
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+    <div style={{ display: "flex", gap: 24, marginTop: -8 }}>
+      <aside style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            padding: "12px 8px",
+            borderBottom: "1px solid var(--ant-color-border)",
+            marginBottom: 8,
+          }}
+        >
+          <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>
             {resourceLabel}
-          </div>
-          <div className="font-medium text-foreground break-all flex items-center gap-2 flex-wrap">
-            <span className="truncate">{resourceName || "(unnamed)"}</span>
+          </Typography.Text>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+            <Typography.Text strong style={{ wordBreak: "break-all" }}>
+              {resourceName || "(unnamed)"}
+            </Typography.Text>
             {badges}
           </div>
         </div>
 
-        <nav className="py-2 space-y-0.5">
-          {tabs.map((t) => {
-            const isActive = t.id === active?.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  "w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors flex items-center justify-between",
-                  isActive
-                    ? "bg-secondary text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        <Menu
+          mode="inline"
+          selectedKeys={active ? [active.id] : []}
+          onClick={({ key }) => setTab(key)}
+          style={{ borderRight: "none", background: "transparent" }}
+          items={tabs.map((t) => ({
+            key: t.id,
+            label: (
+              <span style={{ display: "inline-flex", justifyContent: "space-between", width: "100%" }}>
+                <span>{t.label}</span>
+                {typeof t.count === "number" && t.count > 0 && (
+                  <Badge count={t.count} color="rgba(255,255,255,0.12)" overflowCount={9999} />
                 )}
-              >
-                <span className="truncate">{t.label}</span>
-                {typeof t.count === "number" && (
-                  <span className="text-xs tabular-nums opacity-70">{t.count}</span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+              </span>
+            ),
+          }))}
+        />
 
         {docs.length > 0 && (
-          <div className="mt-auto pt-6">
-            <div className="px-2 mb-2 text-xs uppercase tracking-wider text-muted-foreground">
+          <div style={{ marginTop: 24, padding: "0 8px" }}>
+            <Typography.Text
+              type="secondary"
+              style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}
+            >
               Документация
-            </div>
-            <ul className="space-y-1 px-1">
+            </Typography.Text>
+            <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
               {docs.map((d) => (
                 <li key={d.href}>
-                  <a
+                  <Typography.Link
                     href={d.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group inline-flex items-start gap-1.5 text-xs text-blue-400 hover:text-blue-300 leading-snug"
+                    style={{ fontSize: 12, lineHeight: 1.4 }}
                   >
-                    <span>{d.label}</span>
-                    <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-70" />
-                  </a>
+                    {d.label}
+                  </Typography.Link>
                 </li>
               ))}
             </ul>
@@ -126,7 +122,7 @@ export function DetailShell({
         )}
       </aside>
 
-      <main className="flex-1 min-w-0">{active?.render()}</main>
+      <main style={{ flex: 1, minWidth: 0 }}>{active?.render()}</main>
     </div>
   );
 }
@@ -140,3 +136,6 @@ const DEFAULT_VPC_DOCS: DocLink[] = [
   { label: "Получить статический публичный IP-адрес", href: "https://yandex.cloud/ru/docs/vpc/operations/enable-static-ip" },
   { label: "История изменений Virtual Private Cloud", href: "https://yandex.cloud/ru/docs/release-notes/vpc" },
 ];
+
+// Suppress unused — Link нужен для будущих использований navigator-style link.
+void Link;
