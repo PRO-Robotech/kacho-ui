@@ -1,27 +1,11 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
-import {
-  HomeOutlined,
-  AppstoreOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
-} from "@ant-design/icons";
-import {
-  Network,
-  Layers,
-  Route,
-  MapPin,
-  Shield,
-  Globe,
-  Cloud,
-  Boxes,
-  Search,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
 import { HierarchyTree } from "@/components/HierarchyTree";
+import { VpcSubNav } from "@/components/VpcSubNav";
 import { useFolderStore } from "@/lib/folder-store";
 import {
   HeaderRightSlot,
@@ -30,26 +14,6 @@ import {
 } from "@/components/PageHeaderSlot";
 
 const { Header, Sider, Content } = AntLayout;
-
-interface NavItem {
-  segment: string;
-  label: string;
-  icon: typeof Network;
-  scope: "global" | "folder";
-}
-
-const NAV: NavItem[] = [
-  { segment: "networks", label: "Облачные сети", icon: Network, scope: "folder" },
-  { segment: "subnets", label: "Подсети", icon: Layers, scope: "folder" },
-  { segment: "addresses", label: "Публичные IP-адреса", icon: MapPin, scope: "folder" },
-  { segment: "route-tables", label: "Таблицы маршрутизации", icon: Route, scope: "folder" },
-  { segment: "security-groups", label: "Группы безопасности", icon: Shield, scope: "folder" },
-  // System (admin-only)
-  { segment: "search", label: "Поиск", icon: Search, scope: "global" },
-  { segment: "regions", label: "Регионы", icon: Globe, scope: "global" },
-  { segment: "zones", label: "Зоны", icon: Cloud, scope: "global" },
-  { segment: "address-pools", label: "Пулы адресов", icon: Boxes, scope: "global" },
-];
 
 export function Layout() {
   return (
@@ -62,8 +26,19 @@ export function Layout() {
 function LayoutInner() {
   const location = useLocation();
   const folder = useFolderStore((s) => s.folder);
-  const [treeCollapsed, setTreeCollapsed] = useState(false);
   const { token } = theme.useToken();
+
+  // Sidebar mode выбирается по pathname:
+  //   /dashboard  → tree (root разводная)
+  //   /folders/*  → VPC sub-nav
+  //   /system/*   → VPC sub-nav (System группа активна)
+  //   остальное   → tree (Org/Cloud/Folder drill)
+  const sidebarMode: "tree" | "subnav" = useMemo(() => {
+    const p = location.pathname;
+    if (p.startsWith("/dashboard")) return "tree";
+    if (p.startsWith("/folders/") || p.startsWith("/system/")) return "subnav";
+    return "tree";
+  }, [location.pathname]);
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
@@ -77,16 +52,33 @@ function LayoutInner() {
           position: "sticky",
           top: 0,
           zIndex: 20,
+          paddingInline: 12,
         }}
       >
         <NavLink
           to="/"
-          className="flex items-center justify-center h-7 w-7 shrink-0"
-          title="Kachō Console"
+          aria-label="Kachō Console"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            height: 28,
+            width: 28,
+          }}
         >
           <div
-            className="h-6 w-6 rounded-md flex items-center justify-center text-white text-[11px] font-bold"
-            style={{ background: "linear-gradient(135deg, #fbbf24, #f43f5e)" }}
+            style={{
+              height: 24,
+              width: 24,
+              borderRadius: 6,
+              background: "linear-gradient(135deg, #fbbf24, #f43f5e)",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             K
           </div>
@@ -95,28 +87,39 @@ function LayoutInner() {
         <BreadcrumbSelector />
 
         <Tooltip title="Все сервисы">
-          <Button type="text" icon={<AppstoreOutlined />} size="small" />
+          <Button type="text" size="small" icon={<AppstoreOutlined />} />
         </Tooltip>
-        <Tooltip title="Главная">
-          <NavLink to={folder ? `/folders/${folder.id}` : "/"}>
-            <Button type="text" icon={<HomeOutlined />} size="small" />
+        <Tooltip title="На главную">
+          <NavLink to="/" aria-label="Главная">
+            <Button type="text" size="small" icon={<HomeOutlined />} />
           </NavLink>
         </Tooltip>
 
         <span style={{ color: token.colorTextTertiary, padding: "0 4px" }}>/</span>
-        <div className="flex items-center gap-2 text-sm min-w-0 flex-1 truncate">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            minWidth: 0,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
           <HeaderBreadcrumbSlot />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <HeaderRightSlot />
         </div>
       </Header>
 
       <AntLayout>
-        {/* Левый узкий sidebar — domain icon nav */}
         <Sider
-          width={56}
+          width={260}
           theme="dark"
           style={{
             borderRight: `1px solid ${token.colorBorder}`,
@@ -126,96 +129,27 @@ function LayoutInner() {
             overflowY: "auto",
           }}
         >
-          <div className="py-2 flex flex-col items-center gap-1">
-            {NAV.map((item) => {
-              const Icon = item.icon;
-              const disabled = item.scope === "folder" && !folder;
-              const to =
-                item.scope === "global"
-                  ? `/system/${item.segment}`
-                  : folder
-                  ? `/folders/${folder.id}/${item.segment}`
-                  : "#";
-              const active =
-                item.scope === "global"
-                  ? location.pathname.startsWith(`/system/${item.segment}`)
-                  : location.pathname.startsWith(`/folders/`) &&
-                    location.pathname.includes(`/${item.segment}`);
-              return (
-                <Tooltip
-                  key={item.segment}
-                  title={disabled ? `${item.label} — выберите Folder` : item.label}
-                  placement="right"
-                >
-                  <NavLink
-                    to={to}
-                    className={cn(
-                      "h-9 w-9 inline-flex items-center justify-center rounded-md transition-colors",
-                      disabled && "opacity-30 pointer-events-none",
-                    )}
-                    style={{
-                      background: active ? token.colorBgElevated : "transparent",
-                      color: active ? token.colorText : token.colorTextSecondary,
-                    }}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </NavLink>
-                </Tooltip>
-              );
-            })}
-          </div>
+          {sidebarMode === "tree" ? (
+            <HierarchyTree />
+          ) : (
+            <VpcSubNav />
+          )}
         </Sider>
 
-        {/* Средний sidebar — Org/Cloud/Folder tree */}
-        <Sider
-          width={260}
-          collapsedWidth={0}
-          collapsible
-          collapsed={treeCollapsed}
-          trigger={null}
-          theme="dark"
+        <Content
           style={{
-            borderRight: `1px solid ${token.colorBorder}`,
-            position: "sticky",
-            top: 48,
-            height: "calc(100vh - 48px)",
+            padding: "20px 24px",
+            overflow: "auto",
+            minWidth: 0,
+            background: token.colorBgLayout,
           }}
         >
-          <HierarchyTree />
-        </Sider>
-
-        <div
-          style={{
-            position: "absolute",
-            top: 56,
-            left: treeCollapsed ? 56 : 56 + 260,
-            transition: "left 0.2s",
-            zIndex: 10,
-          }}
-        >
-          <Tooltip title={treeCollapsed ? "Развернуть дерево" : "Свернуть дерево"}>
-            <Button
-              type="text"
-              size="small"
-              icon={treeCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              onClick={() => setTreeCollapsed((c) => !c)}
-              style={{
-                background: token.colorBgContainer,
-                border: `1px solid ${token.colorBorder}`,
-                borderRadius: "0 4px 4px 0",
-                borderLeft: "none",
-                width: 16,
-                height: 32,
-                padding: 0,
-              }}
-            />
-          </Tooltip>
-        </div>
-
-        <Content style={{ padding: "20px 24px", overflow: "auto", minWidth: 0 }}>
           <Outlet />
         </Content>
       </AntLayout>
     </AntLayout>
   );
+
+  // Suppress unused — folder может пригодиться для будущей логики
+  void folder;
 }

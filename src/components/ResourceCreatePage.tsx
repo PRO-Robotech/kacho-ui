@@ -79,16 +79,21 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
     ? `/folders/${filterValue}/${spec.route}`
     : `/${spec.route}`;
 
-  useBreadcrumb(
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-      <Link to={backHref}>
-        <Typography.Text type="secondary">{spec.plural}</Typography.Text>
-      </Link>
-      <Typography.Text type="secondary">/</Typography.Text>
-      <Typography.Text strong>Создать</Typography.Text>
-    </span>,
+  const breadcrumb = useMemo(
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <Link to={backHref}>
+          <Typography.Text type="secondary">{spec.plural}</Typography.Text>
+        </Link>
+        <Typography.Text type="secondary">/</Typography.Text>
+        <Typography.Text strong>Создать</Typography.Text>
+      </span>
+    ),
+    [backHref, spec.plural],
   );
-  useHeaderRight(null);
+  useBreadcrumb(breadcrumb);
+  const noHeaderRight = useMemo(() => null, []);
+  useHeaderRight(noHeaderRight);
 
   const mutation = useMutation({
     mutationFn: (item: unknown) => api.create(spec.apiPath, item),

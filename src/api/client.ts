@@ -32,13 +32,32 @@ export class ApiError extends Error {
   }
 }
 
+// crypto.randomUUID требует secure context (HTTPS или localhost). При работе
+// через http://console.kacho.local оно недоступно — fallback на Math.random.
+function makeRequestId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // ignore
+  }
+  return (
+    Math.random().toString(36).slice(2, 10) +
+    "-" +
+    Math.random().toString(36).slice(2, 10) +
+    "-" +
+    Date.now().toString(36)
+  );
+}
+
 async function fetchJson<T>(method: string, path: string, body?: unknown): Promise<T> {
   const url = `${API_BASE}${path}`;
   const init: RequestInit = {
     method,
     headers: {
       "Content-Type": "application/json",
-      "X-Request-ID": crypto.randomUUID(),
+      "X-Request-ID": makeRequestId(),
     },
   };
   if (body !== undefined) {
