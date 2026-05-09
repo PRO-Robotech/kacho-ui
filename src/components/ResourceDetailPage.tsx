@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
+import { CopyableId } from "@/components/CopyableId";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
@@ -90,11 +91,18 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
     return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
   }
 
+  // Fallback back-link для error/not-found ветки — без `data` восстановить
+  // полный путь до Cloud/Folder list нельзя (org_id/cloud_id живут в data).
+  // Поэтому: для VPC берём folderId из URL; иначе скатываемся на /organizations.
+  const fallbackBack = params.folderId
+    ? `/folders/${params.folderId}/${spec.route}`
+    : "/organizations";
+
   if (isError && !data) {
     return (
       <div className="p-6 space-y-3">
         <Button asChild variant="outline" size="sm">
-          <Link to={`/${spec.route}`}>
+          <Link to={fallbackBack}>
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
@@ -109,7 +117,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
     return (
       <div className="space-y-4">
         <Button asChild variant="outline" size="sm">
-          <Link to={`/${spec.route}`}>
+          <Link to={fallbackBack}>
             <ArrowLeft className="h-4 w-4" /> Back
           </Link>
         </Button>
@@ -124,12 +132,29 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
   const statusValue = getByPath<string>(data, "status");
   const resourceId = getByPath<string>(data, "id") ?? uid ?? "";
 
+  // Back-link к list-странице — должен учитывать parent-context из URL.
+  // VPC ресурсы живут только под /folders/:folderId/<route>, поэтому `/networks`
+  // (без folder) не существует и попадает в `*` → /organizations.
+  const backHref = (() => {
+    const folderId = params.folderId;
+    if (folderId) return `/folders/${folderId}/${spec.route}`;
+    if (spec.id === "clouds") {
+      const orgId = getByPath<string>(data, "organization_id");
+      return orgId ? `/organizations/${orgId}/clouds` : "/organizations";
+    }
+    if (spec.id === "folders") {
+      const cloudId = getByPath<string>(data, "cloud_id");
+      return cloudId ? `/clouds/${cloudId}/folders` : "/organizations";
+    }
+    return "/organizations";
+  })();
+
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2">
           <Button asChild variant="ghost" size="sm" className="h-7 px-2 -ml-2">
-            <Link to={`/${spec.route}`}>
+            <Link to={backHref}>
               <ArrowLeft className="h-4 w-4" /> {spec.plural}
             </Link>
           </Button>
@@ -137,7 +162,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
             <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
             {statusValue && <StatusBadge state={statusValue} />}
           </div>
-          <div className="text-xs text-muted-foreground font-mono">{resourceId}</div>
+          <CopyableId id={resourceId} />
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           {spec.ops.restart && (
@@ -193,7 +218,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
               name={name}
               resourceLabel={spec.singular}
               folderUid={folder?.uid}
-              navigateTo={() => navigate(`/${spec.route}`)}
+              navigateTo={() => navigate(backHref)}
             />
           )}
         </div>
@@ -220,8 +245,8 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
           )}
           <div className="rounded-lg border border-border p-4 space-y-2">
             <h3 className="font-semibold text-sm">Resource fields</h3>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-              <KV k="ID" v={resourceId} mono />
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 text-sm">
+              <KV k="ID" v={resourceId} copyId />
               <KV k="Name" v={name} />
               {statusValue ? <KV k="Status" v={statusValue} /> : null}
               {getByPath<string>(data, "created_at") ? (
@@ -231,13 +256,13 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
                 />
               ) : null}
               {getByPath<string>(data, "folder_id") ? (
-                <KV k="Folder" v={getByPath<string>(data, "folder_id")!} mono />
+                <KV k="Folder" v={getByPath<string>(data, "folder_id")!} copyId />
               ) : null}
               {getByPath<string>(data, "cloud_id") ? (
-                <KV k="Cloud" v={getByPath<string>(data, "cloud_id")!} mono />
+                <KV k="Cloud" v={getByPath<string>(data, "cloud_id")!} copyId />
               ) : null}
               {getByPath<string>(data, "organization_id") ? (
-                <KV k="Organization" v={getByPath<string>(data, "organization_id")!} mono />
+                <KV k="Organization" v={getByPath<string>(data, "organization_id")!} copyId />
               ) : null}
               {getByPath<string>(data, "zone_id") ? (
                 <KV k="Zone" v={getByPath<string>(data, "zone_id")!} />
@@ -267,11 +292,23 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
   );
 }
 
-function KV({ k, v, mono }: { k: string; v?: string; mono?: boolean }) {
+function KV({
+  k,
+  v,
+  mono,
+  copyId,
+}: {
+  k: string;
+  v?: string;
+  mono?: boolean;
+  copyId?: boolean;
+}) {
   return (
     <>
       <dt className="text-muted-foreground">{k}</dt>
-      <dd className={mono ? "font-mono text-xs" : ""}>{v || "—"}</dd>
+      <dd className={mono ? "font-mono text-xs" : ""}>
+        {copyId && v ? <CopyableId id={v} /> : v || "—"}
+      </dd>
     </>
   );
 }

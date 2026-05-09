@@ -36,6 +36,7 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
+import { CopyableId } from "@/components/CopyableId";
 import {
   Dialog,
   DialogContent,
@@ -186,13 +187,13 @@ function OrgCrumb({
   return (
     <Crumb
       icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
-      label={resolvedName ?? (selected ? selected.id.slice(0, 8) + "…" : "Organization")}
+      label={resolvedName ?? (selected ? selected.id : "Organization")}
       placeholder={!selected}
       loading={isLoading && items.length === 0}
       items={items.map((it) => ({
         id: it.id,
         label: it.name,
-        sub: it.id.slice(0, 8),
+        sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
         onEdit: () => onForm({ level: "org", action: "edit", template: it }),
@@ -251,7 +252,7 @@ function CloudCrumb({
       label={
         selected?.name ||
         items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id.slice(0, 8) + "…" : "Cloud")
+        (selected ? selected.id : "Cloud")
       }
       placeholder={!selected}
       disabled={!parentOrgId}
@@ -260,7 +261,7 @@ function CloudCrumb({
       items={items.map((it) => ({
         id: it.id,
         label: it.name,
-        sub: it.id.slice(0, 8),
+        sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
         onEdit: () => onForm({ level: "cloud", action: "edit", template: it }),
@@ -323,7 +324,7 @@ function FolderCrumb({
       label={
         selected?.name ||
         items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id.slice(0, 8) + "…" : "Folder")
+        (selected ? selected.id : "Folder")
       }
       placeholder={!selected}
       disabled={!parentCloudId}
@@ -332,7 +333,7 @@ function FolderCrumb({
       items={items.map((it) => ({
         id: it.id,
         label: it.name,
-        sub: it.id.slice(0, 8),
+        sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
         onEdit: () => onForm({ level: "folder", action: "edit", template: it }),
@@ -465,9 +466,7 @@ function CrumbRow({ item }: { item: CrumbItem }) {
           className={cn("h-4 w-4 shrink-0", item.selected ? "opacity-100" : "opacity-0")}
         />
         <span className="truncate flex-1">{item.label}</span>
-        {item.sub && (
-          <span className="text-xs text-muted-foreground font-mono shrink-0">{item.sub}</span>
-        )}
+        {item.sub && <CopyableId id={item.sub} />}
       </DropdownMenu.Item>
 
       {hasActions && (

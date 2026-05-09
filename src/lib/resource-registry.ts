@@ -66,6 +66,13 @@ const ZONES = [
   { value: "ru-central1-d", label: "ru-central1-d" },
 ];
 
+// Pool kinds — соответствуют proto enum AddressPoolKind.
+const POOL_KINDS = [
+  { value: "EXTERNAL_PUBLIC", label: "EXTERNAL_PUBLIC" },
+  { value: "EXTERNAL_TEST", label: "EXTERNAL_TEST" },
+  { value: "RESERVED_INTERNAL", label: "RESERVED_INTERNAL" },
+];
+
 // Общие колонки
 const COL_NAME: ResourceColumn = {
   header: "Name",
@@ -183,7 +190,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
     ],
     childRoute: "/clouds/:id/folders",
-    template: () => ({ name: "", organization_id: "", description: "" }),
+    template: ({ organizationId }) => ({
+      name: "",
+      organization_id: organizationId ?? "",
+      description: "",
+    }),
   },
 
   // proto: GET /resource-manager/v1/folders
@@ -219,7 +230,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     // Folder drill-down → /folders/:id; FolderDefaultRedirect там перебрасывает
     // дальше на /folders/:id/networks (первый VPC-ресурс).
     childRoute: "/folders/:id",
-    template: () => ({ name: "", cloud_id: "", description: "" }),
+    template: ({ cloudId }) => ({
+      name: "",
+      cloud_id: cloudId ?? "",
+      description: "",
+    }),
   },
 
   // ====== vpc ======
@@ -298,8 +313,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "IPv4 CIDR Blocks",
         type: "array",
         itemLabel: "CIDR",
-        description: "Массив IPv4 CIDR-блоков (RFC 1918). После Create — только через :add-cidr-blocks / :remove-cidr-blocks.",
+        description: "Массив IPv4 CIDR-блоков (RFC 1918).",
         immutable: true,
+        // В Edit поле не показывается — после Create управляется через
+        // SubnetCidrManager на DetailPage (verbs :add-cidr-blocks /
+        // :remove-cidr-blocks). См. YC verbatim Subnet docs.
+        editHidden: true,
         newItem: () => ({ value: "10.0.0.0/24" }),
         itemFields: [
           {
@@ -381,13 +400,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           { value: "internal", label: "Internal IPv4" },
         ],
       },
-      // External fields
+      // External fields — видны только при _address_kind=external (oneof активная ветка).
       {
         name: "external_ipv4_address_spec.zone_id",
         label: "Zone (External)",
         type: "enum",
         options: ZONES,
         description: "Зона для External IP. Оставьте address пустым для auto-allocation.",
+        visibleWhen: { field: "_address_kind", equals: "external" },
       },
       {
         name: "external_ipv4_address_spec.address",
@@ -395,8 +415,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "string",
         placeholder: "пусто = auto-allocated",
         description: "Если пусто — адрес выделяется автоматически.",
+        visibleWhen: { field: "_address_kind", equals: "external" },
       },
-      // Internal fields
+      // Internal fields — видны только при _address_kind=internal.
       {
         name: "internal_ipv4_address_spec.subnet_id",
         label: "Subnet (Internal)",
@@ -404,6 +425,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "subnets",
         refFolderScoped: true,
         description: "Subnet для Internal IP. Адрес выделяется автоматически.",
+        visibleWhen: { field: "_address_kind", equals: "internal" },
       },
       {
         name: "internal_ipv4_address_spec.address",
@@ -411,6 +433,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "string",
         placeholder: "пусто = auto-allocated",
         description: "Если пусто — адрес выделяется из subnet автоматически.",
+        visibleWhen: { field: "_address_kind", equals: "internal" },
       },
       {
         name: "deletion_protection",
@@ -559,6 +582,184 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       if (!Array.isArray(raw)) return obj;
       const clean = raw.map((r) => sanitizeSgRule(r as Record<string, unknown>));
       return { ...obj, rules: clean };
+    },
+  },
+
+  // ====== System (kacho-only admin: Region / Zone / AddressPool) ======
+  // НЕ verbatim-YC: эти ресурсы exposed через apiGW REST для admin UI.
+  // На external TLS endpoint (yc CLI compat) НЕ публикуются — см. kacho-vpc CLAUDE.md.
+  // Sync RPC (без Operation envelope), backend handler возвращает ресурс напрямую.
+
+  regions: {
+    id: "regions",
+    route: "regions",
+    apiPath: "/vpc/v1/regions",
+    payloadKey: "regions",
+    singular: "Region",
+    plural: "Regions",
+    description: "Глобальные регионы инфраструктуры. Admin-only.",
+    scope: "global",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Name", path: "name", format: "text" },
+      COL_CREATED,
+    ],
+    fields: [
+      {
+        name: "id",
+        label: "Region ID",
+        type: "string",
+        required: true,
+        immutable: true,
+        placeholder: "ru-central1",
+        description: "Lower-snake-kebab. Immutable PK.",
+        pattern: "^[a-z][a-z0-9-]*$",
+      },
+      { name: "name", label: "Name", type: "string", placeholder: "Russia Central 1" },
+    ],
+    template: () => ({ id: "", name: "" }),
+  },
+
+  zones: {
+    id: "zones",
+    route: "zones",
+    apiPath: "/vpc/v1/zones",
+    payloadKey: "zones",
+    singular: "Zone",
+    plural: "Zones",
+    description: "Зоны доступности внутри Region. Admin-only.",
+    scope: "global",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Region", path: "region_id", format: "text" },
+      { header: "Name", path: "name", format: "text" },
+      COL_CREATED,
+    ],
+    fields: [
+      {
+        name: "id",
+        label: "Zone ID",
+        type: "string",
+        required: true,
+        immutable: true,
+        placeholder: "ru-central1-a",
+        pattern: "^[a-z][a-z0-9-]*$",
+      },
+      {
+        name: "region_id",
+        label: "Region",
+        type: "ref",
+        refResource: "regions",
+        required: true,
+        immutable: true,
+      },
+      { name: "name", label: "Name", type: "string", placeholder: "Zone A" },
+    ],
+    template: () => ({ id: "", region_id: "", name: "" }),
+  },
+
+  "address-pools": {
+    id: "address-pools",
+    route: "address-pools",
+    apiPath: "/vpc/v1/addressPools",
+    payloadKey: "pools",
+    singular: "Address Pool",
+    plural: "Address Pools",
+    description: "Глобальные пулы внешних IP. Admin-only. Привязка к Zone опциональна (NULL = global default).",
+    scope: "global",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      COL_NAME,
+      { header: "Kind", path: "kind", format: "text" },
+      { header: "Zone", path: "zone_id", format: "text" },
+      { header: "CIDRs", path: "cidr_blocks", format: "list" },
+      { header: "Default", path: "is_default", format: "text" },
+      { header: "Selector", path: "selector_labels", format: "code" },
+      COL_ID,
+    ],
+    fields: [
+      {
+        name: "name",
+        label: "Name",
+        type: "string",
+        placeholder: "default-zone-a",
+      },
+      { name: "description", label: "Description", type: "text", rows: 2 },
+      {
+        name: "kind",
+        label: "Kind",
+        type: "enum",
+        options: POOL_KINDS,
+        required: true,
+        default: "EXTERNAL_PUBLIC",
+        immutable: true,
+      },
+      {
+        name: "zone_id",
+        label: "Zone",
+        type: "ref",
+        refResource: "zones",
+        immutable: true,
+        description: "Опционально. Если пусто — глобальный пул (fallback).",
+      },
+      {
+        name: "cidr_blocks",
+        label: "CIDR Blocks",
+        type: "array",
+        itemLabel: "CIDR",
+        description: "IPv4 CIDR-блоки, из которых аллоцируются адреса.",
+        newItem: () => ({ value: "198.51.100.0/24" }),
+        itemFields: [
+          {
+            name: "value",
+            label: "CIDR",
+            type: "string",
+            required: true,
+            placeholder: "198.51.100.0/24",
+          },
+        ],
+      },
+      {
+        name: "is_default",
+        label: "Default for zone+kind",
+        type: "bool",
+        default: false,
+        description: "Один is_default=true на (zone, kind).",
+      },
+      {
+        name: "selector_priority",
+        label: "Selector priority",
+        type: "int",
+        default: 0,
+        description: "Tie-break при равенстве specificity. Higher wins.",
+      },
+    ],
+    template: () => ({
+      name: "",
+      description: "",
+      kind: "EXTERNAL_PUBLIC",
+      zone_id: "",
+      cidr_blocks: [{ value: "198.51.100.0/24" }],
+      is_default: false,
+      selector_priority: 0,
+    }),
+    // Конвертирует [{value: "..."}, ...] → ["...", ...] для wire format
+    // (аналогично subnets.v4_cidr_blocks).
+    sanitize: (obj) => {
+      const raw = obj["cidr_blocks"];
+      if (Array.isArray(raw)) {
+        obj = {
+          ...obj,
+          cidr_blocks: raw.map((item) =>
+            typeof item === "object" && item !== null && "value" in (item as object)
+              ? (item as Record<string, unknown>)["value"]
+              : item
+          ),
+        };
+      }
+      return obj;
     },
   },
 };

@@ -6,6 +6,10 @@ import {
   Route,
   MapPin,
   Shield,
+  Globe,
+  Cloud,
+  Boxes,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
@@ -29,6 +33,17 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { segment: "route-tables", label: "Route Tables", icon: Route, scope: "folder" },
       { segment: "addresses", label: "Addresses", icon: MapPin, scope: "folder" },
       { segment: "security-groups", label: "Security Groups", icon: Shield, scope: "folder" },
+    ],
+  },
+  // System group — global admin-only ресурсы (Region/Zone/AddressPool + Search).
+  // Path-prefix: /system/<segment>. Не зависят от выбранного folder.
+  {
+    group: "System",
+    items: [
+      { segment: "search", label: "Search", icon: Search, scope: "global" },
+      { segment: "regions", label: "Regions", icon: Globe, scope: "global" },
+      { segment: "zones", label: "Zones", icon: Cloud, scope: "global" },
+      { segment: "address-pools", label: "Address Pools", icon: Boxes, scope: "global" },
     ],
   },
 ];
@@ -65,11 +80,15 @@ export function Layout() {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const disabled = item.scope === "folder" && !folder;
-                const to = folder
-                  ? `/folders/${folder.id}/${item.segment}`
-                  : "#";
-                const active = location.pathname.startsWith(`/folders/`) &&
-                  location.pathname.includes(`/${item.segment}`);
+                const to = item.scope === "global"
+                  ? `/system/${item.segment}`
+                  : folder
+                    ? `/folders/${folder.id}/${item.segment}`
+                    : "#";
+                const active = item.scope === "global"
+                  ? location.pathname.startsWith(`/system/${item.segment}`)
+                  : location.pathname.startsWith(`/folders/`) &&
+                    location.pathname.includes(`/${item.segment}`);
                 return (
                   <NavLink
                     key={item.segment}

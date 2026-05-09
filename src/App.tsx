@@ -5,6 +5,9 @@ import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
+import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
+import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
+import { SystemSearchPage } from "@/pages/SystemSearchPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -78,7 +81,11 @@ export default function App() {
                 />
                 <Route
                   path={`/folders/:folderId/${spec.route}/:uid`}
-                  element={<ResourceDetailPage spec={spec} />}
+                  element={
+                    spec.id === "subnets"
+                      ? <SubnetDetailPage />
+                      : <ResourceDetailPage spec={spec} />
+                  }
                 />
               </Route>
             ))}
@@ -98,6 +105,17 @@ export default function App() {
               path="/clouds/:cloudId"
               element={<ResourceDetailPage spec={REGISTRY.clouds} paramKey="cloudId" />}
             />
+
+            {/* === System (admin-only, kacho-only) === */}
+            {/* Region/Zone/AddressPool — глобальные ресурсы. Не публикуются на
+                external TLS endpoint, см. CLAUDE.md kacho-vpc §16. */}
+            <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
+            <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
+            <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
+            <Route path="/system/zones/:uid" element={<ResourceDetailPage spec={REGISTRY.zones} />} />
+            <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
+            <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
+            <Route path="/system/search" element={<SystemSearchPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

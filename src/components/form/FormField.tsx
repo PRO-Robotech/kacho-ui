@@ -25,6 +25,14 @@ function fullPath(prefix: string, name: string): string {
 
 export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode }: Props) {
   if (field.hidden) return null;
+  if (editMode && field.editHidden) return null;
+  if (field.visibleWhen) {
+    // visibleWhen.field — всегда top-level path (oneof discriminator живёт у корня формы).
+    const cur = getByPath(value, field.visibleWhen.field) as string | undefined;
+    const want = field.visibleWhen.equals;
+    const matched = Array.isArray(want) ? want.includes(cur ?? "") : cur === want;
+    if (!matched) return null;
+  }
   const disabled = !!(field.immutable && editMode);
   if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} />;
   if (field.type === "sg-rules") {

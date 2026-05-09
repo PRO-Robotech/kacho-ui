@@ -8,6 +8,7 @@ import { ChevronRight, Eye, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
+import { CopyableId } from "@/components/CopyableId";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteButton } from "@/components/DeleteButton";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
@@ -116,8 +117,9 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
             <p className="text-sm text-muted-foreground">{spec.description}</p>
           )}
           {parentField && filterValue && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {parentField}: <code className="bg-muted px-1 py-0.5 rounded">{filterValue.slice(0, 8)}…</code>
+            <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-2">
+              <span>{parentField}:</span>
+              <CopyableId id={filterValue} />
             </p>
           )}
         </div>
@@ -192,7 +194,7 @@ function formatCell(c: { path: string; format?: string }, row: Record<string, un
       return <StatusBadge state={typeof v === "string" ? v : undefined} />;
     case "uid-short":
       return typeof v === "string" && v ? (
-        <code className="text-xs text-muted-foreground">{v.slice(0, 8)}…</code>
+        <CopyableId id={v} />
       ) : (
         <span className="text-muted-foreground">—</span>
       );
