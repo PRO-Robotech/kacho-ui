@@ -1,11 +1,16 @@
-// ResourceListPage — generic страница списка ресурсов.
-// Использует polling (3 сек) вместо Watch/WebSocket.
-// spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
+// ResourceListPage — generic страница списка ресурсов на antd.
+//
+// Polling 3 сек (через useResourceList).
 
 import { ReactNode, useMemo, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { Loader2, Plus, RefreshCw, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Alert, Button, Input, Tag, Typography, Space, Spin } from "antd";
+import {
+  PlusOutlined,
+  CheckCircleFilled,
+  WarningOutlined,
+  LoadingOutlined,
+} from "@ant-design/icons";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
@@ -18,9 +23,7 @@ import { useResourceList } from "@/lib/use-resource-list";
 
 interface Props {
   spec: ResourceSpec;
-  /** API field name для фильтрации списка (organization_id / cloud_id / folder_id). */
   parentField?: string;
-  /** URL-param name (orgId / cloudId / folderId) откуда брать значение filter. */
   parentParam?: string;
 }
 
@@ -36,16 +39,12 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     filterValue,
   );
 
-  // Header slots: breadcrumb + primary CTA. Стабильные через useMemo, чтобы
-  // не триггерить лишние setState в провайдере на каждом polling-rerender.
   const breadcrumb = useMemo(
-    () => <span className="text-foreground">{spec.plural}</span>,
+    () => <Typography.Text strong>{spec.plural}</Typography.Text>,
     [spec.plural],
   );
   useBreadcrumb(breadcrumb);
 
-  // Create CTA — navigation на full-page форму /<basePath>/create.
-  // Если у ресурса нет form-schema (fields), используем legacy modal с JSON-editor.
   const createBase = location.pathname.endsWith("/")
     ? location.pathname.slice(0, -1)
     : location.pathname;
@@ -54,15 +53,13 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     if (!spec.ops.create) return null;
     if (spec.fields) {
       return (
-        <Button asChild size="sm">
-          <Link to={`${createBase}/create`}>
-            <Plus className="h-4 w-4" /> Создать {spec.singular.toLowerCase()}
-          </Link>
-        </Button>
+        <Link to={`${createBase}/create`}>
+          <Button type="primary" size="small" icon={<PlusOutlined />}>
+            Создать {spec.singular.toLowerCase()}
+          </Button>
+        </Link>
       );
     }
-    // Fallback на modal — для admin ресурсов (regions/zones/address-pools)
-    // на этом этапе page-mode формы ещё не подняты под /system/*.
     const tpl = spec.template({
       folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
       cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
@@ -85,7 +82,6 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   useHeaderRight(cta);
 
-  // Если ресурс требует parent (например, /folders/:folderId/networks без folderId)
   if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
 
   const basePath = location.pathname.endsWith("/")
@@ -94,7 +90,6 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
-  // Local filter — substring match по name + id.
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
@@ -109,17 +104,15 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     header: c.header,
     className: c.className,
     cell: (row) => formatCell(c, row),
-    // Sortable: name / id / created_at / любые text-колонки.
     sortKey:
       c.format === "datetime" || c.format === "text" || c.format === "uid-short"
         ? c.path
         : undefined,
   }));
 
-  // Финальная action-колонка (kebab).
   columns.push({
     header: "",
-    className: "text-right whitespace-nowrap w-10",
+    className: "text-right whitespace-nowrap",
     cell: (row) => (
       <RowActionsMenu
         spec={spec}
@@ -131,40 +124,38 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            {spec.plural}
+          </Typography.Title>
           {spec.description && (
-            <p className="text-sm text-muted-foreground mt-1">{spec.description}</p>
+            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+              {spec.description}
+            </Typography.Text>
           )}
         </div>
         <PollingIndicator isFetching={isFetching} isError={isError} />
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Фильтр по имени или идентификатору"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-card pl-8 pr-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
+      <Space size={12} wrap>
+        <Input.Search
+          placeholder="Фильтр по имени или идентификатору"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ width: 360 }}
+          allowClear
+        />
         {parentField && filterValue && (
-          <p className="text-xs text-muted-foreground inline-flex items-center gap-2">
-            <span>{parentField}:</span>
-            <CopyableId id={filterValue} />
-          </p>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {parentField}: <CopyableId id={filterValue} />
+          </Typography.Text>
         )}
-      </div>
+      </Space>
 
       {isError && (
-        <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {(error as Error).message}
-        </div>
+        <Alert type="error" message={`Ошибка: ${(error as Error).message}`} />
       )}
 
       <ResourceTable
@@ -173,7 +164,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
         columns={columns}
       />
-    </div>
+    </Space>
   );
 }
 
@@ -186,26 +177,22 @@ function PollingIndicator({
 }) {
   if (isError) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-rose-400">
-        <RefreshCw className="h-3 w-3" /> offline
-      </span>
+      <Tag icon={<WarningOutlined />} color="error">
+        offline
+      </Tag>
     );
   }
   if (isFetching) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> polling
-      </span>
+      <Tag icon={<Spin indicator={<LoadingOutlined spin style={{ fontSize: 12 }} />} />}>
+        polling
+      </Tag>
     );
   }
   return (
-    <span
-      className="inline-flex items-center gap-1 text-xs text-emerald-400"
-      title="Данные актуальны"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+    <Tag icon={<CheckCircleFilled />} color="success">
       live
-    </span>
+    </Tag>
   );
 }
 
@@ -218,28 +205,32 @@ function formatCell(c: { path: string; format?: string }, row: Record<string, un
       return typeof v === "string" && v ? (
         <CopyableId id={v} />
       ) : (
-        <span className="text-muted-foreground">—</span>
+        <Typography.Text type="secondary">—</Typography.Text>
       );
     case "datetime":
       return typeof v === "string" && v ? (
-        <span className="text-xs text-muted-foreground">{new Date(v).toLocaleString()}</span>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {new Date(v).toLocaleString()}
+        </Typography.Text>
       ) : (
-        <span className="text-muted-foreground">—</span>
+        <Typography.Text type="secondary">—</Typography.Text>
       );
     case "code":
       return typeof v === "string" || typeof v === "number" ? (
-        <code className="text-xs">{String(v)}</code>
+        <Typography.Text code style={{ fontSize: 12 }}>
+          {String(v)}
+        </Typography.Text>
       ) : (
-        <span className="text-muted-foreground">—</span>
+        <Typography.Text type="secondary">—</Typography.Text>
       );
     case "list":
       if (Array.isArray(v) && v.length > 0) {
-        return <span className="text-xs">{v.join(", ")}</span>;
+        return <Typography.Text style={{ fontSize: 12 }}>{v.join(", ")}</Typography.Text>;
       }
-      return <span className="text-muted-foreground">—</span>;
+      return <Typography.Text type="secondary">—</Typography.Text>;
     case "text":
     default:
-      if (v == null || v === "") return <span className="text-muted-foreground">—</span>;
+      if (v == null || v === "") return <Typography.Text type="secondary">—</Typography.Text>;
       return String(v);
   }
 }

@@ -1,6 +1,11 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+// ResourceTable — тонкая обёртка над antd Table.
+//
+// Сохраняет старый API (Column<T>, sortKey) для совместимости с
+// ResourceListPage и тестами, но делегирует рендер в antd.
+
+import { type ReactNode, useMemo } from "react";
+import { Table } from "antd";
+import type { ColumnType, TableProps } from "antd/es/table";
 import { getByPath } from "@/lib/path";
 
 export interface Column<T> {
@@ -17,11 +22,10 @@ interface Props<T> {
   rowKey: (row: T) => string;
   empty?: ReactNode;
   loading?: boolean;
-  /** Дефолтная сортировка — индекс колонки + направление. */
   defaultSort?: { col: number; dir: "asc" | "desc" };
 }
 
-export function ResourceTable<T>({
+export function ResourceTable<T extends object>({
   rows,
   columns,
   rowKey,
@@ -29,101 +33,45 @@ export function ResourceTable<T>({
   loading,
   defaultSort,
 }: Props<T>) {
-  const [sort, setSort] = useState<{ col: number; dir: "asc" | "desc" } | null>(
-    defaultSort ?? null,
+  const antColumns: ColumnType<T>[] = useMemo(
+    () =>
+      columns.map((c, idx) => {
+        const col: ColumnType<T> = {
+          title: c.header,
+          key: String(idx),
+          className: c.className,
+          render: (_value, row) => c.cell(row),
+        };
+        if (c.sortKey) {
+          col.sorter = (a: T, b: T) => {
+            const av = getByPath(a, c.sortKey!);
+            const bv = getByPath(b, c.sortKey!);
+            if (av == null && bv == null) return 0;
+            if (av == null) return 1;
+            if (bv == null) return -1;
+            if (typeof av === "number" && typeof bv === "number") return av - bv;
+            return String(av).localeCompare(String(bv));
+          };
+          if (defaultSort && defaultSort.col === idx) {
+            col.defaultSortOrder = defaultSort.dir === "asc" ? "ascend" : "descend";
+          }
+        }
+        return col;
+      }),
+    [columns, defaultSort],
   );
 
-  const sortedRows = useMemo(() => {
-    if (!sort) return rows;
-    const sortKey = columns[sort.col]?.sortKey;
-    if (!sortKey) return rows;
-    const dir = sort.dir === "asc" ? 1 : -1;
-    return [...rows].sort((a, b) => {
-      const av = getByPath(a, sortKey);
-      const bv = getByPath(b, sortKey);
-      if (av == null && bv == null) return 0;
-      if (av == null) return 1;
-      if (bv == null) return -1;
-      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
-      return String(av).localeCompare(String(bv)) * dir;
-    });
-  }, [rows, columns, sort]);
-
-  const onHeaderClick = (idx: number) => {
-    if (!columns[idx].sortKey) return;
-    setSort((s) => {
-      if (!s || s.col !== idx) return { col: idx, dir: "asc" };
-      if (s.dir === "asc") return { col: idx, dir: "desc" };
-      return null;
-    });
+  const tableProps: TableProps<T> = {
+    columns: antColumns,
+    dataSource: rows,
+    rowKey: (row) => rowKey(row),
+    pagination: false,
+    size: "small",
+    loading,
+    locale: {
+      emptyText: empty ?? "Ресурсов не найдено",
+    },
   };
 
-  return (
-    <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40">
-          <tr>
-            {columns.map((col, i) => {
-              const sortable = !!col.sortKey;
-              const active = sort?.col === i;
-              const Icon = !active
-                ? ChevronsUpDown
-                : sort.dir === "asc"
-                ? ChevronUp
-                : ChevronDown;
-              return (
-                <th
-                  key={i}
-                  className={cn(
-                    "text-left px-4 py-2 font-medium text-muted-foreground select-none",
-                    sortable && "cursor-pointer hover:text-foreground",
-                    col.className,
-                  )}
-                  onClick={() => onHeaderClick(i)}
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {col.header}
-                    {sortable && col.header && (
-                      <Icon
-                        className={cn(
-                          "h-3 w-3 opacity-50",
-                          active && "opacity-100 text-foreground",
-                        )}
-                      />
-                    )}
-                  </span>
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {loading && (
-            <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                Загрузка…
-              </td>
-            </tr>
-          )}
-          {!loading && sortedRows.length === 0 && (
-            <tr>
-              <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                {empty ?? "Ресурсов не найдено"}
-              </td>
-            </tr>
-          )}
-          {!loading &&
-            sortedRows.map((row) => (
-              <tr key={rowKey(row)} className="border-t border-border hover:bg-muted/30">
-                {columns.map((col, i) => (
-                  <td key={i} className={cn("px-4 py-2 align-middle", col.className)}>
-                    {col.cell(row)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <Table<T> {...tableProps} />;
 }

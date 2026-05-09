@@ -1,21 +1,8 @@
 // SubnetRelocateDialog — Move Subnet в другую зону через POST /vpc/v1/subnets/{id}:relocate.
-//
-// Фронт-валидация по kacho-vpc/CLAUDE.md §8.4: relocate отвергается, если
-// Subnet содержит Address-ресурсы (verbatim YC: FailedPrecondition
-// "Invalid subnet state"). Бэкенд это сам проверит — UI просто показывает
-// результат через OperationToastWatcher.
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Modal, Select, Typography, Alert, Form } from "antd";
 import { extractOperationId } from "@/components/OperationDialog";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { ApiError, api } from "@/api/client";
@@ -45,7 +32,7 @@ export function SubnetRelocateDialog({
   currentZone,
   folderUid,
 }: Props) {
-  const [targetZone, setTargetZone] = useState("");
+  const [targetZone, setTargetZone] = useState<string | undefined>();
   const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [opId, setOpId] = useState<string | null>(null);
   const invalidate = useInvalidateResourceList();
@@ -61,7 +48,9 @@ export function SubnetRelocateDialog({
 
   const mutation = useMutation({
     mutationFn: () =>
-      api.action(`/vpc/v1/subnets/${subnetId}:relocate`, { destination_zone_id: targetZone }),
+      api.action(`/vpc/v1/subnets/${subnetId}:relocate`, {
+        destination_zone_id: targetZone,
+      }),
     onSuccess: (resp) => {
       setSubmitErr(null);
       const id = extractOperationId(resp);
@@ -80,83 +69,59 @@ export function SubnetRelocateDialog({
 
   return (
     <>
-      <Dialog
+      <Modal
         open={open}
-        onOpenChange={(o) => {
-          if (!o) {
-            setTargetZone("");
-            setSubmitErr(null);
-          }
-          onOpenChange(o);
+        onCancel={() => {
+          setTargetZone(undefined);
+          setSubmitErr(null);
+          onOpenChange(false);
         }}
+        onOk={() => mutation.mutate()}
+        okText="Перенести"
+        okButtonProps={{
+          disabled: !targetZone || mutation.isPending || opId !== null,
+          loading: mutation.isPending || opId !== null,
+        }}
+        cancelText="Отменить"
+        title="Перенести подсеть в другую зону"
       >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Перенести подсеть в другую зону</DialogTitle>
-            <DialogDescription>
-              <span className="block">
-                <span className="text-muted-foreground">Подсеть: </span>
-                <span className="font-medium text-foreground">{subnetName}</span>
-              </span>
-              <span className="block">
-                <span className="text-muted-foreground">Текущая зона: </span>
-                <code className="text-xs">{currentZone}</code>
-              </span>
-              <span className="block text-xs text-muted-foreground mt-2">
-                Перенос невозможен, если в подсети уже есть IP-адреса —
-                бэкенд вернёт <code>FailedPrecondition</code>.
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-2">
-            <label htmlFor="zone-target" className="text-sm">
-              Целевая зона
-            </label>
-            <select
-              id="zone-target"
+        <div style={{ marginBottom: 12 }}>
+          <Typography.Text type="secondary">Подсеть: </Typography.Text>
+          <Typography.Text strong>{subnetName}</Typography.Text>
+          <br />
+          <Typography.Text type="secondary">Текущая зона: </Typography.Text>
+          <Typography.Text code>{currentZone}</Typography.Text>
+        </div>
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={
+            <span>
+              Перенос невозможен, если в подсети уже есть IP-адреса — backend
+              вернёт <code>FailedPrecondition</code>.
+            </span>
+          }
+        />
+        <Form layout="vertical">
+          <Form.Item label="Целевая зона" required>
+            <Select
               value={targetZone}
-              onChange={(e) => setTargetZone(e.target.value)}
-              disabled={isLoading || mutation.isPending || opId !== null}
-              className="flex h-9 w-full rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
-            >
-              <option value="">— Не выбрана —</option>
-              {candidates.map((z) => (
-                <option key={z.id} value={z.id}>
-                  {z.id}
-                  {z.name ? ` — ${z.name}` : ""}
-                </option>
-              ))}
-            </select>
-            {isLoading && <p className="text-xs text-muted-foreground">Загрузка зон…</p>}
-            {!isLoading && candidates.length === 0 && (
-              <p className="text-xs text-amber-400">Нет доступных целевых зон.</p>
-            )}
-          </div>
-
-          {submitErr && (
-            <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">
-              {submitErr}
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => onOpenChange(false)}
-              disabled={mutation.isPending}
-            >
-              Отменить
-            </Button>
-            <Button
-              onClick={() => mutation.mutate()}
-              disabled={!targetZone || mutation.isPending || opId !== null}
-            >
-              {mutation.isPending ? "Отправка…" : opId !== null ? "Выполнение…" : "Перенести"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              onChange={(v) => setTargetZone(v)}
+              loading={isLoading}
+              placeholder="Выберите зону"
+              options={candidates.map((z) => ({
+                value: z.id,
+                label: z.name ? `${z.id} — ${z.name}` : z.id,
+              }))}
+              notFoundContent={
+                isLoading ? "Загрузка зон…" : "Нет доступных целевых зон"
+              }
+            />
+          </Form.Item>
+        </Form>
+        {submitErr && <Alert type="error" message={submitErr} />}
+      </Modal>
 
       <OperationToastWatcher
         opId={opId}

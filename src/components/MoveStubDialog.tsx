@@ -1,19 +1,5 @@
-// MoveStubDialog — заглушка для Move-actions per resource (kebab menu).
-//
-// На текущей итерации UI не реализует выбор целевого folder/cloud — это
-// требует Org/Cloud/Folder picker (отдельная задача). Move-RPC
-// существует на бэкенде (POST /<api>/<id>:move{destination_folder_id}).
-
-import { Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Modal, Typography } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
 
 interface Props {
   open: boolean;
@@ -25,35 +11,31 @@ interface Props {
 
 export function MoveStubDialog({ open, onOpenChange, resourceLabel, name, apiPath }: Props) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5 text-blue-400" />
-            Перемещение через UI пока не реализовано
-          </DialogTitle>
-          <DialogDescription className="space-y-2">
-            <span className="block">
-              <span className="text-muted-foreground">{resourceLabel}: </span>
-              <span className="font-medium text-foreground">{name}</span>
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              UI пока не имеет picker'а целевого Folder/Cloud. Используйте
-              REST API:
-            </span>
-            <code className="block rounded bg-muted px-2 py-1 text-xs font-mono break-all">
-              POST {apiPath}:move
-              {"\n"}
-              {"{ "}destination_folder_id: "&lt;folder-id&gt;"{" }"}
-            </code>
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Понятно
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal
+      open={open}
+      onCancel={() => onOpenChange(false)}
+      onOk={() => onOpenChange(false)}
+      okText="Понятно"
+      cancelButtonProps={{ style: { display: "none" } }}
+      title={
+        <span>
+          <InfoCircleOutlined style={{ color: "#3D8DF5", marginRight: 8 }} />
+          Перемещение через UI пока не реализовано
+        </span>
+      }
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div>
+          <Typography.Text type="secondary">{resourceLabel}: </Typography.Text>
+          <Typography.Text strong>{name}</Typography.Text>
+        </div>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          UI пока не имеет picker'а целевого Folder/Cloud. Используйте REST API:
+        </Typography.Text>
+        <Typography.Text code copyable style={{ display: "block", whiteSpace: "pre-wrap" }}>
+          {`POST ${apiPath}:move\n{ "destination_folder_id": "<folder-id>" }`}
+        </Typography.Text>
+      </div>
+    </Modal>
   );
 }
