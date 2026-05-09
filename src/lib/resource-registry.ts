@@ -56,16 +56,6 @@ export interface ResourceSpec {
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
 }
 
-// Zone whitelist должен совпадать с kacho-corelib/validate.ZoneId.
-// Verbatim YC: ru-central1-{a,b,c,d}. Backend отклонит любой другой
-// zone_id с InvalidArgument.
-const ZONES = [
-  { value: "ru-central1-a", label: "ru-central1-a" },
-  { value: "ru-central1-b", label: "ru-central1-b" },
-  { value: "ru-central1-c", label: "ru-central1-c" },
-  { value: "ru-central1-d", label: "ru-central1-d" },
-];
-
 // Pool kinds — соответствуют proto enum AddressPoolKind.
 const POOL_KINDS = [
   { value: "EXTERNAL_PUBLIC", label: "EXTERNAL_PUBLIC" },
@@ -303,8 +293,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "zone_id",
         label: "Zone",
-        type: "enum",
-        options: ZONES,
+        type: "ref",
+        refResource: "zones",
         required: true,
         immutable: true,
       },
@@ -346,7 +336,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       folder_id: folderId ?? "",
       name: "",
       network_id: "",
-      zone_id: "ru-central1-a",
+      zone_id: "",
       v4_cidr_blocks: [{ value: "10.0.0.0/24" }],
       description: "",
     }),
@@ -404,8 +394,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "external_ipv4_address_spec.zone_id",
         label: "Zone (External)",
-        type: "enum",
-        options: ZONES,
+        type: "ref",
+        refResource: "zones",
         description: "Зона для External IP. Оставьте address пустым для auto-allocation.",
         visibleWhen: { field: "_address_kind", equals: "external" },
       },
@@ -449,7 +439,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       name: "",
       description: "",
       _address_kind: "external",
-      external_ipv4_address_spec: { zone_id: "ru-central1-a", address: "" },
+      external_ipv4_address_spec: { zone_id: "", address: "" },
       deletion_protection: false,
     }),
     // Убирает поле-переключатель _address_kind и неактивный oneof из payload.
