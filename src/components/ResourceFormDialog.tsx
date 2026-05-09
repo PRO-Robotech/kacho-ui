@@ -41,6 +41,10 @@ interface Props {
   fields?: FormField[];
   folderUid?: string | null;
   trigger?: React.ReactNode;
+  /** Управление open/onOpenChange снаружи. Если задано — игнорирует trigger
+   *  и работает в controlled-режиме (используется из kebab-меню в ResourceTable,
+   *  где сам пункт меню — DropdownMenu.Item, не годится как DialogTrigger). */
+  controlledOpen?: { open: boolean; setOpen: (b: boolean) => void };
   onSuccess?: () => void;
   /** Опциональная нормализация payload перед отправкой (sanitize из ResourceSpec). */
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
@@ -56,10 +60,13 @@ export function ResourceFormDialog({
   fields,
   folderUid,
   trigger,
+  controlledOpen,
   onSuccess,
   sanitize,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ? controlledOpen.open : internalOpen;
+  const setOpen = controlledOpen ? controlledOpen.setOpen : setInternalOpen;
   const [view, setView] = useState<"form" | "json">(fields ? "form" : "json");
   const [obj, setObj] = useState<Record<string, unknown>>(() => normalize(template, fields));
   const [text, setText] = useState(() => JSON.stringify(template, null, 2));
@@ -197,21 +204,23 @@ export function ResourceFormDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          {trigger ?? (
-            <Button variant={mode === "create" ? "default" : "outline"} size="sm">
-              {mode === "create" ? (
-                <>
-                  <Plus className="h-4 w-4" /> Create
-                </>
-              ) : (
-                <>
-                  <Pencil className="h-4 w-4" /> Edit
-                </>
-              )}
-            </Button>
-          )}
-        </DialogTrigger>
+        {!controlledOpen && (
+          <DialogTrigger asChild>
+            {trigger ?? (
+              <Button variant={mode === "create" ? "default" : "outline"} size="sm">
+                {mode === "create" ? (
+                  <>
+                    <Plus className="h-4 w-4" /> Create
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="h-4 w-4" /> Edit
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogTrigger>
+        )}
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <div className="flex items-start justify-between gap-3">

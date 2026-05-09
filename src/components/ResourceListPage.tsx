@@ -2,16 +2,16 @@
 // Использует polling (3 сек) вместо Watch/WebSocket.
 // spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
 
-import { ReactNode } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
-import { ChevronRight, Eye, Loader2, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ReactNode, useMemo, useState } from "react";
+import { useParams, useLocation } from "react-router-dom";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { DeleteButton } from "@/components/DeleteButton";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
+import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
 import { useResourceList } from "@/lib/use-resource-list";
 
@@ -27,6 +27,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const params = useParams();
   const location = useLocation();
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
+  const [query, setQuery] = useState("");
 
   const { data, isLoading, isError, error, isFetching } = useResourceList(
     spec,
@@ -34,111 +35,112 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     filterValue,
   );
 
+  // Header slots: breadcrumb + primary CTA. Стабильные через useMemo, чтобы
+  // не триггерить лишние setState в провайдере на каждом polling-rerender.
+  const breadcrumb = useMemo(
+    () => <span className="text-foreground">{spec.plural}</span>,
+    [spec.plural],
+  );
+  useBreadcrumb(breadcrumb);
+
+  const ctaTemplate = useMemo(() => {
+    if (!spec.ops.create) return null;
+    return spec.template({
+      folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
+      cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
+      organizationId:
+        parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
+    });
+  }, [spec, parentField, filterValue]);
+
+  useHeaderRight(
+    spec.ops.create && ctaTemplate !== null ? (
+      <ResourceFormDialog
+        mode="create"
+        title={`Создать ${spec.singular.toLowerCase()}`}
+        apiPath={spec.apiPath}
+        resourceId={spec.id}
+        template={ctaTemplate}
+        fields={spec.fields}
+        folderUid={filterValue ?? null}
+        sanitize={spec.sanitize}
+      />
+    ) : null,
+  );
+
   // Если ресурс требует parent (например, /folders/:folderId/networks без folderId)
   if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
 
-  // Текущий path-prefix — для построения link на detail (preserve nested path).
-  // Например, /folders/X/networks → detail на /folders/X/networks/{id}.
   const basePath = location.pathname.endsWith("/")
     ? location.pathname.slice(0, -1)
     : location.pathname;
 
   const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
+  // Local filter — substring match по name + id.
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((row) => {
+      const name = (getByPath<string>(row, "name") ?? "").toLowerCase();
+      const id = (getByPath<string>(row, "id") ?? "").toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  }, [items, query]);
+
   const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
     header: c.header,
     className: c.className,
     cell: (row) => formatCell(c, row),
+    // Sortable: name / id / created_at / любые text-колонки.
+    sortKey:
+      c.format === "datetime" || c.format === "text" || c.format === "uid-short"
+        ? c.path
+        : undefined,
   }));
 
-  // Колонка действий
+  // Финальная action-колонка (kebab).
   columns.push({
     header: "",
-    className: "text-right whitespace-nowrap",
-    cell: (row) => {
-      const id = getByPath<string>(row, "id") ?? "";
-      const name = getByPath<string>(row, "name") ?? id;
-      // Иерархический drill-down: для Org/Cloud/Folder ведёт в дочерний список.
-      // Leaf-ресурсы (VPC) идут в DetailPage.
-      const drill = spec.childRoute ? spec.childRoute.replace(":id", id) : null;
-      const target = drill ?? `${basePath}/${id}`;
-      return (
-        <div className="flex items-center justify-end gap-1">
-          <Button asChild variant="ghost" size="sm">
-            <Link to={target}>
-              {drill ? (
-                <>
-                  <ChevronRight className="h-4 w-4" /> Open
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4" /> View
-                </>
-              )}
-            </Link>
-          </Button>
-          {spec.ops.update && (
-            <ResourceFormDialog
-              mode="edit"
-              title={`Edit ${spec.singular}`}
-              description="Изменяет ресурс; status пишется только сервером."
-              apiPath={`${spec.apiPath}/${id}`}
-              resourceId={spec.id}
-              template={row}
-              fields={spec.fields}
-              folderUid={filterValue ?? null}
-              sanitize={spec.sanitize}
-            />
-          )}
-          {spec.ops.delete && (
-            <DeleteButton
-              apiPath={`${spec.apiPath}/${id}`}
-              resourceId={spec.id}
-              name={name}
-              resourceLabel={spec.singular}
-              folderUid={filterValue ?? null}
-              triggerLabel=""
-            />
-          )}
-        </div>
-      );
-    },
+    className: "text-right whitespace-nowrap w-10",
+    cell: (row) => (
+      <RowActionsMenu
+        spec={spec}
+        row={row}
+        basePath={basePath}
+        folderUid={filterValue ?? null}
+      />
+    ),
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
-            <PollingIndicator isFetching={isFetching} isError={isError} />
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
           {spec.description && (
-            <p className="text-sm text-muted-foreground">{spec.description}</p>
-          )}
-          {parentField && filterValue && (
-            <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-2">
-              <span>{parentField}:</span>
-              <CopyableId id={filterValue} />
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">{spec.description}</p>
           )}
         </div>
-        {spec.ops.create && (
-          <ResourceFormDialog
-            mode="create"
-            title={`Create ${spec.singular}`}
-            apiPath={spec.apiPath}
-            resourceId={spec.id}
-            template={spec.template({
-              folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
-              cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
-              organizationId:
-                parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
-            })}
-            fields={spec.fields}
-            folderUid={filterValue ?? null}
-            sanitize={spec.sanitize}
+        <PollingIndicator isFetching={isFetching} isError={isError} />
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Фильтр по имени или идентификатору"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-9 w-full rounded-md border border-border bg-card pl-8 pr-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
+        </div>
+        {parentField && filterValue && (
+          <p className="text-xs text-muted-foreground inline-flex items-center gap-2">
+            <span>{parentField}:</span>
+            <CopyableId id={filterValue} />
+          </p>
         )}
       </div>
 
@@ -149,7 +151,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
       )}
 
       <ResourceTable
-        rows={items}
+        rows={filteredItems}
         loading={isLoading && items.length === 0}
         rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
         columns={columns}
@@ -167,7 +169,7 @@ function PollingIndicator({
 }) {
   if (isError) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-rose-600">
+      <span className="inline-flex items-center gap-1 text-xs text-rose-400">
         <RefreshCw className="h-3 w-3" /> offline
       </span>
     );
@@ -180,7 +182,10 @@ function PollingIndicator({
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-emerald-600" title="Данные актуальны">
+    <span
+      className="inline-flex items-center gap-1 text-xs text-emerald-400"
+      title="Данные актуальны"
+    >
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
       live
     </span>
