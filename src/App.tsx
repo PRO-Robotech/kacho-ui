@@ -7,6 +7,7 @@ import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
+import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 
 const queryClient = new QueryClient({
@@ -84,7 +85,9 @@ export default function App() {
                   element={
                     spec.id === "subnets"
                       ? <SubnetDetailPage />
-                      : <ResourceDetailPage spec={spec} />
+                      : spec.id === "security-groups"
+                        ? <SecurityGroupDetailPage />
+                        : <ResourceDetailPage spec={spec} />
                   }
                 />
               </Route>
