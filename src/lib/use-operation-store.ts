@@ -9,7 +9,7 @@
 
 import { useSyncExternalStore } from "react";
 
-export type OpStatus = "pending" | "success" | "error";
+export type OpStatus = "pending" | "success" | "error" | "cancelled";
 
 export interface OpEntry {
   id: string;             // operation_id
@@ -60,6 +60,19 @@ export const operationStore = {
     if (!current) return;
     current = { ...current, status: "error", errorMessage: message };
     emit();
+  },
+  /** Перевести в cancelled. Auto-dismiss через 5 сек (как success). */
+  markCancelled(message?: string) {
+    if (!current) return;
+    current = { ...current, status: "cancelled", errorMessage: message };
+    emit();
+    const op = current;
+    setTimeout(() => {
+      if (current && current.id === op.id && current.status === "cancelled") {
+        current = null;
+        emit();
+      }
+    }, 5000);
   },
   dismiss() {
     current = null;
