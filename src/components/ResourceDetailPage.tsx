@@ -34,9 +34,11 @@ interface Props {
   extraTabs?: (data: Record<string, unknown>) => DetailTab[];
   /** Опциональный ряд secondary-actions кнопок над tab content (Subnet «Перенести в зону»). */
   secondaryActions?: (data: Record<string, unknown>) => React.ReactNode;
+  /** По умолчанию показывается JSON-tab последним. Установить true чтобы скрыть. */
+  hideJsonTab?: boolean;
 }
 
-export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondaryActions }: Props) {
+export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondaryActions, hideJsonTab }: Props) {
   const params = useParams();
   const uid = params[paramKey];
   const navigate = useNavigate();
@@ -268,11 +270,15 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
       ),
     },
     ...(extraTabs ? extraTabs(data) : []),
-    {
-      id: "raw",
-      label: "JSON",
-      render: () => <JsonView data={data} />,
-    },
+    ...(hideJsonTab
+      ? []
+      : [
+          {
+            id: "raw",
+            label: "JSON",
+            render: () => <JsonView data={data} />,
+          },
+        ]),
   ];
 
   return (

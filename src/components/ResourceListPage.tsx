@@ -2,18 +2,18 @@
 //
 // Polling 3 сек (через useResourceList).
 
-import { ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Input, Typography, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { ResourceTable, Column } from "@/components/ResourceTable";
-import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
 import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
 
 interface Props {
@@ -106,15 +106,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     });
   }, [items, query]);
 
-  const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
-    header: c.header,
-    className: c.className,
-    cell: (row) => (c.render ? c.render(row) : formatCell(c, row)),
-    sortKey:
-      c.format === "datetime" || c.format === "text" || c.format === "uid-short"
-        ? c.path
-        : undefined,
-  }));
+  const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec);
 
   columns.push({
     header: "",
@@ -180,57 +172,3 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   );
 }
 
-function formatCell(c: { path: string; format?: string }, row: Record<string, unknown>): ReactNode {
-  const v = getByPath(row, c.path);
-  switch (c.format) {
-    case "status":
-      return <StatusBadge state={typeof v === "string" ? v : undefined} />;
-    case "uid-short":
-      return typeof v === "string" && v ? (
-        <CopyableId id={v} />
-      ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
-      );
-    case "datetime":
-      return typeof v === "string" && v ? (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {new Date(v).toLocaleString()}
-        </Typography.Text>
-      ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
-      );
-    case "code":
-      return typeof v === "string" || typeof v === "number" ? (
-        <Typography.Text code style={{ fontSize: 12 }}>
-          {String(v)}
-        </Typography.Text>
-      ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
-      );
-    case "list":
-      if (Array.isArray(v) && v.length > 0) {
-        // Каждый элемент — на отдельной строке (CIDR'ы и т.п.).
-        return (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {v.map((item, i) => (
-              <span
-                key={i}
-                style={{
-                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                  fontSize: 12,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {String(item)}
-              </span>
-            ))}
-          </div>
-        );
-      }
-      return <Typography.Text type="secondary">—</Typography.Text>;
-    case "text":
-    default:
-      if (v == null || v === "") return <Typography.Text type="secondary">—</Typography.Text>;
-      return String(v);
-  }
-}

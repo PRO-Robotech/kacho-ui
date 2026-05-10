@@ -1,174 +1,140 @@
 // SubnetDetailPage — расширение generic ResourceDetailPage с utilization-баром
-// и tab "IP-адреса" (used addresses из ListUsedAddresses).
-//
-// Шапка/Edit/Delete — через ResourceDetailPage. Здесь только subnet-specific
-// контент: utilization, CIDR breakdown, list used addresses.
+// и tab "IP-адреса", который показывает Address-ресурсы привязанные к этому
+// subnet (через internal_ipv4_address.subnet_id), используя те же колонки,
+// что и /folders/X/addresses.
 
 import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { Alert } from "antd";
 import { Button } from "@/components/ui/button";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
-import { IpamUtilizationBar, CIDRBreakdown } from "@/components/IpamUtilizationBar";
+import { ResourceTable, type Column } from "@/components/ResourceTable";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { api } from "@/api/client";
-import { REGISTRY } from "@/lib/resource-registry";
+import { REGISTRY, getByPath } from "@/lib/resource-registry";
+import { buildSpecColumns } from "@/lib/spec-columns";
 import type { DetailTab } from "@/components/DetailShell";
-
-interface UsedAddress {
-  address: string;
-  ip_version: string;
-  references?: { type: string; referrer: string }[];
-}
-
-// usable IPs per IPv4 CIDR (excluding network/broadcast).
-function usableIPv4(cidr: string): number {
-  const m = cidr.match(/\/(\d+)$/);
-  if (!m) return 0;
-  const bits = Number(m[1]);
-  if (bits === 32) return 1;
-  if (bits === 31) return 2;
-  if (bits >= 30) return Math.max(0, 2 ** (32 - bits) - 2);
-  return Math.max(0, 2 ** (32 - bits) - 2);
-}
 
 export function SubnetDetailPage() {
   const { uid: subnetId, folderId } = useParams();
+  const navigate = useNavigate();
   const spec = REGISTRY["subnets"];
+  const addrSpec = REGISTRY["addresses"];
 
-  const reserveLink = folderId && subnetId
-    ? `/folders/${folderId}/addresses/create?subnet_id=${subnetId}&kind=internal`
-    : null;
+  const reserveLink =
+    folderId && subnetId
+      ? `/folders/${folderId}/addresses/create?subnet_id=${subnetId}&kind=internal`
+      : null;
+  const addressesBasePath = folderId ? `/folders/${folderId}/addresses` : null;
 
-  const { data: used } = useQuery({
-    queryKey: ["subnet-used", subnetId],
+  // Address-ресурсы folder'а — будем фильтровать по subnet_id client-side.
+  const { data: addrList } = useQuery({
+    queryKey: ["addresses", "list", folderId],
     queryFn: () =>
-      api.get<{ addresses: UsedAddress[] }>(
-        `/vpc/v1/subnets/${subnetId}/addresses?pageSize=500`,
-      ),
+      api.list<{ addresses: Array<Record<string, unknown>> }>(addrSpec.apiPath, {
+        folder_id: folderId!,
+        pageSize: "500",
+      }),
     refetchInterval: 5000,
-    enabled: !!subnetId,
+    enabled: !!folderId,
   });
+
+  const subnetAddresses = useMemo(() => {
+    const all = addrList?.addresses ?? [];
+    return all.filter((a) => {
+      const internal = a.internal_ipv4_address as { subnet_id?: string } | undefined;
+      return internal?.subnet_id === subnetId;
+    });
+  }, [addrList, subnetId]);
+
+  // Колонки = те же, что у Addresses list, плюс actions.
+  const addrColumns = useMemo<Column<Record<string, unknown>>[]>(() => {
+    const cols = buildSpecColumns(addrSpec);
+    if (addressesBasePath) {
+      cols.push({
+        header: "",
+        className: "text-right whitespace-nowrap",
+        cell: (row) => (
+          <RowActionsMenu
+            spec={addrSpec}
+            row={row}
+            basePath={addressesBasePath}
+            folderUid={folderId ?? null}
+          />
+        ),
+      });
+    }
+    return cols;
+  }, [addrSpec, addressesBasePath, folderId]);
 
   const extraTabs = useMemo(
     () =>
-      (data: Record<string, unknown>): DetailTab[] => {
-        const cidrs = (data.v4_cidr_blocks as string[] | undefined) ?? [];
-        const usedIPs = used?.addresses?.length ?? 0;
-        const cidrBreakdown = cidrs.map((cidr) => {
-          const total = usableIPv4(cidr);
-          const used4 = (used?.addresses ?? []).filter((u) => ipv4InCidr(u.address, cidr)).length;
-          return { cidr, total, used: used4 };
-        });
-        const totalIPs = cidrBreakdown.reduce((acc, c) => acc + c.total, 0);
-
-        return [
-          {
-            id: "ipam",
-            label: "Использование",
-            render: () => (
-              <div className="space-y-6">
-                <IpamUtilizationBar
-                  label="Утилизация подсети"
-                  total={totalIPs}
-                  used={usedIPs}
-                />
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground mb-2">
-                    По CIDR
-                  </div>
-                  <CIDRBreakdown cidrs={cidrBreakdown} />
+      (): DetailTab[] => [
+        {
+          id: "addresses",
+          label: "IP-адреса",
+          count: subnetAddresses.length,
+          render: () => (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-muted-foreground">
+                  Адреса, привязанные к этой подсети.
                 </div>
-              </div>
-            ),
-          },
-          {
-            id: "addresses",
-            label: "IP-адреса",
-            count: usedIPs,
-            render: () => (
-              <div className="space-y-3">
-                {usedIPs === 0 ? (
-                  <div className="rounded-lg border border-dashed border-border p-10 text-center space-y-3">
-                    <div className="text-base font-medium">У вас пока нет IP-адресов</div>
-                    <div className="text-xs text-muted-foreground">
-                      Зарезервируйте адрес, чтобы он автоматически использовал
-                      CIDR-блок этой подсети.
-                    </div>
-                    {reserveLink && (
-                      <Button asChild>
-                        <Link to={reserveLink}>
-                          <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-end">
-                      {reserveLink && (
-                        <Button asChild size="sm">
-                          <Link to={reserveLink}>
-                            <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
-                          </Link>
-                        </Button>
-                      )}
-                    </div>
-                    <div className="rounded-lg border border-border overflow-hidden bg-card">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/40 text-xs uppercase tracking-wide">
-                          <tr>
-                            <th className="text-left px-3 py-2">IP</th>
-                            <th className="text-left px-3 py-2">Версия</th>
-                            <th className="text-left px-3 py-2">Ссылки</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(used?.addresses ?? []).map((u, i) => (
-                            <tr key={`${u.address}-${i}`} className="border-t border-border hover:bg-muted/20">
-                              <td className="px-3 py-2 font-mono">{u.address}</td>
-                              <td className="px-3 py-2 text-xs">{u.ip_version}</td>
-                              <td className="px-3 py-2 text-xs">
-                                {(u.references ?? []).map((r, j) => (
-                                  <div key={j} className="font-mono">
-                                    {r.type}: {r.referrer}
-                                  </div>
-                                ))}
-                                {!u.references?.length && "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
+                {reserveLink && (
+                  <Button asChild size="sm">
+                    <Link to={reserveLink}>
+                      <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
+                    </Link>
+                  </Button>
                 )}
               </div>
-            ),
-          },
-        ];
-      },
-    [used, reserveLink],
+
+              {subnetAddresses.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-10 text-center space-y-3">
+                  <div className="text-base font-medium">У вас пока нет IP-адресов</div>
+                  <div className="text-xs text-muted-foreground">
+                    Зарезервируйте адрес, чтобы он автоматически использовал
+                    CIDR-блок этой подсети.
+                  </div>
+                  {reserveLink && (
+                    <Button asChild>
+                      <Link to={reserveLink}>
+                        <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <ResourceTable
+                  rows={subnetAddresses}
+                  columns={addrColumns}
+                  rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+                  onRowClick={(r) => {
+                    const id = getByPath<string>(r, "id");
+                    if (id && addressesBasePath) navigate(`${addressesBasePath}/${id}`);
+                  }}
+                />
+              )}
+            </div>
+          ),
+        },
+        {
+          id: "operations",
+          label: "Операции",
+          render: () => (
+            <Alert
+              type="info"
+              showIcon
+              message="История операций"
+              description="OperationService пока не поддерживает фильтр по resource_id. Список операций по этой подсети появится после соответствующего изменения backend (см. план §11.1)."
+            />
+          ),
+        },
+      ],
+    [reserveLink, subnetAddresses, addrColumns, addressesBasePath, navigate],
   );
 
-  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} />;
-}
-
-// ipv4InCidr — простая проверка вхождения IP в CIDR.
-function ipv4InCidr(ip: string, cidr: string): boolean {
-  if (!ip || !cidr) return false;
-  const [base, bitsStr] = cidr.split("/");
-  const bits = Number(bitsStr);
-  if (!bits || bits < 0 || bits > 32) return false;
-  const ipN = ipv4ToInt(ip);
-  const baseN = ipv4ToInt(base);
-  if (ipN < 0 || baseN < 0) return false;
-  const mask = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
-  return (ipN & mask) === (baseN & mask);
-}
-
-function ipv4ToInt(ip: string): number {
-  const parts = ip.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((p) => isNaN(p) || p < 0 || p > 255)) return -1;
-  return ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} hideJsonTab />;
 }

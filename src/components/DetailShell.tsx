@@ -68,7 +68,16 @@ export function DetailShell({
   const docs = docLinks ?? DEFAULT_VPC_DOCS;
 
   return (
-    <div style={{ display: "flex", gap: 24, marginTop: -8, alignItems: "flex-start" }}>
+    <div
+      style={{
+        display: "flex",
+        gap: 24,
+        marginTop: -8,
+        alignItems: "stretch",
+        // Высота под viewport: header h=48 + Content padding 20+20 + small.
+        minHeight: "calc(100vh - 110px)",
+      }}
+    >
       <aside
         style={{
           width: SUB_PANE_WIDTH,
@@ -77,7 +86,6 @@ export function DetailShell({
           flexDirection: "column",
           borderRight: "1px solid var(--ant-color-border-secondary)",
           paddingRight: 8,
-          minHeight: 200,
         }}
       >
         <div
@@ -144,7 +152,13 @@ export function DetailShell({
         />
 
         {docs.length > 0 && (
-          <div style={{ marginTop: "auto", padding: "16px 8px 0 8px" }}>
+          <div
+            style={{
+              marginTop: "auto",
+              padding: "16px 8px 8px 8px",
+              borderTop: "1px solid var(--ant-color-border-secondary)",
+            }}
+          >
             <Typography.Text
               type="secondary"
               style={{

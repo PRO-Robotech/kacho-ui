@@ -9,6 +9,7 @@ import { ResourceCreatePage } from "@/components/ResourceCreatePage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
+import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
@@ -169,11 +170,13 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/${spec.route}/:uid`}
                   element={
-                    spec.id === "subnets"
-                      ? <SubnetDetailPage />
-                      : spec.id === "security-groups"
-                        ? <SecurityGroupDetailPage />
-                        : <ResourceDetailPage spec={spec} />
+                    spec.id === "networks"
+                      ? <NetworkDetailPage />
+                      : spec.id === "subnets"
+                        ? <SubnetDetailPage />
+                        : spec.id === "security-groups"
+                          ? <SecurityGroupDetailPage />
+                          : <ResourceDetailPage spec={spec} />
                   }
                 />
               </Route>
