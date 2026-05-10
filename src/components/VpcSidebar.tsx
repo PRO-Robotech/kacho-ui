@@ -15,7 +15,7 @@
 //   👤 Профиль (заглушка)
 //
 // При отсутствии folder VPC-иконки disabled (muted цвет, тулзип «Выберите каталог»).
-// HierarchyTree уехал в Cloud-pill dropdown (см. BreadcrumbSelector).
+// Иерархия Org→Cloud→Folder выбирается через три pill'а в шапке (BreadcrumbSelector).
 
 import { useMemo, type ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";

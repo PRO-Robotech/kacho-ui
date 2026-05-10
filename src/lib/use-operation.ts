@@ -26,17 +26,19 @@ export function useOperation(opId: string | null) {
 
 /**
  * invalidateResourceList — хелпер: инвалидирует кэш list-query после завершения операции.
- * Вызывать после done=true. Также инвалидирует tree-queries (HierarchyTree) и
- * dashboard-queries (DashboardPage) — чтобы новые org/cloud/folder/network/etc.
- * сразу появлялись слева и в счётчиках без ручного refresh.
+ * Вызывать после done=true. Также инвалидирует breadcrumb-pill queries и
+ * dashboard-queries — чтобы новые org/cloud/folder/network/etc. сразу
+ * появлялись в pills и в счётчиках без ручного refresh.
  */
 export function useInvalidateResourceList() {
   const qc = useQueryClient();
   return (resourceId: string, folderUid?: string | null) => {
     qc.invalidateQueries({ queryKey: [resourceId, "list", folderUid ?? null] });
-    // Tree всегда пересобираем — изменение Org/Cloud/Folder влияет на дерево.
-    qc.invalidateQueries({ queryKey: ["tree"] });
-    // Dashboard counts тоже зависят от ресурсов.
+    // Breadcrumb pills (Org/Cloud/Folder dropdowns).
+    qc.invalidateQueries({ queryKey: ["bc.orgs"] });
+    qc.invalidateQueries({ queryKey: ["bc.clouds"] });
+    qc.invalidateQueries({ queryKey: ["bc.folders"] });
+    // Dashboard counts.
     qc.invalidateQueries({ queryKey: ["dash"] });
   };
 }
