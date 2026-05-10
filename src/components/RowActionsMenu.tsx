@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button, Dropdown } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -9,12 +9,11 @@ import {
   DeleteOutlined,
   ArrowRightOutlined,
   DragOutlined,
-  GlobalOutlined,
+  PlusOutlined,
 } from "@ant-design/icons";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteConfirmStub } from "@/components/DeleteConfirmStub";
 import { MoveStubDialog } from "@/components/MoveStubDialog";
-import { SubnetRelocateDialog } from "@/components/SubnetRelocateDialog";
 import { getByPath, type ResourceSpec } from "@/lib/resource-registry";
 
 interface Props {
@@ -26,10 +25,10 @@ interface Props {
 
 export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
   const navigate = useNavigate();
+  const params = useParams();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [relocateOpen, setRelocateOpen] = useState(false);
 
   const id = getByPath<string>(row, "id") ?? "";
   const name = getByPath<string>(row, "name") ?? id;
@@ -51,8 +50,8 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
     "address-pools",
   ].includes(spec.id);
 
-  const isSubnet = spec.id === "subnets";
-  const currentZone = getByPath<string>(row, "zone_id") ?? "";
+  const isNetwork = spec.id === "networks";
+  const currentFolderId = params.folderId ?? folderUid ?? null;
 
   const items: MenuProps["items"] = [
     {
@@ -61,6 +60,15 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
       label: drillIsChild ? "Открыть" : "Просмотр",
       onClick: () => navigate(drillTarget),
     },
+    isNetwork && currentFolderId
+      ? {
+          key: "create-subnet",
+          icon: <PlusOutlined />,
+          label: "Создать подсеть",
+          onClick: () =>
+            navigate(`/folders/${currentFolderId}/subnets/create?network_id=${id}`),
+        }
+      : null,
     spec.ops.update
       ? {
           key: "edit",
@@ -75,14 +83,6 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           icon: <DragOutlined />,
           label: "Переместить",
           onClick: () => setMoveOpen(true),
-        }
-      : null,
-    isSubnet
-      ? {
-          key: "relocate",
-          icon: <GlobalOutlined />,
-          label: "Перенести в другую зону",
-          onClick: () => setRelocateOpen(true),
         }
       : null,
     showDelete ? { type: "divider" as const } : null,
@@ -112,7 +112,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
       {spec.ops.update && (
         <ResourceFormDialog
           mode="edit"
-          title={`Edit ${spec.singular}`}
+          title={`Редактировать ${spec.singular}`}
           description="Изменяет ресурс; status пишется только сервером."
           apiPath={editPath}
           resourceId={spec.id}
@@ -141,17 +141,6 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           resourceLabel={spec.singular}
           name={name}
           apiPath={editPath}
-        />
-      )}
-
-      {isSubnet && (
-        <SubnetRelocateDialog
-          open={relocateOpen}
-          onOpenChange={setRelocateOpen}
-          subnetId={id}
-          subnetName={name}
-          currentZone={currentZone}
-          folderUid={folderUid}
         />
       )}
     </>

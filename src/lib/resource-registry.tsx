@@ -256,7 +256,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         header: "Имя",
         path: "name",
-        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
       },
       {
         header: "Идентификатор",
@@ -275,6 +275,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           <RefNameLink
             specId="security-groups"
             refId={row.default_security_group_id as string | undefined}
+            maxChars={42}
           />
         ),
       },
@@ -326,7 +327,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         header: "Имя",
         path: "name",
-        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
       },
       {
         header: "Идентификатор",
@@ -478,7 +479,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         header: "Имя",
         path: "name",
-        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
       },
       {
         header: "Идентификатор",

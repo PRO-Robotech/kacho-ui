@@ -16,9 +16,11 @@ interface Props {
   folderId?: string;
   /** Render как antd Tag (chip-стиль). Default — обычная ссылка. */
   asTag?: boolean;
+  /** Если задан — обрезать имя по N символов с многоточием. Title даёт полное имя. */
+  maxChars?: number;
 }
 
-export function RefNameLink({ specId, refId, folderId: folderOverride, asTag }: Props) {
+export function RefNameLink({ specId, refId, folderId: folderOverride, asTag, maxChars }: Props) {
   const params = useParams();
   const folder = useFolderStore((s) => s.folder);
   const folderId = folderOverride ?? params.folderId ?? folder?.id ?? null;
@@ -40,19 +42,24 @@ export function RefNameLink({ specId, refId, folderId: folderOverride, asTag }: 
 
   const items = data?.[spec.payloadKey] ?? [];
   const row = items.find((r) => r.id === refId);
-  const display = row?.name || refId.slice(0, 12) + "…";
+  const fullName = row?.name || refId.slice(0, 12) + "…";
+  const display =
+    maxChars && fullName.length > maxChars
+      ? fullName.slice(0, maxChars) + "…"
+      : fullName;
   const href = folderId ? `/folders/${folderId}/${spec.route}/${refId}` : null;
 
   const inner = href ? (
     <Link
       to={href}
       onClick={(e) => e.stopPropagation()}
+      title={fullName}
       className="text-primary hover:underline"
     >
       {display}
     </Link>
   ) : (
-    <span className="text-foreground">{display}</span>
+    <span className="text-foreground" title={fullName}>{display}</span>
   );
 
   if (asTag) {

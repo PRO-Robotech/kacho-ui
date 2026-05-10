@@ -9,21 +9,27 @@ import { cn } from "@/lib/utils";
 
 interface Props {
   name: string;
+  /** Fallback значение, если name пустое (например — id ресурса). */
+  fallback?: string;
   className?: string;
 }
 
-export function CopyableName({ name, className }: Props) {
+export function CopyableName({ name, fallback, className }: Props) {
   const [copied, setCopied] = useState(false);
 
-  if (!name) return <span className="text-muted-foreground italic">(unnamed)</span>;
+  // Используем name если есть, иначе fallback (id), иначе empty placeholder.
+  const value = name || fallback || "";
+  const isFallback = !name && !!fallback;
+
+  if (!value) return <span className="text-muted-foreground italic">(unnamed)</span>;
 
   const onCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(name);
+      await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast.success("Имя скопировано");
+      toast.success(isFallback ? "ID скопирован" : "Имя скопировано");
       setTimeout(() => setCopied(false), 1500);
     } catch {
       toast.error("Не удалось скопировать");
@@ -34,14 +40,15 @@ export function CopyableName({ name, className }: Props) {
     <button
       type="button"
       onClick={onCopy}
-      title={copied ? "Скопировано" : "Скопировать имя"}
+      title={copied ? "Скопировано" : isFallback ? "Имя не задано — скопировать ID" : "Скопировать имя"}
       className={cn(
         "group inline-flex items-center gap-1 font-medium text-sm",
         "text-foreground hover:text-primary transition-colors cursor-pointer text-left",
+        isFallback && "font-mono text-xs",
         className,
       )}
     >
-      <span className="break-all">{name}</span>
+      <span className="break-all">{value}</span>
       {copied ? (
         <Check className="h-3 w-3 text-emerald-500 shrink-0" />
       ) : (

@@ -209,7 +209,23 @@ function formatCell(c: { path: string; format?: string }, row: Record<string, un
       );
     case "list":
       if (Array.isArray(v) && v.length > 0) {
-        return <Typography.Text style={{ fontSize: 12 }}>{v.join(", ")}</Typography.Text>;
+        // Каждый элемент — на отдельной строке (CIDR'ы и т.п.).
+        return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {v.map((item, i) => (
+              <span
+                key={i}
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                  fontSize: 12,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {String(item)}
+              </span>
+            ))}
+          </div>
+        );
       }
       return <Typography.Text type="secondary">—</Typography.Text>;
     case "text":
