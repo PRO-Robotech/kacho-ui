@@ -49,6 +49,9 @@ interface Props {
   /** Подменить primary "Создать <singular>" в default overview-actions на другую кнопку.
    *  Например, на Network detail логично "Создать подсеть" вместо "Создать Network". */
   overviewCreateOverride?: { label: string; onClick: () => void };
+  /** Добавить дополнительные секции в Обзор-tab после "Общее"-Descriptions.
+   *  Используется для inline-таблиц дочерних ресурсов (Network → Подсети). */
+  overviewExtras?: (data: Record<string, unknown>) => React.ReactNode;
 }
 
 export function ResourceDetailPage({
@@ -59,6 +62,7 @@ export function ResourceDetailPage({
   hideJsonTab,
   headerActionsByTab,
   overviewCreateOverride,
+  overviewExtras,
 }: Props) {
   const params = useParams();
   const uid = params[paramKey];
@@ -364,6 +368,7 @@ export function ResourceDetailPage({
               children: it.value,
             }))}
           />
+          {overviewExtras && overviewExtras(data)}
         </Space>
       ),
     },

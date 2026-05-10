@@ -29,11 +29,21 @@ export function useOperation(opId: string | null) {
  * Вызывать после done=true. Также инвалидирует breadcrumb-pill queries и
  * dashboard-queries — чтобы новые org/cloud/folder/network/etc. сразу
  * появлялись в pills и в счётчиках без ручного refresh.
+ *
+ * useResourceList queryKey = [spec.id, "list", filterField, filterValue].
+ * invalidateQueries с queryKey работает по prefix match — ["networks", "list"]
+ * матчит все ["networks", "list", *, *] независимо от parent-фильтра.
  */
 export function useInvalidateResourceList() {
   const qc = useQueryClient();
-  return (resourceId: string, folderUid?: string | null) => {
-    qc.invalidateQueries({ queryKey: [resourceId, "list", folderUid ?? null] });
+  return (resourceId: string, _folderUid?: string | null) => {
+    void _folderUid;
+    // Все list-варианты этого ресурса (любой parent-фильтр).
+    qc.invalidateQueries({ queryKey: [resourceId, "list"] });
+    // Detail этого ресурса (если открыт).
+    qc.invalidateQueries({ queryKey: [resourceId, "detail"] });
+    // RefNameLink lookup-кэш.
+    qc.invalidateQueries({ queryKey: ["ref-name", resourceId] });
     // Breadcrumb pills (Org/Cloud/Folder dropdowns).
     qc.invalidateQueries({ queryKey: ["bc.orgs"] });
     qc.invalidateQueries({ queryKey: ["bc.clouds"] });

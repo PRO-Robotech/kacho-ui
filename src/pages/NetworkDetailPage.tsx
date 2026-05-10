@@ -25,6 +25,19 @@ export function NetworkDetailPage() {
   const rtSpec = REGISTRY["route-tables"];
   const sgSpec = REGISTRY["security-groups"];
 
+  const subnetSpec = REGISTRY["subnets"];
+
+  const { data: subnetData } = useQuery({
+    queryKey: ["subnets", "list", folderId],
+    queryFn: () =>
+      api.list<{ subnets: Array<Record<string, unknown>> }>(subnetSpec.apiPath, {
+        folder_id: folderId!,
+        pageSize: "500",
+      }),
+    refetchInterval: 5000,
+    enabled: !!folderId,
+  });
+
   const { data: rtData } = useQuery({
     queryKey: ["route-tables", "list", folderId],
     queryFn: () =>
@@ -47,6 +60,10 @@ export function NetworkDetailPage() {
     enabled: !!folderId,
   });
 
+  const networkSubnets = useMemo(
+    () => (subnetData?.subnets ?? []).filter((r) => r.network_id === networkId),
+    [subnetData, networkId],
+  );
   const networkRouteTables = useMemo(
     () => (rtData?.route_tables ?? []).filter((r) => r.network_id === networkId),
     [rtData, networkId],
@@ -56,8 +73,24 @@ export function NetworkDetailPage() {
     [sgData, networkId],
   );
 
+  const subnetColumns = useChildColumns(subnetSpec, folderId);
   const rtColumns = useChildColumns(rtSpec, folderId);
   const sgColumns = useChildColumns(sgSpec, folderId);
+
+  const overviewExtras = useCallback(
+    () => (
+      <ChildSection
+        title="Подсети"
+        rows={networkSubnets}
+        columns={subnetColumns}
+        emptyText="В сети нет подсетей."
+        onClick={(id) =>
+          folderId && navigate(`/folders/${folderId}/subnets/${id}`)
+        }
+      />
+    ),
+    [networkSubnets, subnetColumns, folderId, navigate],
+  );
 
   const extraTabs = useMemo(
     () =>
@@ -179,6 +212,7 @@ export function NetworkDetailPage() {
       hideJsonTab
       headerActionsByTab={headerActionsByTab}
       overviewCreateOverride={overviewCreateOverride}
+      overviewExtras={overviewExtras}
     />
   );
 }
