@@ -159,12 +159,26 @@ export function NetworkDetailPage() {
     [folderId, networkId, navigate],
   );
 
+  // На Network detail логично создавать подсеть из текущей сети, а не ещё одну сеть.
+  const overviewCreateOverride = useMemo(
+    () =>
+      folderId && networkId
+        ? {
+            label: "Создать подсеть",
+            onClick: () =>
+              navigate(`/folders/${folderId}/subnets/create?network_id=${networkId}`),
+          }
+        : undefined,
+    [folderId, networkId, navigate],
+  );
+
   return (
     <ResourceDetailPage
       spec={networkSpec}
       extraTabs={extraTabs}
       hideJsonTab
       headerActionsByTab={headerActionsByTab}
+      overviewCreateOverride={overviewCreateOverride}
     />
   );
 }

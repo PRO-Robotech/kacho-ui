@@ -47,6 +47,9 @@ interface Props {
     tabId: string,
     data: Record<string, unknown>,
   ) => React.ReactNode | null | undefined;
+  /** Подменить primary "Создать <singular>" в default overview-actions на другую кнопку.
+   *  Например, на Network detail логично "Создать подсеть" вместо "Создать Network". */
+  overviewCreateOverride?: { label: string; onClick: () => void };
 }
 
 export function ResourceDetailPage({
@@ -56,6 +59,7 @@ export function ResourceDetailPage({
   secondaryActions,
   hideJsonTab,
   headerActionsByTab,
+  overviewCreateOverride,
 }: Props) {
   const params = useParams();
   const uid = params[paramKey];
@@ -182,7 +186,16 @@ export function ResourceDetailPage({
 
     return (
       <Space size="small">
-        {spec.ops.create && (
+        {overviewCreateOverride ? (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={overviewCreateOverride.onClick}
+          >
+            {overviewCreateOverride.label}
+          </Button>
+        ) : spec.ops.create ? (
           <Button
             type="primary"
             size="small"
@@ -191,7 +204,7 @@ export function ResourceDetailPage({
           >
             Создать {spec.singular.toLowerCase()}
           </Button>
-        )}
+        ) : null}
         {spec.ops.restart && (
           <Button
             size="small"
@@ -240,6 +253,7 @@ export function ResourceDetailPage({
     data,
     moveCapable,
     backHref,
+    overviewCreateOverride,
     actionMutation.isPending,
     actionMutation.variables,
   ]);
