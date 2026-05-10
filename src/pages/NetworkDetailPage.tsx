@@ -5,7 +5,7 @@
 // Per-tab header CTA через ResourceDetailPage.headerActionsByTab.
 // Каждый child-tab имеет Title + filter (имя или id substring) над таблицей.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, Button, Empty, Input, Space, Typography } from "antd";
@@ -123,38 +123,41 @@ export function NetworkDetailPage() {
     [networkRouteTables, networkSGs, rtColumns, sgColumns, folderId, navigate],
   );
 
-  const headerActionsByTab = (tabId: string) => {
-    if (!folderId) return null;
-    if (tabId === "route-tables") {
-      return (
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={() =>
-            navigate(`/folders/${folderId}/route-tables/create?network_id=${networkId}`)
-          }
-        >
-          Создать таблицу маршрутизации
-        </Button>
-      );
-    }
-    if (tabId === "security-groups") {
-      return (
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={() =>
-            navigate(`/folders/${folderId}/security-groups/create?network_id=${networkId}`)
-          }
-        >
-          Создать группу безопасности
-        </Button>
-      );
-    }
-    return null;
-  };
+  const headerActionsByTab = useCallback(
+    (tabId: string) => {
+      if (!folderId) return null;
+      if (tabId === "route-tables") {
+        return (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() =>
+              navigate(`/folders/${folderId}/route-tables/create?network_id=${networkId}`)
+            }
+          >
+            Создать таблицу маршрутизации
+          </Button>
+        );
+      }
+      if (tabId === "security-groups") {
+        return (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() =>
+              navigate(`/folders/${folderId}/security-groups/create?network_id=${networkId}`)
+            }
+          >
+            Создать группу безопасности
+          </Button>
+        );
+      }
+      return null;
+    },
+    [folderId, networkId, navigate],
+  );
 
   return (
     <ResourceDetailPage

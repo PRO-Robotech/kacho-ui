@@ -3,7 +3,7 @@
 // subnet (через internal_ipv4_address.subnet_id), используя те же колонки,
 // что и /folders/X/addresses.
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -104,21 +104,24 @@ export function SubnetDetailPage() {
     [reserveLink, subnetAddresses, addrColumns, addressesBasePath, navigate],
   );
 
-  const headerActionsByTab = (tabId: string) => {
-    if (tabId === "addresses" && reserveLink) {
-      return (
-        <AntButton
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={() => navigate(reserveLink)}
-        >
-          Зарезервировать IP-адрес
-        </AntButton>
-      );
-    }
-    return null;
-  };
+  const headerActionsByTab = useCallback(
+    (tabId: string) => {
+      if (tabId === "addresses" && reserveLink) {
+        return (
+          <AntButton
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => navigate(reserveLink)}
+          >
+            Зарезервировать IP-адрес
+          </AntButton>
+        );
+      }
+      return null;
+    },
+    [reserveLink, navigate],
+  );
 
   return (
     <ResourceDetailPage

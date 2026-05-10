@@ -245,10 +245,15 @@ export function ResourceDetailPage({
   ]);
 
   // Per-tab header CTA (через ?tab) — если задано и возвращает не-null,
-  // используется вместо overviewActions.
+  // используется вместо overviewActions. useMemo обязателен, иначе
+  // useHeaderRight видит новый node-ref на каждый рендер и зацикливает setState.
   const activeTabId = searchParams.get("tab") ?? "overview";
-  const tabOverride = headerActionsByTab && data ? headerActionsByTab(activeTabId, data) : null;
-  useHeaderRight(tabOverride ?? overviewActions);
+  const finalHeaderRight = useMemo(() => {
+    if (!data) return null;
+    const override = headerActionsByTab ? headerActionsByTab(activeTabId, data) : null;
+    return override ?? overviewActions;
+  }, [headerActionsByTab, activeTabId, data, overviewActions]);
+  useHeaderRight(finalHeaderRight);
 
   if (isLoading && !data) {
     return (
