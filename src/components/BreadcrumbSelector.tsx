@@ -34,6 +34,7 @@ import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/CopyableId";
+import { HierarchyTree } from "@/components/HierarchyTree";
 import {
   Dialog,
   DialogContent,
@@ -137,9 +138,7 @@ interface FolderRow {
 function CloudCrumb({
   selected,
   parentOrgId,
-  onSelect,
   onForm,
-  onDelete,
 }: {
   selected: CloudRef | null;
   parentOrgId: string | null;
@@ -147,49 +146,26 @@ function CloudCrumb({
   onForm: (s: FormDialogState) => void;
   onDelete: (s: DeleteDialogState) => void;
 }) {
-  const navigate = useNavigate();
-  const { data, isLoading } = useQuery({
-    queryKey: ["bc.clouds", parentOrgId],
-    queryFn: () =>
-      api.list<{ clouds: CloudRow[] }>("/resource-manager/v1/clouds", {
-        organization_id: parentOrgId!,
-      }),
-    refetchInterval: 30_000,
-    enabled: !!parentOrgId,
-  });
-  const items = data?.clouds ?? [];
-
+  // Cloud-pill — открывает HierarchyTree (Org → Clouds → Folders) полностью.
+  // Это заменяет старую боковую sidebar-tree (HierarchyTree уехал сюда после A4).
+  // Sub-меню Edit/Delete на конкретной строке tree остаются TODO — управление
+  // Cloud/Folder через Cloud detail page.
+  const label =
+    selected?.name || (selected ? selected.id : "Cloud");
   return (
     <Crumb
       icon={<Cloud className="h-4 w-4 text-muted-foreground" />}
-      label={
-        selected?.name ||
-        items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id : "Cloud")
-      }
+      label={label}
       placeholder={!selected}
       disabled={!parentOrgId}
-      loading={isLoading && items.length === 0}
+      loading={false}
       disabledHint="Выберите Organization"
-      items={items.map((it) => ({
-        id: it.id,
-        label: it.name,
-        sub: it.id,
-        selected: selected?.id === it.id,
-        onSelect: () => onSelect(it),
-        onEdit: () => onForm({ level: "cloud", action: "edit", template: it }),
-        onDelete: () =>
-          onDelete({
-            level: "cloud",
-            apiPath: `/resource-manager/v1/clouds/${it.id}`,
-            name: it.name,
-            resourceLabel: "Cloud",
-            onSuccess: () => {
-              if (selected?.id === it.id && parentOrgId)
-                navigate(`/organizations/${parentOrgId}/clouds`);
-            },
-          }),
-      }))}
+      contentMinWidth={360}
+      customContent={
+        <div style={{ maxHeight: "60vh", overflowY: "auto", padding: 4 }}>
+          <HierarchyTree embedded />
+        </div>
+      }
       onCreate={
         parentOrgId
           ? () =>
@@ -302,7 +278,12 @@ interface CrumbProps {
   placeholder?: boolean;
   disabled?: boolean;
   loading?: boolean;
-  items: CrumbItem[];
+  /** Список строк (классический pill). Если задан customContent — игнорируется. */
+  items?: CrumbItem[];
+  /** Кастомный JSX в dropdown (например, HierarchyTree для Cloud-pill). Перебивает items. */
+  customContent?: ReactNode;
+  /** Минимальная ширина dropdown. По умолчанию 280. */
+  contentMinWidth?: number;
   disabledHint?: string;
   onCreate?: () => void;
 }
@@ -315,6 +296,8 @@ function Crumb({
   disabled,
   loading,
   items,
+  customContent,
+  contentMinWidth = 280,
   disabledHint,
   onCreate,
 }: CrumbProps) {
@@ -341,26 +324,33 @@ function Crumb({
         <DropdownMenu.Content
           align="start"
           sideOffset={4}
-          className="z-30 min-w-[280px] max-h-[60vh] overflow-y-auto rounded-md border border-border bg-background shadow-md p-1"
+          style={{ minWidth: contentMinWidth }}
+          className="z-30 max-h-[70vh] overflow-y-auto rounded-md border border-border bg-card shadow-lg p-1"
         >
-          {loading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
+          {customContent ? (
+            customContent
+          ) : (
+            <>
+              {loading && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
+              )}
+              {!loading && (items?.length ?? 0) === 0 && (
+                <div className="px-3 py-2 text-xs text-muted-foreground italic">
+                  Список пуст. Создайте первый элемент.
+                </div>
+              )}
+              {(items ?? []).map((it) => (
+                <CrumbRow key={it.id} item={it} />
+              ))}
+            </>
           )}
-          {!loading && items.length === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground italic">
-              Список пуст. Создайте первый элемент.
-            </div>
-          )}
-          {items.map((it) => (
-            <CrumbRow key={it.id} item={it} />
-          ))}
 
           {onCreate && (
             <>
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
               <DropdownMenu.Item
                 onSelect={() => onCreate()}
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent text-emerald-700 font-medium"
+                className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent text-emerald-400 font-medium"
               >
                 <Plus className="h-4 w-4" />
                 <span>Create new</span>

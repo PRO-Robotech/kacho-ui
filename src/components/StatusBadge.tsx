@@ -1,134 +1,31 @@
-// StatusBadge — отображает статус ресурса.
-// Поддерживает оба naming convention:
-//   STATUS_* (sub-phase 1.0 flat API)
-//   STATE_*  (legacy 0.x envelope API)
+// StatusBadge — YC-style плотный pill для статуса ресурса.
+// Поддерживает оба naming convention: STATUS_* (1.0 flat) и STATE_* (legacy 0.x).
+// Тема — dark only (под AntD darkAlgorithm). Светлые палитры из 0.x удалены.
 
 import { cn } from "@/lib/utils";
 
-const STATE_STYLES: Record<string, string> = {
-  // ===== STATUS_* (1.0) =====
-  // active / ready / running
-  STATUS_ACTIVE: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  STATUS_READY: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  STATUS_RUNNING: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  STATUS_RESERVED: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
+type Tone = "ok" | "info" | "warn" | "muted" | "error" | "violet";
 
-  // creating / provisioning / starting
-  STATUS_CREATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATUS_PROVISIONING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATUS_STARTING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATUS_ATTACHING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATUS_UPDATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-
-  // stopping / deleting
-  STATUS_STOPPING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  STATUS_DETACHING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  STATUS_DELETING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-
-  // stopped
-  STATUS_STOPPED: "bg-zinc-100 text-zinc-700 ring-zinc-300/70",
-  STATUS_RELEASED: "bg-zinc-100 text-zinc-700 ring-zinc-300/70",
-
-  // error
-  STATUS_ERROR: "bg-rose-100 text-rose-800 ring-rose-300/70",
-
-  // in use
-  STATUS_IN_USE: "bg-violet-100 text-violet-800 ring-violet-300/70",
-
-  // ===== Bare status names (без префикса, для совместимости) =====
-  ACTIVE: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  READY: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  RUNNING: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  RESERVED: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-
-  CREATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  PROVISIONING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STARTING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  ATTACHING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  UPDATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-
-  STOPPING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  DETACHING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  DELETING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-
-  STOPPED: "bg-zinc-100 text-zinc-700 ring-zinc-300/70",
-  RELEASED: "bg-zinc-100 text-zinc-700 ring-zinc-300/70",
-
-  ERROR: "bg-rose-100 text-rose-800 ring-rose-300/70",
-  IN_USE: "bg-violet-100 text-violet-800 ring-violet-300/70",
-
-  // ===== STATE_* (legacy 0.x) =====
-  STATE_RUNNING: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  STATE_READY: "bg-emerald-100 text-emerald-800 ring-emerald-300/70",
-  STATE_CREATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATE_PROVISIONING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATE_STARTING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATE_ATTACHING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATE_UPDATING: "bg-sky-100 text-sky-800 ring-sky-300/70",
-  STATE_STOPPING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  STATE_DETACHING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  STATE_DELETING: "bg-amber-100 text-amber-800 ring-amber-300/70",
-  STATE_STOPPED: "bg-zinc-100 text-zinc-700 ring-zinc-300/70",
-  STATE_ERROR: "bg-rose-100 text-rose-800 ring-rose-300/70",
+const TONE_CLASS: Record<Tone, string> = {
+  ok:    "bg-emerald-900/40 text-emerald-300 border-emerald-800/60",
+  info:  "bg-sky-900/40 text-sky-300 border-sky-800/60",
+  warn:  "bg-amber-900/40 text-amber-300 border-amber-800/60",
+  muted: "bg-zinc-700/30 text-zinc-300 border-zinc-700/50",
+  error: "bg-rose-900/40 text-rose-300 border-rose-800/60",
+  violet:"bg-violet-900/40 text-violet-300 border-violet-800/60",
 };
 
-const DOT_STYLES: Record<string, string> = {
-  STATUS_ACTIVE: "bg-emerald-500",
-  STATUS_READY: "bg-emerald-500",
-  STATUS_RUNNING: "bg-emerald-500",
-  STATUS_RESERVED: "bg-emerald-500",
-  STATUS_CREATING: "bg-sky-500 animate-pulse",
-  STATUS_PROVISIONING: "bg-sky-500 animate-pulse",
-  STATUS_STARTING: "bg-sky-500 animate-pulse",
-  STATUS_ATTACHING: "bg-sky-500 animate-pulse",
-  STATUS_UPDATING: "bg-sky-500 animate-pulse",
-  STATUS_STOPPING: "bg-amber-500 animate-pulse",
-  STATUS_DETACHING: "bg-amber-500 animate-pulse",
-  STATUS_DELETING: "bg-amber-500 animate-pulse",
-  STATUS_STOPPED: "bg-zinc-400",
-  STATUS_RELEASED: "bg-zinc-400",
-  STATUS_ERROR: "bg-rose-500",
-  STATUS_IN_USE: "bg-violet-500",
-
-  ACTIVE: "bg-emerald-500",
-  READY: "bg-emerald-500",
-  RUNNING: "bg-emerald-500",
-  RESERVED: "bg-emerald-500",
-  CREATING: "bg-sky-500 animate-pulse",
-  PROVISIONING: "bg-sky-500 animate-pulse",
-  STARTING: "bg-sky-500 animate-pulse",
-  ATTACHING: "bg-sky-500 animate-pulse",
-  UPDATING: "bg-sky-500 animate-pulse",
-  STOPPING: "bg-amber-500 animate-pulse",
-  DETACHING: "bg-amber-500 animate-pulse",
-  DELETING: "bg-amber-500 animate-pulse",
-  STOPPED: "bg-zinc-400",
-  RELEASED: "bg-zinc-400",
-  ERROR: "bg-rose-500",
-  IN_USE: "bg-violet-500",
-
-  STATE_RUNNING: "bg-emerald-500",
-  STATE_READY: "bg-emerald-500",
-  STATE_CREATING: "bg-sky-500 animate-pulse",
-  STATE_PROVISIONING: "bg-sky-500 animate-pulse",
-  STATE_STARTING: "bg-sky-500 animate-pulse",
-  STATE_ATTACHING: "bg-sky-500 animate-pulse",
-  STATE_UPDATING: "bg-sky-500 animate-pulse",
-  STATE_STOPPING: "bg-amber-500 animate-pulse",
-  STATE_DETACHING: "bg-amber-500 animate-pulse",
-  STATE_DELETING: "bg-amber-500 animate-pulse",
-  STATE_STOPPED: "bg-zinc-400",
-  STATE_ERROR: "bg-rose-500",
+const TONE_BY_STATUS: Record<string, Tone> = {
+  ACTIVE: "ok", READY: "ok", RUNNING: "ok", RESERVED: "ok",
+  CREATING: "info", PROVISIONING: "info", STARTING: "info",
+  ATTACHING: "info", UPDATING: "info",
+  STOPPING: "warn", DETACHING: "warn", DELETING: "warn",
+  STOPPED: "muted", RELEASED: "muted",
+  ERROR: "error",
+  IN_USE: "violet",
 };
 
-const DEFAULT_BADGE = "bg-zinc-100 text-zinc-700 ring-zinc-300/70";
-const DEFAULT_DOT = "bg-zinc-400";
-
-/** Нормализует label для отображения:
- *  STATUS_RUNNING → RUNNING
- *  STATE_RUNNING  → RUNNING
- *  RUNNING        → RUNNING
- */
+/** Нормализует label: STATUS_RUNNING → RUNNING, STATE_RUNNING → RUNNING, RUNNING → RUNNING. */
 function displayLabel(raw: string): string {
   if (raw.startsWith("STATUS_")) return raw.slice(7);
   if (raw.startsWith("STATE_")) return raw.slice(6);
@@ -136,19 +33,19 @@ function displayLabel(raw: string): string {
 }
 
 export function StatusBadge({ state }: { state?: string }) {
-  const label = state ?? "—";
-  const cls = STATE_STYLES[label] ?? DEFAULT_BADGE;
-  const dot = DOT_STYLES[label] ?? DEFAULT_DOT;
-  const display = label === "—" ? "—" : displayLabel(label);
+  if (!state) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  const display = displayLabel(state);
+  const tone = TONE_BY_STATUS[display] ?? "muted";
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-        cls,
+        "inline-flex items-center rounded px-1.5 h-[20px] text-[11px] font-medium leading-none border",
+        TONE_CLASS[tone],
       )}
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
-      {display}
+      {display.charAt(0) + display.slice(1).toLowerCase()}
     </span>
   );
 }

@@ -91,7 +91,12 @@ interface FolderInfo {
   orgId: string;
 }
 
-export function HierarchyTree() {
+interface HierarchyTreeProps {
+  /** Если true — рендерится без внешней обёртки (для встраивания в dropdown). */
+  embedded?: boolean;
+}
+
+export function HierarchyTree({ embedded }: HierarchyTreeProps = {}) {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
@@ -264,12 +269,8 @@ export function HierarchyTree() {
     return [];
   }, [ctx]);
 
-  return (
-    <div
-      className="h-full overflow-y-auto"
-      style={{ background: token.colorBgLayout, padding: "8px 4px" }}
-      data-testid="hierarchy-tree"
-    >
+  const inner = (
+    <>
       {orgsQuery.isLoading && (
         <div style={{ display: "flex", justifyContent: "center", padding: 16 }}>
           <Spin size="small" />
@@ -293,6 +294,20 @@ export function HierarchyTree() {
           onExpand={(keys) => setExpandedKeys(keys)}
         />
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <div data-testid="hierarchy-tree">{inner}</div>;
+  }
+
+  return (
+    <div
+      className="h-full overflow-y-auto"
+      style={{ background: token.colorBgLayout, padding: "8px 4px" }}
+      data-testid="hierarchy-tree"
+    >
+      {inner}
     </div>
   );
 }

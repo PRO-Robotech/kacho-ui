@@ -1,17 +1,21 @@
-// DetailShell — обёртка detail-страницы под YC look-and-feel на antd.
+// DetailShell — обёртка detail-страницы под YC look-and-feel.
 //
-// Структура:
-//   ┌──────────────┬──────────────────────────────────────────────┐
-//   │  resource    │                                              │
-//   │  name+badge  │           main content (per tab)             │
-//   │  Menu (tabs) │                                              │
-//   │  Документация│                                              │
-//   └──────────────┴──────────────────────────────────────────────┘
+// Layout (внутри Content; глобальный VpcSidebar w=56 рисует Layout.tsx):
+//   ┌─ Sub-pane w=240 ────────┬─ Main pane ────────────────────────────────┐
+//   │  RESOURCE LABEL (caps)  │  [secondary action row]                    │
+//   │  Name + status badges   │                                            │
+//   │  ──────                 │  Active tab content (Обзор / IP-адреса …)  │
+//   │  Tabs (vertical menu)   │                                            │
+//   │                         │                                            │
+//   │  ──────                 │                                            │
+//   │  ДОКУМЕНТАЦИЯ           │                                            │
+//   │  · ссылки               │                                            │
+//   └─────────────────────────┴────────────────────────────────────────────┘
 //
 // Tab выбирается через ?tab=<id>. Дефолт — первый tab.
 
-import { useMemo, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
 
 export interface DetailTab {
@@ -31,15 +35,21 @@ interface Props {
   resourceName: string;
   badges?: ReactNode;
   tabs: DetailTab[];
+  /** Опциональный ряд кнопок-secondary actions над content в main pane.
+   *  Используется для domain-specific действий (Subnet «Перенести в зону» и т.п.). */
+  secondaryActions?: ReactNode;
   docLinks?: DocLink[];
   defaultTab?: string;
 }
+
+const SUB_PANE_WIDTH = 240;
 
 export function DetailShell({
   resourceLabel,
   resourceName,
   badges,
   tabs,
+  secondaryActions,
   docLinks,
   defaultTab,
 }: Props) {
@@ -55,23 +65,49 @@ export function DetailShell({
     setParams(next, { replace: true });
   };
 
-  const docs = useMemo(() => docLinks ?? DEFAULT_VPC_DOCS, [docLinks]);
+  const docs = docLinks ?? DEFAULT_VPC_DOCS;
 
   return (
-    <div style={{ display: "flex", gap: 24, marginTop: -8 }}>
-      <aside style={{ width: 260, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", gap: 24, marginTop: -8, alignItems: "flex-start" }}>
+      <aside
+        style={{
+          width: SUB_PANE_WIDTH,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          borderRight: "1px solid var(--ant-color-border-secondary)",
+          paddingRight: 8,
+          minHeight: 200,
+        }}
+      >
         <div
           style={{
             padding: "12px 8px",
-            borderBottom: "1px solid var(--ant-color-border)",
+            borderBottom: "1px solid var(--ant-color-border-secondary)",
             marginBottom: 8,
           }}
         >
-          <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          <Typography.Text
+            type="secondary"
+            style={{
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: 0.5,
+              fontWeight: 500,
+            }}
+          >
             {resourceLabel}
           </Typography.Text>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
-            <Typography.Text strong style={{ wordBreak: "break-all" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginTop: 4,
+            }}
+          >
+            <Typography.Text strong style={{ wordBreak: "break-all", fontSize: 14 }}>
               {resourceName || "(unnamed)"}
             </Typography.Text>
             {badges}
@@ -86,10 +122,21 @@ export function DetailShell({
           items={tabs.map((t) => ({
             key: t.id,
             label: (
-              <span style={{ display: "inline-flex", justifyContent: "space-between", width: "100%" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  alignItems: "center",
+                }}
+              >
                 <span>{t.label}</span>
                 {typeof t.count === "number" && t.count > 0 && (
-                  <Badge count={t.count} color="rgba(255,255,255,0.12)" overflowCount={9999} />
+                  <Badge
+                    count={t.count}
+                    color="rgba(255,255,255,0.12)"
+                    overflowCount={9999}
+                  />
                 )}
               </span>
             ),
@@ -97,14 +144,28 @@ export function DetailShell({
         />
 
         {docs.length > 0 && (
-          <div style={{ marginTop: 24, padding: "0 8px" }}>
+          <div style={{ marginTop: "auto", padding: "16px 8px 0 8px" }}>
             <Typography.Text
               type="secondary"
-              style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+                fontWeight: 500,
+              }}
             >
               Документация
             </Typography.Text>
-            <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0 0", display: "flex", flexDirection: "column", gap: 6 }}>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: "8px 0 0 0",
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
               {docs.map((d) => (
                 <li key={d.href}>
                   <Typography.Link
@@ -122,7 +183,23 @@ export function DetailShell({
         )}
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0 }}>{active?.render()}</main>
+      <main style={{ flex: 1, minWidth: 0 }}>
+        {secondaryActions && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginBottom: 16,
+              paddingBottom: 12,
+              borderBottom: "1px solid var(--ant-color-border-secondary)",
+            }}
+          >
+            {secondaryActions}
+          </div>
+        )}
+        {active?.render()}
+      </main>
     </div>
   );
 }
@@ -136,6 +213,3 @@ const DEFAULT_VPC_DOCS: DocLink[] = [
   { label: "Получить статический публичный IP-адрес", href: "https://yandex.cloud/ru/docs/vpc/operations/enable-static-ip" },
   { label: "История изменений Virtual Private Cloud", href: "https://yandex.cloud/ru/docs/release-notes/vpc" },
 ];
-
-// Suppress unused — Link нужен для будущих использований navigator-style link.
-void Link;

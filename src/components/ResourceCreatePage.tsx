@@ -7,12 +7,12 @@ import { Alert, Button, Card, Space, Tag, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { extractOperationId } from "@/components/OperationDialog";
-import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { setByPath } from "@/lib/path";
 import { useInvalidateResourceList } from "@/lib/use-operation";
+import { operationStore } from "@/lib/use-operation-store";
 import { toast } from "@/lib/toast";
 
 interface Props {
@@ -72,7 +72,6 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   const [obj, setObj] = useState<Record<string, unknown>>(initialObj);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
-  const [opId, setOpId] = useState<string | null>(null);
 
   const lockedPathsRef = useRef(new Set(Object.keys(presetFields)));
 
@@ -99,14 +98,24 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   const mutation = useMutation({
     mutationFn: (item: unknown) => api.create(spec.apiPath, item),
-    onSuccess: (resp) => {
+    onSuccess: (resp, variables) => {
       setSubmitErr(null);
       const id = extractOperationId(resp);
-      if (id) setOpId(id);
-      else {
+      const name = (variables as Record<string, unknown> | null | undefined)?.["name"];
+      const titleSuffix = typeof name === "string" && name.length > 0 ? ` ${name}` : "";
+      if (id) {
+        // Async: пушим в OperationBanner и сразу redirect.
+        operationStore.start({
+          id,
+          title: `Создание ${spec.singular.toLowerCase()}${titleSuffix}`,
+          resourceId: spec.id,
+          folderUid: filterValue ?? null,
+        });
+      } else {
+        // Sync (Region/Zone/AddressPool — admin RPC без Operation envelope).
         invalidate(spec.id, filterValue ?? null);
-        navigate(backHref);
       }
+      navigate(backHref);
     },
     onError: (err) => {
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
@@ -184,7 +193,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
             <Button
               type="primary"
               onClick={submit}
-              loading={mutation.isPending || opId !== null}
+              loading={mutation.isPending}
             >
               Создать {spec.singular.toLowerCase()}
             </Button>
@@ -194,16 +203,6 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
           </Space>
         </Space>
       </div>
-
-      <OperationToastWatcher
-        opId={opId}
-        title={`Создаётся ${spec.singular.toLowerCase()}`}
-        onDone={(success) => {
-          setOpId(null);
-          invalidate(spec.id, filterValue ?? null);
-          if (success) navigate(backHref);
-        }}
-      />
     </>
   );
 

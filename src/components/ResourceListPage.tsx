@@ -4,13 +4,8 @@
 
 import { ReactNode, useMemo, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { Alert, Button, Input, Tag, Typography, Space, Spin } from "antd";
-import {
-  PlusOutlined,
-  CheckCircleFilled,
-  WarningOutlined,
-  LoadingOutlined,
-} from "@ant-design/icons";
+import { Alert, Button, Input, Typography, Space } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
@@ -33,7 +28,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
   const [query, setQuery] = useState("");
 
-  const { data, isLoading, isError, error, isFetching } = useResourceList(
+  const { data, isLoading, isError, error } = useResourceList(
     spec,
     parentField ?? null,
     filterValue,
@@ -125,18 +120,15 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {spec.plural}
-          </Typography.Title>
-          {spec.description && (
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-              {spec.description}
-            </Typography.Text>
-          )}
-        </div>
-        <PollingIndicator isFetching={isFetching} isError={isError} />
+      <div>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          {spec.plural}
+        </Typography.Title>
+        {spec.description && (
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            {spec.description}
+          </Typography.Text>
+        )}
       </div>
 
       <Space size={12} wrap>
@@ -165,34 +157,6 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         columns={columns}
       />
     </Space>
-  );
-}
-
-function PollingIndicator({
-  isFetching,
-  isError,
-}: {
-  isFetching: boolean;
-  isError: boolean;
-}) {
-  if (isError) {
-    return (
-      <Tag icon={<WarningOutlined />} color="error">
-        offline
-      </Tag>
-    );
-  }
-  if (isFetching) {
-    return (
-      <Tag icon={<Spin indicator={<LoadingOutlined spin style={{ fontSize: 12 }} />} />}>
-        polling
-      </Tag>
-    );
-  }
-  return (
-    <Tag icon={<CheckCircleFilled />} color="success">
-      live
-    </Tag>
   );
 }
 

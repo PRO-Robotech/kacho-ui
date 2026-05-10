@@ -1,12 +1,10 @@
-import { useMemo } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
 import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
-import { HierarchyTree } from "@/components/HierarchyTree";
-import { VpcSubNav } from "@/components/VpcSubNav";
-import { useFolderStore } from "@/lib/folder-store";
+import { VpcSidebar } from "@/components/VpcSidebar";
+import { OperationBanner } from "@/components/OperationBanner";
 import {
   HeaderRightSlot,
   HeaderBreadcrumbSlot,
@@ -14,6 +12,9 @@ import {
 } from "@/components/PageHeaderSlot";
 
 const { Header, Sider, Content } = AntLayout;
+
+const SIDEBAR_WIDTH = 56;
+const HEADER_HEIGHT = 48;
 
 export function Layout() {
   return (
@@ -24,25 +25,12 @@ export function Layout() {
 }
 
 function LayoutInner() {
-  const location = useLocation();
-  const folder = useFolderStore((s) => s.folder);
   const { token } = theme.useToken();
-
-  // Sidebar mode выбирается по pathname:
-  //   /dashboard  → tree (root разводная)
-  //   /folders/*  → VPC sub-nav
-  //   /system/*   → VPC sub-nav (System группа активна)
-  //   остальное   → tree (Org/Cloud/Folder drill)
-  const sidebarMode: "tree" | "subnav" = useMemo(() => {
-    const p = location.pathname;
-    if (p.startsWith("/dashboard")) return "tree";
-    if (p.startsWith("/folders/") || p.startsWith("/system/")) return "subnav";
-    return "tree";
-  }, [location.pathname]);
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
       <ContextUrlSync />
+
       <Header
         style={{
           display: "flex",
@@ -53,6 +41,8 @@ function LayoutInner() {
           top: 0,
           zIndex: 20,
           paddingInline: 12,
+          height: HEADER_HEIGHT,
+          lineHeight: `${HEADER_HEIGHT}px`,
         }}
       >
         <NavLink
@@ -117,23 +107,22 @@ function LayoutInner() {
         </div>
       </Header>
 
+      <OperationBanner />
+
       <AntLayout>
         <Sider
-          width={260}
+          width={SIDEBAR_WIDTH}
           theme="dark"
           style={{
             borderRight: `1px solid ${token.colorBorder}`,
             position: "sticky",
-            top: 48,
-            height: "calc(100vh - 48px)",
-            overflowY: "auto",
+            top: HEADER_HEIGHT,
+            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+            overflow: "visible",
+            background: token.colorBgLayout,
           }}
         >
-          {sidebarMode === "tree" ? (
-            <HierarchyTree />
-          ) : (
-            <VpcSubNav />
-          )}
+          <VpcSidebar />
         </Sider>
 
         <Content
@@ -149,7 +138,4 @@ function LayoutInner() {
       </AntLayout>
     </AntLayout>
   );
-
-  // Suppress unused — folder может пригодиться для будущей логики
-  void folder;
 }

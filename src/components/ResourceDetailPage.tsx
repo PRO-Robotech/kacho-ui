@@ -32,9 +32,11 @@ interface Props {
   spec: ResourceSpec;
   paramKey?: string;
   extraTabs?: (data: Record<string, unknown>) => DetailTab[];
+  /** Опциональный ряд secondary-actions кнопок над tab content (Subnet «Перенести в зону»). */
+  secondaryActions?: (data: Record<string, unknown>) => React.ReactNode;
 }
 
-export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props) {
+export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondaryActions }: Props) {
   const params = useParams();
   const uid = params[paramKey];
   const navigate = useNavigate();
@@ -274,6 +276,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs }: Props)
         resourceName={name || resourceId}
         badges={statusValue ? <StatusBadge state={statusValue} /> : null}
         tabs={tabs}
+        secondaryActions={secondaryActions ? secondaryActions(data) : undefined}
       />
 
       {spec.ops.update && (
