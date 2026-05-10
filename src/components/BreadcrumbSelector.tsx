@@ -1,8 +1,6 @@
-// BreadcrumbSelector — Org → Cloud → Folder breadcrumbs.
-// Каждая крошка:
-//   - dropdown со списком ресурсов соответствующего уровня
-//   - на каждом ряду — kebab (⋮) с Edit / Delete
-//   - "+ Create new" внизу dropdown — создать новый
+// BreadcrumbSelector — Org → Cloud → Folder breadcrumbs (pills).
+// Каждая крошка: dropdown со списком текущего parent + Create-кнопка (navigate)
+// + per-row Edit (navigate /edit) и Delete (DeleteDialog).
 
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,8 +17,7 @@ import {
   Trash2,
   MoreVertical,
 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { ApiError, api } from "@/api/client";
+import { api } from "@/api/client";
 import {
   contextApi,
   useContext,
@@ -29,38 +26,16 @@ import {
   type OrgRef,
 } from "@/lib/context-store";
 import { cn } from "@/lib/utils";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { OperationToastWatcher } from "@/components/OperationToastWatcher";
-import { extractOperationId } from "@/components/OperationDialog";
-import { useInvalidateResourceList } from "@/lib/use-operation";
-import { toast } from "@/lib/toast";
-import { Button } from "@/components/ui/button";
+import { DeleteDialog } from "@/components/DeleteDialog";
 import { CopyableId } from "@/components/CopyableId";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { REGISTRY } from "@/lib/resource-registry";
-
-type Level = "org" | "cloud" | "folder";
 
 const ORG_API_PATH = "/organization-manager/v1/organizations";
 
-interface FormDialogState {
-  level: Level;
-  action: "create" | "edit";
-  template: unknown;
-}
-interface DeleteDialogState {
-  level: Level;
+interface DeleteState {
   apiPath: string;
   name: string;
+  resourceId: string; // для invalidate (organizations/clouds/folders)
   resourceLabel: string;
-  // Callback после успешного удаления (например, сбросить selection в context).
   onSuccess?: () => void;
 }
 
@@ -70,23 +45,18 @@ export function BreadcrumbSelector() {
   const folder = useContext((s) => s.folder);
   const navigate = useNavigate();
 
-  const [formAction, setFormAction] = useState<FormDialogState | null>(null);
-  const [deleteAction, setDeleteAction] = useState<DeleteDialogState | null>(null);
+  const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
 
-  // navigation actions: сначала обновляем context-store (со side-effect-ом
-  // сброса дочерних уровней), затем навигируем. ContextUrlSync не повредит —
-  // он не сбрасывает context при отсутствии IDs в URL.
   const goOrg = (id: string, name: string) => {
-    contextApi.setOrg({ id, name }); // сбрасывает cloud + folder
+    contextApi.setOrg({ id, name });
     navigate(`/organizations/${id}/clouds`);
   };
   const goCloud = (id: string, name: string, orgId: string) => {
-    contextApi.setCloud({ id, name, organizationId: orgId }); // сбрасывает folder
+    contextApi.setCloud({ id, name, organizationId: orgId });
     navigate(`/clouds/${id}/folders`);
   };
   const goFolder = (id: string, name: string, cloudId: string, orgId: string) => {
     contextApi.setFolder({ id, uid: id, name, cloudId, organizationId: orgId });
-    // При выборе folder через крошки — всегда переходим на dashboard этого folder.
     navigate(`/folders/${id}/dashboard`);
   };
 
@@ -95,40 +65,42 @@ export function BreadcrumbSelector() {
       <OrgCrumb
         selected={org}
         onSelect={(it) => goOrg(it.id, it.name)}
-        onForm={setFormAction}
-        onDelete={setDeleteAction}
+        onDelete={setDeleteState}
       />
       <CrumbSeparator />
       <CloudCrumb
         selected={cloud}
         parentOrgId={org?.id ?? null}
         onSelect={(it) => goCloud(it.id, it.name, it.organization_id)}
-        onForm={setFormAction}
-        onDelete={setDeleteAction}
+        onDelete={setDeleteState}
       />
       <CrumbSeparator />
       <FolderCrumb
         selected={folder}
         parentCloudId={cloud?.id ?? null}
         onSelect={(it) => goFolder(it.id, it.name, it.cloud_id, org?.id ?? "")}
-        onForm={setFormAction}
-        onDelete={setDeleteAction}
+        onDelete={setDeleteState}
       />
 
-      {formAction && (
-        <CrumbFormDialog state={formAction} onClose={() => setFormAction(null)} />
-      )}
-      {deleteAction && (
-        <CrumbDeleteDialog
-          state={deleteAction}
-          onClose={() => setDeleteAction(null)}
+      {deleteState && (
+        <DeleteDialog
+          open
+          onOpenChange={(o) => !o && setDeleteState(null)}
+          apiPath={deleteState.apiPath}
+          resourceId={deleteState.resourceId}
+          resourceLabel={deleteState.resourceLabel}
+          name={deleteState.name}
+          onSuccess={() => {
+            deleteState.onSuccess?.();
+            setDeleteState(null);
+          }}
         />
       )}
     </div>
   );
 }
 
-// ====== Row data shapes (verbatim YC) ======
+// ====== Row shapes ======
 
 interface OrgRow {
   id: string;
@@ -167,13 +139,11 @@ function CrumbSeparator() {
 function OrgCrumb({
   selected,
   onSelect,
-  onForm,
   onDelete,
 }: {
   selected: OrgRef | null;
   onSelect: (row: OrgRow) => void;
-  onForm: (s: FormDialogState) => void;
-  onDelete: (s: DeleteDialogState) => void;
+  onDelete: (s: DeleteState) => void;
 }) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
@@ -199,12 +169,12 @@ function OrgCrumb({
         sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
-        onEdit: () => onForm({ level: "org", action: "edit", template: it }),
+        onEdit: () => navigate(`/organizations/${it.id}/edit`),
         onDelete: () =>
           onDelete({
-            level: "org",
             apiPath: `${ORG_API_PATH}/${it.id}`,
             name: it.name,
+            resourceId: "organizations",
             resourceLabel: "Organization",
             onSuccess: () => {
               if (selected?.id === it.id) navigate("/organizations");
@@ -222,14 +192,12 @@ function CloudCrumb({
   selected,
   parentOrgId,
   onSelect,
-  onForm,
   onDelete,
 }: {
   selected: CloudRef | null;
   parentOrgId: string | null;
   onSelect: (row: CloudRow) => void;
-  onForm: (s: FormDialogState) => void;
-  onDelete: (s: DeleteDialogState) => void;
+  onDelete: (s: DeleteState) => void;
 }) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
@@ -261,12 +229,12 @@ function CloudCrumb({
         sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
-        onEdit: () => onForm({ level: "cloud", action: "edit", template: it }),
+        onEdit: () => navigate(`/clouds/${it.id}/edit`),
         onDelete: () =>
           onDelete({
-            level: "cloud",
             apiPath: `/resource-manager/v1/clouds/${it.id}`,
             name: it.name,
+            resourceId: "clouds",
             resourceLabel: "Cloud",
             onSuccess: () => {
               if (selected?.id === it.id && parentOrgId)
@@ -289,14 +257,12 @@ function FolderCrumb({
   selected,
   parentCloudId,
   onSelect,
-  onForm,
   onDelete,
 }: {
   selected: FolderRef | null;
   parentCloudId: string | null;
   onSelect: (row: FolderRow) => void;
-  onForm: (s: FormDialogState) => void;
-  onDelete: (s: DeleteDialogState) => void;
+  onDelete: (s: DeleteState) => void;
 }) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
@@ -335,12 +301,14 @@ function FolderCrumb({
         sub: it.id,
         selected: selected?.id === it.id,
         onSelect: () => onSelect(it),
-        onEdit: () => onForm({ level: "folder", action: "edit", template: it }),
+        // Folder /edit route нет — Edit пока навигирует на dashboard;
+        // когда появится folder edit-page, тут поменяется на /folders/<id>/edit.
+        onEdit: () => navigate(`/folders/${it.id}/edit`),
         onDelete: () =>
           onDelete({
-            level: "folder",
             apiPath: `/resource-manager/v1/folders/${it.id}`,
             name: it.name,
+            resourceId: "folders",
             resourceLabel: "Folder",
             onSuccess: () => {
               if (selected?.id === it.id && parentCloudId)
@@ -376,11 +344,7 @@ interface CrumbProps {
   placeholder?: boolean;
   disabled?: boolean;
   loading?: boolean;
-  /** Список строк (классический pill). Если задан customContent — игнорируется. */
   items?: CrumbItem[];
-  /** Кастомный JSX в dropdown. Перебивает items. */
-  customContent?: ReactNode;
-  /** Минимальная ширина dropdown. По умолчанию 280. */
   contentMinWidth?: number;
   disabledHint?: string;
   onCreate?: () => void;
@@ -394,7 +358,6 @@ function Crumb({
   disabled,
   loading,
   items,
-  customContent,
   contentMinWidth = 280,
   disabledHint,
   onCreate,
@@ -425,23 +388,17 @@ function Crumb({
           style={{ minWidth: contentMinWidth }}
           className="z-30 max-h-[70vh] overflow-y-auto rounded-md border border-border bg-card shadow-lg p-1"
         >
-          {customContent ? (
-            customContent
-          ) : (
-            <>
-              {loading && (
-                <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
-              )}
-              {!loading && (items?.length ?? 0) === 0 && (
-                <div className="px-3 py-2 text-xs text-muted-foreground italic">
-                  Список пуст. Создайте первый элемент.
-                </div>
-              )}
-              {(items ?? []).map((it) => (
-                <CrumbRow key={it.id} item={it} />
-              ))}
-            </>
+          {loading && (
+            <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
           )}
+          {!loading && (items?.length ?? 0) === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground italic">
+              Список пуст. Создайте первый элемент.
+            </div>
+          )}
+          {(items ?? []).map((it) => (
+            <CrumbRow key={it.id} item={it} />
+          ))}
 
           {onCreate && (
             <>
@@ -465,7 +422,6 @@ function CrumbRow({ item }: { item: CrumbItem }) {
   const hasActions = !!item.onEdit || !!item.onDelete;
   return (
     <div className="flex items-stretch rounded hover:bg-accent group">
-      {/* Select-area — занимает основное место, click → onSelect */}
       <DropdownMenu.Item
         onSelect={() => item.onSelect()}
         className={cn(
@@ -496,7 +452,7 @@ function CrumbRow({ item }: { item: CrumbItem }) {
           <DropdownMenu.Portal>
             <DropdownMenu.SubContent
               sideOffset={4}
-              className="z-40 min-w-[160px] rounded-md border border-border bg-background shadow-md p-1"
+              className="z-40 min-w-[160px] rounded-md border border-border bg-card shadow-md p-1"
             >
               {item.onEdit && (
                 <DropdownMenu.Item
@@ -504,16 +460,16 @@ function CrumbRow({ item }: { item: CrumbItem }) {
                   className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
                 >
                   <Pencil className="h-4 w-4" />
-                  Edit
+                  Редактировать
                 </DropdownMenu.Item>
               )}
               {item.onDelete && (
                 <DropdownMenu.Item
                   onSelect={() => item.onDelete?.()}
-                  className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-rose-50 data-[highlighted]:text-rose-900 text-rose-700"
+                  className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-rose-500/15 data-[highlighted]:text-rose-300 text-rose-400"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete
+                  Удалить
                 </DropdownMenu.Item>
               )}
             </DropdownMenu.SubContent>
@@ -522,141 +478,4 @@ function CrumbRow({ item }: { item: CrumbItem }) {
       )}
     </div>
   );
-}
-
-// ====== Form / Delete dialogs (Create+Edit и confirmation) ======
-
-function CrumbFormDialog({
-  state,
-  onClose,
-}: {
-  state: FormDialogState;
-  onClose: () => void;
-}) {
-  const [open, setOpen] = useState(true);
-  const spec = REGISTRY[levelToRegistryKey(state.level)];
-  if (!spec) return null;
-
-  const tplObj = state.template as { id?: string };
-  const apiPath =
-    state.action === "create" ? spec.apiPath : `${spec.apiPath}/${tplObj.id ?? ""}`;
-  const dialogTitle =
-    state.action === "create" ? `Создать ${spec.singular}` : `Редактировать ${spec.singular}`;
-
-  return (
-    <ResourceFormDialog
-      mode={state.action}
-      title={dialogTitle}
-      apiPath={apiPath}
-      resourceId={spec.id}
-      template={state.template}
-      fields={spec.fields}
-      sanitize={spec.sanitize}
-      controlledOpen={{
-        open,
-        setOpen: (v) => {
-          setOpen(v);
-          if (!v) onClose();
-        },
-      }}
-      onSuccess={() => {
-        setOpen(false);
-        onClose();
-      }}
-    />
-  );
-}
-
-function CrumbDeleteDialog({
-  state,
-  onClose,
-}: {
-  state: DeleteDialogState;
-  onClose: () => void;
-}) {
-  const [opId, setOpId] = useState<string | null>(null);
-  const invalidate = useInvalidateResourceList();
-  const resourceId = levelToRegistryKey(state.level);
-
-  const mutation = useMutation({
-    mutationFn: () => api.delete(state.apiPath),
-    onSuccess: (resp) => {
-      const id = extractOperationId(resp);
-      if (id) {
-        setOpId(id);
-      } else {
-        invalidate(resourceId, null);
-        state.onSuccess?.();
-        onClose();
-      }
-    },
-    onError: (e) => {
-      const m = e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message;
-      toast.error(`Delete ${state.resourceLabel} ${state.name}: ${m}`);
-    },
-  });
-
-  const closeIfIdle = () => {
-    if (!mutation.isPending && !opId) onClose();
-  };
-
-  return (
-    <>
-      <Dialog open onOpenChange={(o) => !o && closeIfIdle()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Удалить {state.resourceLabel}?</DialogTitle>
-            <DialogDescription>
-              <span className="font-medium text-foreground">{state.name}</span>
-              <br />
-              <code className="text-xs text-muted-foreground">{state.apiPath}</code>
-              <br />
-              Действие необратимо.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => closeIfIdle()}
-              disabled={mutation.isPending || opId !== null}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || opId !== null}
-            >
-              {mutation.isPending
-                ? "Deleting…"
-                : opId !== null
-                ? "Выполнение…"
-                : "Delete"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <OperationToastWatcher
-        opId={opId}
-        title={`Deleting ${state.resourceLabel} ${state.name}`}
-        onDone={(success) => {
-          setOpId(null);
-          invalidate(resourceId, null);
-          if (success) {
-            state.onSuccess?.();
-            onClose();
-          }
-          // При error диалог закрываем (юзер уже сделал выбор), toast показал ошибку.
-          else onClose();
-        }}
-      />
-    </>
-  );
-}
-
-function levelToRegistryKey(l: Level): string {
-  if (l === "org") return "organizations";
-  if (l === "cloud") return "clouds";
-  return "folders";
 }

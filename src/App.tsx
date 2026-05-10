@@ -6,6 +6,7 @@ import { Layout } from "@/components/Layout";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceCreatePage } from "@/components/ResourceCreatePage";
+import { ResourceEditPage } from "@/components/ResourceEditPage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
@@ -179,13 +180,22 @@ export default function App() {
                           : <ResourceDetailPage spec={spec} />
                   }
                 />
+                <Route
+                  path={`/folders/:folderId/${spec.route}/:uid/edit`}
+                  element={<ResourceEditPage spec={spec} />}
+                />
               </Route>
             ))}
 
-            {/* /folders/:folderId — пока редирект на networks (default landing) */}
+            {/* /folders/:folderId — редирект на dashboard */}
             <Route
               path="/folders/:folderId"
               element={<FolderDefaultRedirect />}
+            />
+            {/* Edit folder — full-page форма */}
+            <Route
+              path="/folders/:folderId/edit"
+              element={<ResourceEditPage spec={REGISTRY.folders} paramKey="folderId" />}
             />
 
             {/* Detail-страницы для Resource Manager */}
@@ -194,8 +204,16 @@ export default function App() {
               element={<ResourceDetailPage spec={REGISTRY.organizations} paramKey="orgId" />}
             />
             <Route
+              path="/organizations/:orgId/edit"
+              element={<ResourceEditPage spec={REGISTRY.organizations} paramKey="orgId" />}
+            />
+            <Route
               path="/clouds/:cloudId"
               element={<ResourceDetailPage spec={REGISTRY.clouds} paramKey="cloudId" />}
+            />
+            <Route
+              path="/clouds/:cloudId/edit"
+              element={<ResourceEditPage spec={REGISTRY.clouds} paramKey="cloudId" />}
             />
 
             {/* === System (admin-only, kacho-only) === */}
@@ -204,12 +222,15 @@ export default function App() {
             <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/create" element={<ResourceCreatePage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
+            <Route path="/system/regions/:uid/edit" element={<ResourceEditPage spec={REGISTRY.regions} />} />
             <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/create" element={<ResourceCreatePage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/:uid" element={<ResourceDetailPage spec={REGISTRY.zones} />} />
+            <Route path="/system/zones/:uid/edit" element={<ResourceEditPage spec={REGISTRY.zones} />} />
             <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/create" element={<ResourceCreatePage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
+            <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />

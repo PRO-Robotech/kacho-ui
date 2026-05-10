@@ -3,7 +3,7 @@
 // Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
 import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, Link, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
 import type { MenuProps } from "antd";
@@ -21,8 +21,7 @@ import {
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { DeleteConfirmStub } from "@/components/DeleteConfirmStub";
+import { DeleteDialog } from "@/components/DeleteDialog";
 import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
@@ -64,11 +63,11 @@ export function ResourceDetailPage({
   const params = useParams();
   const uid = params[paramKey];
   const navigate = useNavigate();
+  const location = useLocation();
   const folder = useFolderStore((s) => s.folder);
   const invalidate = useInvalidateResourceList();
   const [searchParams] = useSearchParams();
 
-  const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
 
@@ -236,7 +235,11 @@ export function ResourceDetailPage({
           </Button>
         )}
         {spec.ops.update && data && (
-          <Button size="small" icon={<EditOutlined />} onClick={() => setEditOpen(true)}>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => navigate(`${location.pathname}/edit`)}
+          >
             Редактировать
           </Button>
         )}
@@ -254,6 +257,7 @@ export function ResourceDetailPage({
     moveCapable,
     backHref,
     overviewCreateOverride,
+    location.pathname,
     actionMutation.isPending,
     actionMutation.variables,
   ]);
@@ -385,27 +389,16 @@ export function ResourceDetailPage({
         secondaryActions={secondaryActions ? secondaryActions(data) : undefined}
       />
 
-      {spec.ops.update && (
-        <ResourceFormDialog
-          mode="edit"
-          title={`Edit ${spec.singular}`}
-          description="Изменяет ресурс."
-          apiPath={editPath}
-          resourceId={spec.id}
-          template={data}
-          fields={spec.fields}
-          folderUid={folder?.uid}
-          sanitize={spec.sanitize}
-          controlledOpen={{ open: editOpen, setOpen: setEditOpen }}
-        />
-      )}
       {spec.ops.delete && (
-        <DeleteConfirmStub
+        <DeleteDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
+          apiPath={editPath}
+          resourceId={spec.id}
           resourceLabel={spec.singular}
           name={name || resourceId}
-          apiPath={editPath}
+          folderUid={folder?.uid ?? null}
+          onSuccess={() => navigate(backHref)}
         />
       )}
 

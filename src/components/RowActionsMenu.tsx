@@ -11,8 +11,7 @@ import {
   DragOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { DeleteConfirmStub } from "@/components/DeleteConfirmStub";
+import { DeleteDialog } from "@/components/DeleteDialog";
 import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { getByPath, type ResourceSpec } from "@/lib/resource-registry";
 
@@ -26,7 +25,6 @@ interface Props {
 export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
   const navigate = useNavigate();
   const params = useParams();
-  const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
 
@@ -74,7 +72,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "edit",
           icon: <EditOutlined />,
           label: "Редактировать",
-          onClick: () => setEditOpen(true),
+          onClick: () => navigate(`${basePath}/${id}/edit`),
         }
       : null,
     moveCapable
@@ -109,28 +107,15 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
         />
       </Dropdown>
 
-      {spec.ops.update && (
-        <ResourceFormDialog
-          mode="edit"
-          title={`Редактировать ${spec.singular}`}
-          description="Изменяет ресурс; status пишется только сервером."
-          apiPath={editPath}
-          resourceId={spec.id}
-          template={row}
-          fields={spec.fields}
-          folderUid={folderUid}
-          sanitize={spec.sanitize}
-          controlledOpen={{ open: editOpen, setOpen: setEditOpen }}
-        />
-      )}
-
       {showDelete && (
-        <DeleteConfirmStub
+        <DeleteDialog
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
+          apiPath={editPath}
+          resourceId={spec.id}
           resourceLabel={spec.singular}
           name={name}
-          apiPath={editPath}
+          folderUid={folderUid}
         />
       )}
 

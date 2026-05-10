@@ -95,31 +95,26 @@ export function DetailShell({
             marginBottom: 8,
           }}
         >
-          <Typography.Text
-            type="secondary"
-            style={{
-              fontSize: 11,
-              textTransform: "uppercase",
-              letterSpacing: 0.5,
-              fontWeight: 500,
-            }}
-          >
-            {resourceLabel}
-          </Typography.Text>
+          {/* Имя ресурса — bold сверху, label-тип ниже мелким (как в YC). */}
           <div
             style={{
               display: "flex",
               gap: 8,
               alignItems: "center",
               flexWrap: "wrap",
-              marginTop: 4,
             }}
           >
-            <Typography.Text strong style={{ wordBreak: "break-all", fontSize: 14 }}>
+            <Typography.Text strong style={{ wordBreak: "break-all", fontSize: 15 }}>
               {resourceName || "(unnamed)"}
             </Typography.Text>
             {badges}
           </div>
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: 12, marginTop: 2, display: "block" }}
+          >
+            {resourceLabel}
+          </Typography.Text>
         </div>
 
         <Menu

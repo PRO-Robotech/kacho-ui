@@ -8,7 +8,6 @@ import { Alert, Button, Input, Typography, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { CopyableId } from "@/components/CopyableId";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
 import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
@@ -57,34 +56,14 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
-    if (spec.fields) {
-      return (
-        <Link to={`${createBase}/create`}>
-          <Button type="primary" size="small" icon={<PlusOutlined />}>
-            Создать {spec.singular.toLowerCase()}
-          </Button>
-        </Link>
-      );
-    }
-    const tpl = spec.template({
-      folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
-      cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
-      organizationId:
-        parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
-    });
     return (
-      <ResourceFormDialog
-        mode="create"
-        title={`Создать ${spec.singular.toLowerCase()}`}
-        apiPath={spec.apiPath}
-        resourceId={spec.id}
-        template={tpl}
-        fields={spec.fields}
-        folderUid={filterValue ?? null}
-        sanitize={spec.sanitize}
-      />
+      <Link to={`${createBase}/create`}>
+        <Button type="primary" size="small" icon={<PlusOutlined />}>
+          Создать {spec.singular.toLowerCase()}
+        </Button>
+      </Link>
     );
-  }, [spec, createBase, parentField, filterValue]);
+  }, [spec, createBase]);
 
   useHeaderRight(cta);
 
