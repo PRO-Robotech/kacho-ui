@@ -83,6 +83,8 @@ export default function App() {
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            {/* Dashboard with folder context in URL. */}
+            <Route path="/folders/:folderId/dashboard" element={<DashboardPage />} />
 
             {/* === Resource Manager hierarchy (через path) === */}
 
@@ -218,9 +220,9 @@ export default function App() {
   );
 }
 
-// FolderDefaultRedirect: /folders/:folderId → /folders/:folderId/networks
+// FolderDefaultRedirect: /folders/:folderId → /folders/:folderId/dashboard
 import { useParams } from "react-router-dom";
 function FolderDefaultRedirect() {
   const { folderId } = useParams();
-  return <Navigate to={`/folders/${folderId}/networks`} replace />;
+  return <Navigate to={`/folders/${folderId}/dashboard`} replace />;
 }

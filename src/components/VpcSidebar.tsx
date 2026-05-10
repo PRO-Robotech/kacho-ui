@@ -56,8 +56,10 @@ const ITEMS: NavEntry[] = [
     key: "dashboard",
     icon: <HomeOutlined />,
     tooltip: "Дашборд",
-    to: () => "/dashboard",
-    matches: (p) => p.startsWith("/dashboard"),
+    // Если folder выбран — сохраняем путь до него в URL.
+    to: (f) => (f ? `/folders/${f}/dashboard` : "/dashboard"),
+    matches: (p) =>
+      p === "/dashboard" || /^\/folders\/[^/]+\/dashboard$/.test(p),
   },
   {
     kind: "item",

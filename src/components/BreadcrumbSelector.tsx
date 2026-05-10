@@ -5,7 +5,7 @@
 //   - "+ Create new" внизу dropdown — создать новый
 
 import { useState, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -69,7 +69,6 @@ export function BreadcrumbSelector() {
   const cloud = useContext((s) => s.cloud);
   const folder = useContext((s) => s.folder);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [formAction, setFormAction] = useState<FormDialogState | null>(null);
   const [deleteAction, setDeleteAction] = useState<DeleteDialogState | null>(null);
@@ -87,10 +86,8 @@ export function BreadcrumbSelector() {
   };
   const goFolder = (id: string, name: string, cloudId: string, orgId: string) => {
     contextApi.setFolder({ id, uid: id, name, cloudId, organizationId: orgId });
-    // Если уже на /folders/X/<resource> — сменить только folderId, сохранив resource.
-    const m = location.pathname.match(/^\/folders\/[^/]+(\/.+)?$/);
-    const tail = m && m[1] ? m[1] : "/networks";
-    navigate(`/folders/${id}${tail}`);
+    // При выборе folder через крошки — всегда переходим на dashboard этого folder.
+    navigate(`/folders/${id}/dashboard`);
   };
 
   return (
