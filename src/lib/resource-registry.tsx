@@ -7,8 +7,9 @@ import type { FormField } from "./form-schema";
 import { setByPath } from "./path";
 import { CopyableId } from "@/components/CopyableId";
 import { CopyableName } from "@/components/CopyableName";
-import { SgNameById } from "@/components/SgNameById";
+import { RefNameLink } from "@/components/RefNameLink";
 import { LabelsCell } from "@/components/LabelsCell";
+import { StatusBadge } from "@/components/StatusBadge";
 
 export interface ResourceColumn {
   header: string;
@@ -264,8 +265,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         header: "Группа безопасности по умолчанию",
         path: "default_security_group_id",
         render: (row) => (
-          <SgNameById sgId={row.default_security_group_id as string | undefined} />
+          <RefNameLink
+            specId="security-groups"
+            refId={row.default_security_group_id as string | undefined}
+          />
         ),
+      },
+      {
+        header: "Статус",
+        path: "status",
+        render: (row) => <StatusBadge state={row.status as string | undefined} />,
       },
       {
         header: "Дата создания",
@@ -306,12 +315,66 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Network", path: "network_id", format: "uid-short" },
-      { header: "Zone", path: "zone_id", format: "text" },
-      { header: "CIDRs", path: "v4_cidr_blocks", format: "list" },
-      { header: "Route Table", path: "route_table_id", format: "uid-short" },
-      COL_ID,
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Сеть",
+        path: "network_id",
+        render: (row) => (
+          <RefNameLink specId="networks" refId={row.network_id as string | undefined} />
+        ),
+      },
+      {
+        header: "Описание",
+        path: "description",
+        format: "text",
+      },
+      {
+        header: "IPv4 CIDR",
+        path: "v4_cidr_blocks",
+        format: "list",
+      },
+      {
+        header: "IPv6 CIDR",
+        path: "v6_cidr_blocks",
+        format: "list",
+      },
+      {
+        header: "Зона доступности",
+        path: "zone_id",
+        format: "text",
+      },
+      {
+        header: "Статус",
+        path: "status",
+        render: (row) => <StatusBadge state={row.status as string | undefined} />,
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
+      {
+        header: "Таблица маршрутизации",
+        path: "route_table_id",
+        render: (row) => (
+          <RefNameLink
+            specId="route-tables"
+            refId={row.route_table_id as string | undefined}
+            asTag
+          />
+        ),
+      },
     ],
     fields: [
       FIELD_NAME_VPC,
