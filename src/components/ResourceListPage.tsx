@@ -36,8 +36,18 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   );
 
   const breadcrumb = useMemo(
-    () => <Typography.Text strong>{spec.plural}</Typography.Text>,
-    [spec.plural],
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
+        <Typography.Text strong>{spec.plural}</Typography.Text>
+      </span>
+    ),
+    [spec.plural, spec.serviceTitle],
   );
   useBreadcrumb(breadcrumb);
 

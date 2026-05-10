@@ -214,13 +214,7 @@ function OrgCrumb({
             },
           }),
       }))}
-      onCreate={() =>
-        onForm({
-          level: "org",
-          action: "create",
-          template: { name: "", title: "", description: "" },
-        })
-      }
+      onCreate={() => navigate("/organizations/create")}
     />
   );
 }
@@ -285,12 +279,7 @@ function CloudCrumb({
       }))}
       onCreate={
         parentOrgId
-          ? () =>
-              onForm({
-                level: "cloud",
-                action: "create",
-                template: { name: "", organization_id: parentOrgId, description: "" },
-              })
+          ? () => navigate(`/organizations/${parentOrgId}/clouds/create`)
           : undefined
       }
     />
@@ -364,12 +353,7 @@ function FolderCrumb({
       }))}
       onCreate={
         parentCloudId
-          ? () =>
-              onForm({
-                level: "folder",
-                action: "create",
-                template: { name: "", cloud_id: parentCloudId, description: "" },
-              })
+          ? () => navigate(`/clouds/${parentCloudId}/folders/create`)
           : undefined
       }
     />
@@ -552,6 +536,7 @@ function CrumbFormDialog({
   state: FormDialogState;
   onClose: () => void;
 }) {
+  const [open, setOpen] = useState(true);
   const spec = REGISTRY[levelToRegistryKey(state.level)];
   if (!spec) return null;
 
@@ -559,7 +544,7 @@ function CrumbFormDialog({
   const apiPath =
     state.action === "create" ? spec.apiPath : `${spec.apiPath}/${tplObj.id ?? ""}`;
   const dialogTitle =
-    state.action === "create" ? `Create ${spec.singular}` : `Edit ${spec.singular}`;
+    state.action === "create" ? `Создать ${spec.singular}` : `Редактировать ${spec.singular}`;
 
   return (
     <ResourceFormDialog
@@ -569,21 +554,18 @@ function CrumbFormDialog({
       resourceId={spec.id}
       template={state.template}
       fields={spec.fields}
-      onSuccess={onClose}
-      // Скрытый trigger — auto-open сразу при mount.
-      trigger={
-        <button
-          style={{ display: "none" }}
-          aria-hidden
-          ref={(el) => {
-            // Defer click до mount: запускаем 1 раз
-            if (el && !el.dataset.clicked) {
-              el.dataset.clicked = "1";
-              el.click();
-            }
-          }}
-        />
-      }
+      sanitize={spec.sanitize}
+      controlledOpen={{
+        open,
+        setOpen: (v) => {
+          setOpen(v);
+          if (!v) onClose();
+        },
+      }}
+      onSuccess={() => {
+        setOpen(false);
+        onClose();
+      }}
     />
   );
 }

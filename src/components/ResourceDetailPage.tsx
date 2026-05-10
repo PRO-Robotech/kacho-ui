@@ -104,6 +104,12 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
   const breadcrumb = useMemo(
     () => (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
         <Link to={backHref}>
           <Typography.Text type="secondary">{spec.plural}</Typography.Text>
         </Link>
@@ -113,7 +119,7 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
         </Typography.Text>
       </span>
     ),
-    [backHref, spec.plural, name, resourceId],
+    [backHref, spec.plural, spec.serviceTitle, name, resourceId],
   );
   useBreadcrumb(breadcrumb);
 

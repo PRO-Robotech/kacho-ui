@@ -83,6 +83,12 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   const breadcrumb = useMemo(
     () => (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
         <Link to={backHref}>
           <Typography.Text type="secondary">{spec.plural}</Typography.Text>
         </Link>
@@ -90,7 +96,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
         <Typography.Text strong>Создать</Typography.Text>
       </span>
     ),
-    [backHref, spec.plural],
+    [backHref, spec.plural, spec.serviceTitle],
   );
   useBreadcrumb(breadcrumb);
   const noHeaderRight = useMemo(() => null, []);

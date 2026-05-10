@@ -34,6 +34,9 @@ export interface ResourceSpec {
   // plural label
   plural: string;
   description?: string;
+  /** Service-domain заголовок (отображается в breadcrumb перед именем категории).
+   *  Примеры: "Virtual Private Cloud", "Resource Manager", "Администрирование". */
+  serviceTitle?: string;
   // global = cluster-scoped, folder = только в выбранном folder
   scope: "global" | "folder";
   // поддерживаемые операции
@@ -137,6 +140,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Organization",
     plural: "Organizations",
     description: "Корневой уровень иерархии ресурсов Kachō.",
+    serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -165,6 +169,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Cloud",
     plural: "Clouds",
     description: "Billing-scope внутри Organization.",
+    serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -202,6 +207,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Folder",
     plural: "Folders",
     description: "Isolation-scope для domain-ресурсов.",
+    serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -241,8 +247,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/networks",
     payloadKey: "networks",
     singular: "Network",
-    plural: "Networks",
+    plural: "Облачные сети",
     description: "VPC Networks.",
+    serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -310,8 +317,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/subnets",
     payloadKey: "subnets",
     singular: "Subnet",
-    plural: "Subnets",
+    plural: "Подсети",
     description: "VPC Subnets (folder-scoped).",
+    serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -462,16 +470,103 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/addresses",
     payloadKey: "addresses",
     singular: "Address",
-    plural: "Addresses",
+    plural: "Публичные IP-адреса",
+    serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Type", path: "type", format: "text" },
-      { header: "Ext IPv4", path: "external_ipv4_address.address", format: "code" },
-      { header: "Int IPv4", path: "internal_ipv4_address.address", format: "code" },
-      { header: "Reserved", path: "reserved", format: "text" },
-      COL_ID,
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "IP-адрес",
+        path: "external_ipv4_address.address",
+        render: (row) => {
+          const ext = (row.external_ipv4_address as { address?: string } | undefined)?.address;
+          const int = (row.internal_ipv4_address as { address?: string } | undefined)?.address;
+          const ip = ext || int;
+          if (!ip) return <span className="text-muted-foreground">—</span>;
+          return <span className="font-mono text-xs">{ip}</span>;
+        },
+      },
+      {
+        header: "Используется",
+        path: "used",
+        render: (row) => (row.used ? "Да" : <span className="text-muted-foreground">Нет</span>),
+      },
+      {
+        header: "Версия",
+        path: "ip_version",
+        render: (row) => {
+          const v = (row.ip_version as string | undefined) ?? "";
+          if (!v) return <span className="text-muted-foreground">—</span>;
+          // IPV4 / IPV6 / IP_VERSION_UNSPECIFIED
+          return v.replace(/^IP_VERSION_/, "").replace(/^IPV/, "IPv");
+        },
+      },
+      {
+        header: "Вид",
+        path: "type",
+        render: (row) => {
+          const t = (row.type as string | undefined) ?? "";
+          if (t === "EXTERNAL") return "Публичный";
+          if (t === "INTERNAL") return "Внутренний";
+          return <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "Защита от DDoS-атак",
+        path: "external_ipv4_address.requirements.ddos_protection_provider",
+        render: (row) => {
+          const ext = row.external_ipv4_address as
+            | { requirements?: { ddos_protection_provider?: string } }
+            | undefined;
+          const provider = ext?.requirements?.ddos_protection_provider;
+          if (!provider) return <span className="text-muted-foreground">—</span>;
+          return provider;
+        },
+      },
+      {
+        header: "Защита от удаления",
+        path: "deletion_protection",
+        render: (row) =>
+          row.deletion_protection ? "Да" : <span className="text-muted-foreground">Нет</span>,
+      },
+      {
+        header: "Ресурс",
+        path: "references",
+        render: (row) => {
+          const refs = (row.references as Array<{ type?: string; referrer?: string }> | undefined) ?? [];
+          if (refs.length === 0) return <span className="text-muted-foreground">—</span>;
+          const r = refs[0];
+          return (
+            <span className="text-xs">
+              {r.type ? `${r.type}: ` : ""}
+              <span className="font-mono">{r.referrer ?? "—"}</span>
+              {refs.length > 1 ? ` +${refs.length - 1}` : ""}
+            </span>
+          );
+        },
+      },
+      {
+        header: "Дата создания",
+        path: "created_at",
+        format: "datetime",
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
     ],
     fields: [
       FIELD_NAME_VPC,
@@ -561,7 +656,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/routeTables",
     payloadKey: "route_tables",
     singular: "Route Table",
-    plural: "Route Tables",
+    plural: "Таблицы маршрутизации",
+    serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -624,8 +720,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/securityGroups",
     payloadKey: "security_groups",
     singular: "Security Group",
-    plural: "Security Groups",
+    plural: "Группы безопасности",
     description: "VPC Security Groups (folder-scoped, привязаны к Network).",
+    serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -683,8 +780,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/regions",
     payloadKey: "regions",
     singular: "Region",
-    plural: "Regions",
+    plural: "Регионы",
     description: "Глобальные регионы инфраструктуры. Admin-only.",
+    serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -714,8 +812,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/zones",
     payloadKey: "zones",
     singular: "Zone",
-    plural: "Zones",
+    plural: "Зоны",
     description: "Зоны доступности внутри Region. Admin-only.",
+    serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
@@ -753,8 +852,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/addressPools",
     payloadKey: "pools",
     singular: "Address Pool",
-    plural: "Address Pools",
+    plural: "Пулы адресов",
     description: "Глобальные пулы внешних IP. Admin-only. Привязка к Zone опциональна (NULL = global default).",
+    serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
