@@ -23,6 +23,9 @@ interface Props<T> {
   empty?: ReactNode;
   loading?: boolean;
   defaultSort?: { col: number; dir: "asc" | "desc" };
+  /** Если задан — клик по строке вызывает callback (для drill-down в detail).
+   *  Cells, у которых внутри есть button/link с stopPropagation, не триггерят. */
+  onRowClick?: (row: T) => void;
 }
 
 export function ResourceTable<T extends object>({
@@ -32,6 +35,7 @@ export function ResourceTable<T extends object>({
   empty,
   loading,
   defaultSort,
+  onRowClick,
 }: Props<T>) {
   const antColumns: ColumnType<T>[] = useMemo(
     () =>
@@ -71,6 +75,12 @@ export function ResourceTable<T extends object>({
     locale: {
       emptyText: empty ?? "Ресурсов не найдено",
     },
+    onRow: onRowClick
+      ? (row) => ({
+          onClick: () => onRowClick(row),
+          style: { cursor: "pointer" },
+        })
+      : undefined,
   };
 
   return <Table<T> {...tableProps} />;

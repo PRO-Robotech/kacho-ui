@@ -3,7 +3,7 @@
 // Polling 3 сек (через useResourceList).
 
 import { ReactNode, useMemo, useState } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { Alert, Button, Input, Typography, Space } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { ResourceTable, Column } from "@/components/ResourceTable";
@@ -25,6 +25,7 @@ interface Props {
 export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const params = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
   const [query, setQuery] = useState("");
 
@@ -98,7 +99,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
     header: c.header,
     className: c.className,
-    cell: (row) => formatCell(c, row),
+    cell: (row) => (c.render ? c.render(row) : formatCell(c, row)),
     sortKey:
       c.format === "datetime" || c.format === "text" || c.format === "uid-short"
         ? c.path
@@ -155,6 +156,15 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         loading={isLoading && items.length === 0}
         rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
         columns={columns}
+        onRowClick={(row) => {
+          const id = getByPath<string>(row, "id");
+          if (!id) return;
+          // childRoute шаблон: /folders/:id, /clouds/:id/folders, ...
+          const target = spec.childRoute
+            ? spec.childRoute.replace(":id", id)
+            : `${basePath}/${id}`;
+          navigate(target);
+        }}
       />
     </Space>
   );

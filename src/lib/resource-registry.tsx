@@ -5,6 +5,10 @@
 import type { ReactNode } from "react";
 import type { FormField } from "./form-schema";
 import { setByPath } from "./path";
+import { CopyableId } from "@/components/CopyableId";
+import { CopyableName } from "@/components/CopyableName";
+import { SgNameById } from "@/components/SgNameById";
+import { LabelsCell } from "@/components/LabelsCell";
 
 export interface ResourceColumn {
   header: string;
@@ -241,11 +245,40 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Default SG", path: "default_security_group_id", format: "uid-short" },
-      { header: "Description", path: "description", format: "text" },
-      COL_CREATED,
-      COL_ID,
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Описание",
+        path: "description",
+        format: "text",
+      },
+      {
+        header: "Группа безопасности по умолчанию",
+        path: "default_security_group_id",
+        render: (row) => (
+          <SgNameById sgId={row.default_security_group_id as string | undefined} />
+        ),
+      },
+      {
+        header: "Дата создания",
+        path: "created_at",
+        format: "datetime",
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
     ],
     fields: [
       FIELD_NAME_VPC,
@@ -256,6 +289,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       folder_id: folderId ?? "",
       name: "",
       description: "",
+      labels: {},
     }),
   },
 
