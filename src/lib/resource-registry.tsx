@@ -662,10 +662,67 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "folder",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Network", path: "network_id", format: "uid-short" },
-      COL_CREATED,
-      COL_ID,
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Сеть",
+        path: "network_id",
+        render: (row) => (
+          <RefNameLink specId="networks" refId={row.network_id as string | undefined} />
+        ),
+      },
+      {
+        header: "Описание",
+        path: "description",
+        format: "text",
+      },
+      {
+        header: "Статические маршруты",
+        path: "static_routes",
+        render: (row) => {
+          const routes = (row.static_routes as Array<{
+            destination_prefix?: string;
+            next_hop_address?: string;
+          }> | undefined) ?? [];
+          if (routes.length === 0) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {routes.map((r, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                    fontSize: 12,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {r.destination_prefix ?? "?"} → {r.next_hop_address ?? "?"}
+                </span>
+              ))}
+            </div>
+          );
+        },
+      },
+      {
+        header: "Дата создания",
+        path: "created_at",
+        format: "datetime",
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
     ],
     fields: [
       FIELD_NAME_VPC,
