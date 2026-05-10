@@ -1,14 +1,18 @@
 // HierarchyTree — antd Tree для левой боковой панели: Org → Cloud → Folder.
 //
-// Lazy-load:
+// Lazy-load через queryClient.fetchQuery (с staleTime + invalidation):
 //   корни  = GET /organization-manager/v1/organizations
 //   org→   = GET /resource-manager/v1/clouds?organization_id=<X>
 //   cloud→ = GET /resource-manager/v1/folders?cloud_id=<X>
 //
+// queryKey начинается с ["tree", ...] — useInvalidateResourceList после
+// Create/Update/Delete рефрешит дерево автоматически.
+//
 // Click → navigate + setContext (синхронно с Cloud/Folder pills в шапке).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tree, Spin, theme } from "antd";
 import type { TreeDataNode } from "antd";
 import { CloudOutlined, FolderOutlined, ApartmentOutlined } from "@ant-design/icons";
@@ -19,13 +23,11 @@ interface OrgRow {
   id: string;
   name: string;
 }
-
 interface CloudRow {
   id: string;
   name: string;
   organization_id: string;
 }
-
 interface FolderRow {
   id: string;
   name: string;
@@ -44,15 +46,49 @@ function parseKey(key: string): { kind: "org" | "cloud" | "folder"; id: string }
   return { kind: m[1] as "org" | "cloud" | "folder", id: m[2] };
 }
 
-function nodeTitle(name: string, id: string): React.ReactNode {
+function nodeTitle(name: string, id: string, color: string): React.ReactNode {
   return (
-    <span className="inline-flex items-baseline gap-1.5 max-w-full">
-      <span className="truncate">{name || "(unnamed)"}</span>
-      <span className="text-[10px] text-[var(--ant-color-text-tertiary)] font-mono opacity-70">
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "baseline",
+        gap: 6,
+        maxWidth: "100%",
+      }}
+    >
+      <span
+        style={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {name || "(unnamed)"}
+      </span>
+      <span
+        style={{
+          fontSize: 10,
+          color,
+          fontFamily: "monospace",
+          opacity: 0.7,
+        }}
+      >
         {id.slice(0, 8)}
       </span>
     </span>
   );
+}
+
+interface CloudInfo {
+  id: string;
+  name: string;
+  orgId: string;
+}
+interface FolderInfo {
+  id: string;
+  name: string;
+  cloudId: string;
+  orgId: string;
 }
 
 export function HierarchyTree() {
@@ -60,42 +96,68 @@ export function HierarchyTree() {
   const location = useLocation();
   const { token } = theme.useToken();
   const ctx = useContext((s) => s);
+  const qc = useQueryClient();
 
-  // Кеш загруженных детей: keyParent -> [child keys]
+  // Корневые orgs через useQuery (auto-refetch + invalidation).
+  const orgsQuery = useQuery({
+    queryKey: ["tree", "orgs"],
+    queryFn: () => api.list<{ organizations: OrgRow[] }>("/organization-manager/v1/organizations"),
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  });
+  const orgs = orgsQuery.data?.organizations ?? [];
+
+  // Дети дерева — кеш {parentKey: TreeDataNode[]}. Заполняется в loadData.
   const [loaded, setLoaded] = useState<Record<string, TreeDataNode[]>>({});
-  const [orgs, setOrgs] = useState<OrgRow[] | null>(null);
-  const [loadingRoots, setLoadingRoots] = useState(false);
+  // Память cloud/folder (id, name, parents) для navigate без re-парса JSX.
+  const [cloudInfo, setCloudInfo] = useState<Record<string, CloudInfo>>({});
+  const [folderInfo, setFolderInfo] = useState<Record<string, FolderInfo>>({});
 
-  // Загружаем корневые orgs один раз при mount.
+  // Controlled expanded/loaded keys — позволяет force re-load после invalidate.
+  // При invalidate: очищаем `loadedKeys` (Tree снова считает children нелоadenным
+  // и вызывает onLoadData), но сохраняем `expandedKeys` (открытые узлы остаются
+  // открытыми во время рефреша).
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const [loadedKeys, setLoadedKeys] = useState<React.Key[]>([]);
+  const expandInitDone = useRef(false);
+
+  // Инициализация expandedKeys из текущего ctx (один раз при mount).
   useEffect(() => {
-    let cancelled = false;
-    setLoadingRoots(true);
-    api
-      .list<{ organizations: OrgRow[] }>("/organization-manager/v1/organizations")
-      .then((r) => {
-        if (!cancelled) setOrgs(r.organizations ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setOrgs([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingRoots(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (expandInitDone.current) return;
+    const init: React.Key[] = [];
+    if (ctx.org) init.push(k.org(ctx.org.id));
+    if (ctx.cloud) init.push(k.cloud(ctx.cloud.id));
+    if (init.length > 0) {
+      setExpandedKeys(init);
+      expandInitDone.current = true;
+    }
+  }, [ctx.org, ctx.cloud]);
+
+  // Подписка на invalidate — сбрасываем loadedKeys, чтобы Tree перевызвала
+  // onLoadData для уже expanded узлов.
+  useEffect(() => {
+    const unsub = qc.getQueryCache().subscribe((evt) => {
+      if (
+        evt.type === "updated" &&
+        Array.isArray(evt.query.queryKey) &&
+        evt.query.queryKey[0] === "tree"
+      ) {
+        setLoaded({});
+        setLoadedKeys([]);
+      }
+    });
+    return unsub;
+  }, [qc]);
 
   const treeData: TreeDataNode[] = useMemo(() => {
-    if (!orgs) return [];
     return orgs.map((o) => ({
       key: k.org(o.id),
-      title: nodeTitle(o.name, o.id),
+      title: nodeTitle(o.name, o.id, token.colorTextTertiary),
       icon: <ApartmentOutlined />,
       children: loaded[k.org(o.id)] ?? undefined,
       isLeaf: false,
     }));
-  }, [orgs, loaded]);
+  }, [orgs, loaded, token.colorTextTertiary]);
 
   const onLoadData = async (node: TreeDataNode): Promise<void> => {
     const parsed = parseKey(String(node.key));
@@ -104,28 +166,57 @@ export function HierarchyTree() {
     if (loaded[cacheKey]) return;
 
     if (parsed.kind === "org") {
-      const r = await api.list<{ clouds: CloudRow[] }>("/resource-manager/v1/clouds", {
-        organization_id: parsed.id,
+      const r = await qc.fetchQuery({
+        queryKey: ["tree", "clouds", parsed.id],
+        queryFn: () =>
+          api.list<{ clouds: CloudRow[] }>("/resource-manager/v1/clouds", {
+            organization_id: parsed.id,
+          }),
+        staleTime: 10_000,
       });
-      const children: TreeDataNode[] = (r.clouds ?? []).map((c) => ({
-        key: k.cloud(c.id),
-        title: nodeTitle(c.name, c.id),
-        icon: <CloudOutlined />,
-        children: loaded[k.cloud(c.id)] ?? undefined,
-        isLeaf: false,
-      }));
-      setLoaded((prev) => ({ ...prev, [cacheKey]: children }));
-    } else if (parsed.kind === "cloud") {
-      const r = await api.list<{ folders: FolderRow[] }>("/resource-manager/v1/folders", {
-        cloud_id: parsed.id,
+      const children: TreeDataNode[] = (r.clouds ?? []).map((c) => {
+        setCloudInfo((prev) => ({
+          ...prev,
+          [c.id]: { id: c.id, name: c.name, orgId: c.organization_id },
+        }));
+        return {
+          key: k.cloud(c.id),
+          title: nodeTitle(c.name, c.id, token.colorTextTertiary),
+          icon: <CloudOutlined />,
+          children: loaded[k.cloud(c.id)] ?? undefined,
+          isLeaf: false,
+        };
       });
-      const children: TreeDataNode[] = (r.folders ?? []).map((f) => ({
-        key: k.folder(f.id),
-        title: nodeTitle(f.name, f.id),
-        icon: <FolderOutlined />,
-        isLeaf: true,
-      }));
       setLoaded((prev) => ({ ...prev, [cacheKey]: children }));
+      setLoadedKeys((prev) => Array.from(new Set([...prev, cacheKey])));
+      return;
+    }
+
+    if (parsed.kind === "cloud") {
+      const r = await qc.fetchQuery({
+        queryKey: ["tree", "folders", parsed.id],
+        queryFn: () =>
+          api.list<{ folders: FolderRow[] }>("/resource-manager/v1/folders", {
+            cloud_id: parsed.id,
+          }),
+        staleTime: 10_000,
+      });
+      const ci = cloudInfo[parsed.id];
+      const orgId = ci?.orgId ?? "";
+      const children: TreeDataNode[] = (r.folders ?? []).map((f) => {
+        setFolderInfo((prev) => ({
+          ...prev,
+          [f.id]: { id: f.id, name: f.name, cloudId: f.cloud_id, orgId },
+        }));
+        return {
+          key: k.folder(f.id),
+          title: nodeTitle(f.name, f.id, token.colorTextTertiary),
+          icon: <FolderOutlined />,
+          isLeaf: true,
+        };
+      });
+      setLoaded((prev) => ({ ...prev, [cacheKey]: children }));
+      setLoadedKeys((prev) => Array.from(new Set([...prev, cacheKey])));
     }
   };
 
@@ -134,70 +225,32 @@ export function HierarchyTree() {
     if (!parsed) return;
 
     if (parsed.kind === "org") {
-      // Найдём имя в orgs
-      const name = (orgs ?? []).find((o) => o.id === parsed.id)?.name ?? "";
+      const name = orgs.find((o) => o.id === parsed.id)?.name ?? "";
       contextApi.setOrg({ id: parsed.id, name });
       navigate(`/organizations/${parsed.id}/clouds`);
       return;
     }
 
     if (parsed.kind === "cloud") {
-      const orgChildren = Object.values(loaded).flat();
-      const node = orgChildren.find((n) => n.key === info.node.key);
-      const name = (() => {
-        // children'ы хранятся как cloud-rows, имя в title — это JSX. Лучше
-        // ре-парсить из orgs+loaded напрямую.
-        for (const [pk, kids] of Object.entries(loaded)) {
-          for (const kid of kids) {
-            if (kid.key === info.node.key) {
-              const orgKey = parseKey(pk);
-              return { id: parsed.id, organization_id: orgKey?.id ?? "" };
-            }
-          }
-        }
-        return { id: parsed.id, organization_id: "" };
-      })();
-      const titleNode = typeof node?.title === "function" ? null : node?.title;
+      const ci = cloudInfo[parsed.id];
       contextApi.setCloud({
         id: parsed.id,
-        name: extractName(titleNode) ?? "",
-        organizationId: name.organization_id,
+        name: ci?.name ?? "",
+        organizationId: ci?.orgId ?? "",
       });
       navigate(`/clouds/${parsed.id}/folders`);
       return;
     }
 
     if (parsed.kind === "folder") {
-      // Найти cloud-id и org-id parent'ов через loaded-cache.
-      let cloudId = "";
-      let orgId = "";
-      for (const [pk, kids] of Object.entries(loaded)) {
-        for (const kid of kids) {
-          if (kid.key === info.node.key) {
-            const parent = parseKey(pk);
-            if (parent?.kind === "cloud") {
-              cloudId = parent.id;
-              // Найти org для этого cloud
-              for (const [orgKey, orgKids] of Object.entries(loaded)) {
-                if (orgKids.some((c) => c.key === pk)) {
-                  const o = parseKey(orgKey);
-                  if (o?.kind === "org") orgId = o.id;
-                }
-              }
-            }
-          }
-        }
-      }
-      const titleNode = typeof info.node.title === "function" ? null : info.node.title;
-      const folderName = extractName(titleNode) ?? "";
+      const fi = folderInfo[parsed.id];
       contextApi.setFolder({
         id: parsed.id,
         uid: parsed.id,
-        name: folderName,
-        cloudId,
-        organizationId: orgId,
+        name: fi?.name ?? "",
+        cloudId: fi?.cloudId ?? "",
+        organizationId: fi?.orgId ?? "",
       });
-      // Если уже на /folders/X/<resource> — сменить только folderId.
       const m = location.pathname.match(/^\/folders\/[^/]+(\/.+)?$/);
       const tail = m && m[1] ? m[1] : "/networks";
       navigate(`/folders/${parsed.id}${tail}`);
@@ -211,59 +264,35 @@ export function HierarchyTree() {
     return [];
   }, [ctx]);
 
-  // Авто-expand до текущего контекста — добавляем в expandedKeys org/cloud
-  // если они есть.
-  const expandedKeys: React.Key[] = useMemo(() => {
-    const out: React.Key[] = [];
-    if (ctx.org) out.push(k.org(ctx.org.id));
-    if (ctx.cloud) out.push(k.cloud(ctx.cloud.id));
-    return out;
-  }, [ctx]);
-
   return (
     <div
       className="h-full overflow-y-auto"
       style={{ background: token.colorBgLayout, padding: "8px 4px" }}
+      data-testid="hierarchy-tree"
     >
-      {loadingRoots && (
-        <div className="flex items-center justify-center p-4">
+      {orgsQuery.isLoading && (
+        <div style={{ display: "flex", justifyContent: "center", padding: 16 }}>
           <Spin size="small" />
         </div>
       )}
-      {!loadingRoots && treeData.length === 0 && (
-        <div className="px-3 py-4 text-xs text-[var(--ant-color-text-tertiary)]">
+      {!orgsQuery.isLoading && treeData.length === 0 && (
+        <div style={{ padding: "16px 12px", fontSize: 12, color: token.colorTextTertiary }}>
           Нет организаций. Создайте первую через Organizations.
         </div>
       )}
-      {!loadingRoots && treeData.length > 0 && (
+      {!orgsQuery.isLoading && treeData.length > 0 && (
         <Tree
           showIcon
           blockNode
           treeData={treeData}
           loadData={onLoadData}
+          loadedKeys={loadedKeys}
           onSelect={onSelect}
           selectedKeys={selectedKeys}
-          defaultExpandedKeys={expandedKeys}
+          expandedKeys={expandedKeys}
+          onExpand={(keys) => setExpandedKeys(keys)}
         />
       )}
     </div>
   );
-}
-
-// Извлекает имя из JSX-ноды title (созданной nodeTitle()).
-function extractName(node: React.ReactNode): string | null {
-  if (!node || typeof node !== "object") return null;
-  // node — JSX <span><span>{name}</span><span>{id}</span></span>
-  // Walking children for first string is простейший reliable path.
-  const stack: unknown[] = [node];
-  while (stack.length) {
-    const cur = stack.shift();
-    if (typeof cur === "string") return cur;
-    if (cur && typeof cur === "object" && "props" in cur) {
-      const props = (cur as { props: { children?: unknown } }).props;
-      if (Array.isArray(props.children)) stack.push(...props.children);
-      else if (props.children) stack.push(props.children);
-    }
-  }
-  return null;
 }

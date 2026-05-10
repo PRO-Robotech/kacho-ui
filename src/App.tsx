@@ -91,6 +91,10 @@ export default function App() {
               path="/organizations"
               element={<ResourceListPage spec={REGISTRY.organizations} />}
             />
+            <Route
+              path="/organizations/create"
+              element={<ResourceCreatePage spec={REGISTRY.organizations} />}
+            />
 
             {/* /organizations/:orgId/clouds — список clouds в orgId */}
             <Route
@@ -103,12 +107,32 @@ export default function App() {
                 />
               }
             />
+            <Route
+              path="/organizations/:orgId/clouds/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY.clouds}
+                  parentField="organization_id"
+                  parentParam="orgId"
+                />
+              }
+            />
 
             {/* /clouds/:cloudId/folders — список folders в cloudId */}
             <Route
               path="/clouds/:cloudId/folders"
               element={
                 <ResourceListPage
+                  spec={REGISTRY.folders}
+                  parentField="cloud_id"
+                  parentParam="cloudId"
+                />
+              }
+            />
+            <Route
+              path="/clouds/:cloudId/folders/create"
+              element={
+                <ResourceCreatePage
                   spec={REGISTRY.folders}
                   parentField="cloud_id"
                   parentParam="cloudId"
@@ -173,10 +197,13 @@ export default function App() {
             {/* Region/Zone/AddressPool — глобальные ресурсы. Не публикуются на
                 external TLS endpoint, см. CLAUDE.md kacho-vpc §16. */}
             <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
+            <Route path="/system/regions/create" element={<ResourceCreatePage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
             <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
+            <Route path="/system/zones/create" element={<ResourceCreatePage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/:uid" element={<ResourceDetailPage spec={REGISTRY.zones} />} />
             <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
+            <Route path="/system/address-pools/create" element={<ResourceCreatePage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
 

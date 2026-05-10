@@ -1,7 +1,7 @@
 // ResourceCreatePage — full-page форма Create (не modal).
 
 import { useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Card, Space, Tag, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
@@ -24,6 +24,7 @@ interface Props {
 export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
   const invalidate = useInvalidateResourceList();
@@ -75,9 +76,10 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   const lockedPathsRef = useRef(new Set(Object.keys(presetFields)));
 
-  const backHref = parentParam && filterValue
-    ? `/folders/${filterValue}/${spec.route}`
-    : `/${spec.route}`;
+  // Back = текущий path без /create суффикса (универсально работает для
+  // /folders/X/<resource>/create, /organizations/create, /clouds/X/folders/create
+  // и /system/<resource>/create).
+  const backHref = location.pathname.replace(/\/create$/, "") || "/";
 
   const breadcrumb = useMemo(
     () => (
