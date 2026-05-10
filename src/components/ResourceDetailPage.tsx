@@ -3,9 +3,10 @@
 // Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
 import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Alert, Button, Descriptions, Space, Spin, Typography } from "antd";
+import { Alert, Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
+import type { MenuProps } from "antd";
 import {
   ArrowLeftOutlined,
   ReloadOutlined,
@@ -13,12 +14,16 @@ import {
   PauseCircleOutlined,
   EditOutlined,
   DeleteOutlined,
+  PlusOutlined,
+  MoreOutlined,
+  DragOutlined,
 } from "@ant-design/icons";
 import { JsonView } from "@/components/JsonView";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
 import { ResourceFormDialog } from "@/components/ResourceFormDialog";
 import { DeleteConfirmStub } from "@/components/DeleteConfirmStub";
+import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
@@ -36,17 +41,32 @@ interface Props {
   secondaryActions?: (data: Record<string, unknown>) => React.ReactNode;
   /** По умолчанию показывается JSON-tab последним. Установить true чтобы скрыть. */
   hideJsonTab?: boolean;
+  /** Per-tab override header-right slot. Возвращает null/undefined → fallback на default
+   *  (Создать <singular> + Редактировать + kebab Move/Delete). */
+  headerActionsByTab?: (
+    tabId: string,
+    data: Record<string, unknown>,
+  ) => React.ReactNode | null | undefined;
 }
 
-export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondaryActions, hideJsonTab }: Props) {
+export function ResourceDetailPage({
+  spec,
+  paramKey = "uid",
+  extraTabs,
+  secondaryActions,
+  hideJsonTab,
+  headerActionsByTab,
+}: Props) {
   const params = useParams();
   const uid = params[paramKey];
   const navigate = useNavigate();
   const folder = useFolderStore((s) => s.folder);
   const invalidate = useInvalidateResourceList();
+  const [searchParams] = useSearchParams();
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],
@@ -125,9 +145,53 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
   );
   useBreadcrumb(breadcrumb);
 
-  const headerActions = useMemo(
-    () => (
+  // Move-capable: те же ресурсы, что в RowActionsMenu (Org/Cloud/Folder/Region/Zone/AddressPool — нет).
+  const moveCapable = useMemo(
+    () =>
+      ![
+        "organizations",
+        "clouds",
+        "folders",
+        "regions",
+        "zones",
+        "address-pools",
+      ].includes(spec.id),
+    [spec.id],
+  );
+
+  const overviewActions = useMemo(() => {
+    const kebabItems: MenuProps["items"] = [
+      moveCapable
+        ? {
+            key: "move",
+            icon: <DragOutlined />,
+            label: "Переместить",
+            onClick: () => setMoveOpen(true),
+          }
+        : null,
+      spec.ops.delete && data
+        ? {
+            key: "delete",
+            icon: <DeleteOutlined />,
+            label: "Удалить",
+            danger: true,
+            onClick: () => setDeleteOpen(true),
+          }
+        : null,
+    ].filter(Boolean) as MenuProps["items"];
+
+    return (
       <Space size="small">
+        {spec.ops.create && (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={() => navigate(`${backHref}/create`)}
+          >
+            Создать {spec.singular.toLowerCase()}
+          </Button>
+        )}
         {spec.ops.restart && (
           <Button
             size="small"
@@ -163,17 +227,28 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
             Редактировать
           </Button>
         )}
-        {spec.ops.delete && data && (
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => setDeleteOpen(true)}>
-            Удалить
-          </Button>
+        {kebabItems && kebabItems.length > 0 && (
+          <Dropdown menu={{ items: kebabItems }} trigger={["click"]} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined />} aria-label="Действия" />
+          </Dropdown>
         )}
       </Space>
-    ),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spec, data, actionMutation.isPending, actionMutation.variables],
-  );
-  useHeaderRight(headerActions);
+  }, [
+    spec,
+    data,
+    moveCapable,
+    backHref,
+    actionMutation.isPending,
+    actionMutation.variables,
+  ]);
+
+  // Per-tab header CTA (через ?tab) — если задано и возвращает не-null,
+  // используется вместо overviewActions.
+  const activeTabId = searchParams.get("tab") ?? "overview";
+  const tabOverride = headerActionsByTab && data ? headerActionsByTab(activeTabId, data) : null;
+  useHeaderRight(tabOverride ?? overviewActions);
 
   if (isLoading && !data) {
     return (
@@ -309,6 +384,16 @@ export function ResourceDetailPage({ spec, paramKey = "uid", extraTabs, secondar
         <DeleteConfirmStub
           open={deleteOpen}
           onOpenChange={setDeleteOpen}
+          resourceLabel={spec.singular}
+          name={name || resourceId}
+          apiPath={editPath}
+        />
+      )}
+
+      {moveCapable && (
+        <MoveStubDialog
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
           resourceLabel={spec.singular}
           name={name || resourceId}
           apiPath={editPath}

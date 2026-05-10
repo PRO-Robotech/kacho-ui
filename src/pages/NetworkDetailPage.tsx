@@ -2,14 +2,14 @@
 // Tabs: Обзор (auto) / Таблицы маршрутизации / Группы безопасности /
 //       DNS зоны / Операции.
 //
-// Дети (route-tables, security-groups) фильтруются по network_id client-side
-// из folder-scoped list. Используются те же колонки, что и /folders/X/<resource>
-// — через buildSpecColumns + ResourceTable.
+// Per-tab header CTA через ResourceDetailPage.headerActionsByTab.
+// Каждый child-tab имеет Title + filter (имя или id substring) над таблицей.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Empty, Typography } from "antd";
+import { Alert, Button, Empty, Input, Space, Typography } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
@@ -67,7 +67,8 @@ export function NetworkDetailPage() {
           label: "Таблицы маршрутизации",
           count: networkRouteTables.length,
           render: () => (
-            <ChildList
+            <ChildSection
+              title="Таблицы маршрутизации"
               rows={networkRouteTables}
               columns={rtColumns}
               emptyText="К сети не привязано ни одной таблицы маршрутизации."
@@ -82,7 +83,8 @@ export function NetworkDetailPage() {
           label: "Группы безопасности",
           count: networkSGs.length,
           render: () => (
-            <ChildList
+            <ChildSection
+              title="Группы безопасности"
               rows={networkSGs}
               columns={sgColumns}
               emptyText="В сети нет групп безопасности."
@@ -121,7 +123,47 @@ export function NetworkDetailPage() {
     [networkRouteTables, networkSGs, rtColumns, sgColumns, folderId, navigate],
   );
 
-  return <ResourceDetailPage spec={networkSpec} extraTabs={extraTabs} hideJsonTab />;
+  const headerActionsByTab = (tabId: string) => {
+    if (!folderId) return null;
+    if (tabId === "route-tables") {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={() =>
+            navigate(`/folders/${folderId}/route-tables/create?network_id=${networkId}`)
+          }
+        >
+          Создать таблицу маршрутизации
+        </Button>
+      );
+    }
+    if (tabId === "security-groups") {
+      return (
+        <Button
+          type="primary"
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={() =>
+            navigate(`/folders/${folderId}/security-groups/create?network_id=${networkId}`)
+          }
+        >
+          Создать группу безопасности
+        </Button>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <ResourceDetailPage
+      spec={networkSpec}
+      extraTabs={extraTabs}
+      hideJsonTab
+      headerActionsByTab={headerActionsByTab}
+    />
+  );
 }
 
 // useChildColumns — buildSpecColumns + actions-колонка для child-tabs.
@@ -150,33 +192,59 @@ function useChildColumns(
   }, [spec, folderId]);
 }
 
-function ChildList({
+// ChildSection — Title + filter + table. Используется на каждой
+// child-tab Network detail.
+function ChildSection({
+  title,
   rows,
   columns,
   emptyText,
   onClick,
 }: {
+  title: string;
   rows: Array<Record<string, unknown>>;
   columns: Column<Record<string, unknown>>[];
   emptyText: string;
   onClick: (id: string) => void;
 }) {
-  if (rows.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-        {emptyText}
-      </div>
-    );
-  }
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const name = (getByPath<string>(row, "name") ?? "").toLowerCase();
+      const id = (getByPath<string>(row, "id") ?? "").toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+  }, [rows, query]);
+
   return (
-    <ResourceTable
-      rows={rows}
-      columns={columns}
-      rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
-      onRowClick={(r) => {
-        const id = getByPath<string>(r, "id");
-        if (id) onClick(id);
-      }}
-    />
+    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+      <Typography.Title level={4} style={{ margin: 0 }}>
+        {title}
+      </Typography.Title>
+      <Input.Search
+        placeholder="Фильтр по имени или идентификатору"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ maxWidth: 360 }}
+        allowClear
+      />
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+          {query ? "По фильтру ничего не найдено." : emptyText}
+        </div>
+      ) : (
+        <ResourceTable
+          rows={filtered}
+          columns={columns}
+          rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+          onRowClick={(r) => {
+            const id = getByPath<string>(r, "id");
+            if (id) onClick(id);
+          }}
+        />
+      )}
+    </Space>
   );
 }

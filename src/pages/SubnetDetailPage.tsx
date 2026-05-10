@@ -3,11 +3,12 @@
 // subnet (через internal_ipv4_address.subnet_id), используя те же колонки,
 // что и /folders/X/addresses.
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { Alert } from "antd";
+import { Alert, Button as AntButton, Input, Space, Typography } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import { Button } from "@/components/ui/button";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
@@ -77,47 +78,14 @@ export function SubnetDetailPage() {
           label: "IP-адреса",
           count: subnetAddresses.length,
           render: () => (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs text-muted-foreground">
-                  Адреса, привязанные к этой подсети.
-                </div>
-                {reserveLink && (
-                  <Button asChild size="sm">
-                    <Link to={reserveLink}>
-                      <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
-                    </Link>
-                  </Button>
-                )}
-              </div>
-
-              {subnetAddresses.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-10 text-center space-y-3">
-                  <div className="text-base font-medium">У вас пока нет IP-адресов</div>
-                  <div className="text-xs text-muted-foreground">
-                    Зарезервируйте адрес, чтобы он автоматически использовал
-                    CIDR-блок этой подсети.
-                  </div>
-                  {reserveLink && (
-                    <Button asChild>
-                      <Link to={reserveLink}>
-                        <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <ResourceTable
-                  rows={subnetAddresses}
-                  columns={addrColumns}
-                  rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
-                  onRowClick={(r) => {
-                    const id = getByPath<string>(r, "id");
-                    if (id && addressesBasePath) navigate(`${addressesBasePath}/${id}`);
-                  }}
-                />
-              )}
-            </div>
+            <AddressesSection
+              rows={subnetAddresses}
+              columns={addrColumns}
+              reserveLink={reserveLink}
+              onClick={(id) =>
+                addressesBasePath && navigate(`${addressesBasePath}/${id}`)
+              }
+            />
           ),
         },
         {
@@ -136,5 +104,103 @@ export function SubnetDetailPage() {
     [reserveLink, subnetAddresses, addrColumns, addressesBasePath, navigate],
   );
 
-  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} hideJsonTab />;
+  const headerActionsByTab = (tabId: string) => {
+    if (tabId === "addresses" && reserveLink) {
+      return (
+        <AntButton
+          type="primary"
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={() => navigate(reserveLink)}
+        >
+          Зарезервировать IP-адрес
+        </AntButton>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <ResourceDetailPage
+      spec={spec}
+      extraTabs={extraTabs}
+      hideJsonTab
+      headerActionsByTab={headerActionsByTab}
+    />
+  );
+}
+
+// AddressesSection — Title + filter + table для tab "IP-адреса".
+function AddressesSection({
+  rows,
+  columns,
+  reserveLink,
+  onClick,
+}: {
+  rows: Array<Record<string, unknown>>;
+  columns: Column<Record<string, unknown>>[];
+  reserveLink: string | null;
+  onClick: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const name = (getByPath<string>(row, "name") ?? "").toLowerCase();
+      const id = (getByPath<string>(row, "id") ?? "").toLowerCase();
+      const ext = (
+        (row.external_ipv4_address as { address?: string } | undefined)?.address ?? ""
+      ).toLowerCase();
+      const int = (
+        (row.internal_ipv4_address as { address?: string } | undefined)?.address ?? ""
+      ).toLowerCase();
+      return name.includes(q) || id.includes(q) || ext.includes(q) || int.includes(q);
+    });
+  }, [rows, query]);
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+      <Typography.Title level={4} style={{ margin: 0 }}>
+        IP-адреса
+      </Typography.Title>
+      <Input.Search
+        placeholder="Фильтр по имени, идентификатору или IP"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        style={{ maxWidth: 360 }}
+        allowClear
+      />
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border p-10 text-center space-y-3">
+          <div className="text-base font-medium">
+            {query ? "По фильтру ничего не найдено" : "У вас пока нет IP-адресов"}
+          </div>
+          {!query && (
+            <div className="text-xs text-muted-foreground">
+              Зарезервируйте адрес, чтобы он автоматически использовал
+              CIDR-блок этой подсети.
+            </div>
+          )}
+          {!query && reserveLink && (
+            <Button asChild>
+              <Link to={reserveLink}>
+                <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
+              </Link>
+            </Button>
+          )}
+        </div>
+      ) : (
+        <ResourceTable
+          rows={filtered}
+          columns={columns}
+          rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+          onRowClick={(r) => {
+            const id = getByPath<string>(r, "id");
+            if (id) onClick(id);
+          }}
+        />
+      )}
+    </Space>
+  );
 }
