@@ -1,6 +1,6 @@
 // DetailShell — обёртка detail-страницы под YC look-and-feel.
 //
-// Layout (внутри Content; глобальный VpcSidebar w=56 рисует Layout.tsx):
+// Layout (внутри Content; глобальный ServiceSidebar w=56 рисует Layout.tsx):
 //   ┌─ Sub-pane w=240 ────────┬─ Main pane ────────────────────────────────┐
 //   │  RESOURCE LABEL (caps)  │  [secondary action row]                    │
 //   │  Name + status badges   │                                            │
