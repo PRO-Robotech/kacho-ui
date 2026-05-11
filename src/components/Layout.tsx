@@ -3,7 +3,7 @@ import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
 import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
-import { VpcSidebar } from "@/components/VpcSidebar";
+import { ServiceSidebar } from "@/components/ServiceSidebar";
 import {
   HeaderRightSlot,
   HeaderBreadcrumbSlot,
@@ -76,7 +76,9 @@ function LayoutInner() {
         <BreadcrumbSelector />
 
         <Tooltip title="Все сервисы">
-          <Button type="text" size="small" icon={<AppstoreOutlined />} />
+          <NavLink to="/dashboard" aria-label="Все сервисы">
+            <Button type="text" size="small" icon={<AppstoreOutlined />} />
+          </NavLink>
         </Tooltip>
         <Tooltip title="На главную">
           <NavLink to="/" aria-label="Главная">
@@ -120,7 +122,7 @@ function LayoutInner() {
             background: token.colorBgLayout,
           }}
         >
-          <VpcSidebar />
+          <ServiceSidebar />
         </Sider>
 
         <Content

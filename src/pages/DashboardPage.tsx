@@ -1,163 +1,66 @@
-// DashboardPage — root экран /dashboard. YC-style разводная страница.
+// DashboardPage — root экран /dashboard. Разводная страница: плашки опубликованных
+// сервисов (модулей) — сейчас VPC и Compute. Клик по плашке → вход в модуль
+// (сайдбар переключает набор ссылок на этот модуль, см. ServiceSidebar).
 //
-// Уровни context, поддерживаемые tile'ом «Virtual Private Cloud»:
-//   • folder выбран     → counts по folder + click → /folders/X/networks
-//   • cloud выбран      → агрегированные counts по всем folder'ам в cloud
-//                          + click → /clouds/X/folders (выбрать/создать)
-//   • ничего не выбрано → "—" + кнопка-CTA «Перейти к Organizations»
-//
-// На YC console дашборд тоже разводная — показывает плашки сервисов на
-// уровне Cloud (без явного folder).
+// Уровни контекста (выбираются pill'ами в шапке — BreadcrumbSelector):
+//   • folder выбран     → counts по folder + клик → landing модуля в этом folder
+//   • cloud выбран      → counts агрегированно по всем folder'ам облака + клик → выбор folder
+//   • ничего не выбрано → "—" + CTA «Перейти к Organizations»
 
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  Empty,
-  Statistic,
-  Typography,
-  Space,
-  Button,
-  Row,
-  Col,
-  Alert,
-} from "antd";
-import {
-  ApartmentOutlined,
-  ArrowRightOutlined,
-  FolderOpenOutlined,
-} from "@ant-design/icons";
-import {
-  useBreadcrumb,
-  useHeaderRight,
-  usePageTitle,
-} from "@/components/PageHeaderSlot";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert } from "antd";
+import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { useBreadcrumb, useHeaderRight, usePageTitle } from "@/components/PageHeaderSlot";
 import { api } from "@/api/client";
 import { useContext } from "@/lib/context-store";
+import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
 
 interface FolderRow {
   id: string;
-  name: string;
-  cloud_id: string;
 }
 
-type Counts = {
-  networks: number | null;
-  subnets: number | null;
-  sgs: number | null;
-};
-
-/** Counts для одного folder. */
-function useFolderCounts(folderId: string | null): Counts {
-  const networks = useQuery({
-    queryKey: ["dash", "networks", folderId],
-    queryFn: () =>
-      api.list<{ networks?: unknown[] }>("/vpc/v1/networks", {
-        folder_id: folderId!,
-        pageSize: "1000",
-      }),
-    refetchInterval: 15_000,
-    enabled: !!folderId,
-  });
-  const subnets = useQuery({
-    queryKey: ["dash", "subnets", folderId],
-    queryFn: () =>
-      api.list<{ subnets?: unknown[] }>("/vpc/v1/subnets", {
-        folder_id: folderId!,
-        pageSize: "1000",
-      }),
-    refetchInterval: 15_000,
-    enabled: !!folderId,
-  });
-  const sgs = useQuery({
-    queryKey: ["dash", "security-groups", folderId],
-    queryFn: () =>
-      api.list<{ security_groups?: unknown[] }>("/vpc/v1/securityGroups", {
-        folder_id: folderId!,
-        pageSize: "1000",
-      }),
-    refetchInterval: 15_000,
-    enabled: !!folderId,
-  });
-
-  return {
-    networks: networks.data?.networks?.length ?? null,
-    subnets: subnets.data?.subnets?.length ?? null,
-    sgs: sgs.data?.security_groups?.length ?? null,
-  };
-}
-
-/** Counts агрегированно по всем folder'ам в cloud. */
-function useCloudCounts(cloudId: string | null): Counts & { foldersCount: number | null } {
-  const folders = useQuery({
+/** Список folder'ов в облаке (для cloud-level агрегации). */
+function useFoldersInCloud(cloudId: string | null) {
+  const q = useQuery({
     queryKey: ["dash", "cloud-folders", cloudId],
-    queryFn: () =>
-      api.list<{ folders: FolderRow[] }>("/resource-manager/v1/folders", {
-        cloud_id: cloudId!,
-      }),
-    refetchInterval: 30_000,
+    queryFn: () => api.list<{ folders?: FolderRow[] }>("/resource-manager/v1/folders", { cloud_id: cloudId! }),
     enabled: !!cloudId,
+    refetchInterval: 30_000,
   });
-  const folderIds = folders.data?.folders?.map((f) => f.id) ?? [];
-
-  const networks = useQuery({
-    queryKey: ["dash", "cloud-net", cloudId, folderIds],
-    queryFn: async () => {
-      const lists = await Promise.all(
-        folderIds.map((fid) =>
-          api.list<{ networks?: unknown[] }>("/vpc/v1/networks", {
-            folder_id: fid,
-            pageSize: "1000",
-          }),
-        ),
-      );
-      return lists.reduce((sum, l) => sum + (l.networks?.length ?? 0), 0);
-    },
-    refetchInterval: 15_000,
-    enabled: !!cloudId && folderIds.length > 0,
-  });
-  const subnets = useQuery({
-    queryKey: ["dash", "cloud-sub", cloudId, folderIds],
-    queryFn: async () => {
-      const lists = await Promise.all(
-        folderIds.map((fid) =>
-          api.list<{ subnets?: unknown[] }>("/vpc/v1/subnets", {
-            folder_id: fid,
-            pageSize: "1000",
-          }),
-        ),
-      );
-      return lists.reduce((sum, l) => sum + (l.subnets?.length ?? 0), 0);
-    },
-    refetchInterval: 15_000,
-    enabled: !!cloudId && folderIds.length > 0,
-  });
-  const sgs = useQuery({
-    queryKey: ["dash", "cloud-sg", cloudId, folderIds],
-    queryFn: async () => {
-      const lists = await Promise.all(
-        folderIds.map((fid) =>
-          api.list<{ security_groups?: unknown[] }>("/vpc/v1/securityGroups", {
-            folder_id: fid,
-            pageSize: "1000",
-          }),
-        ),
-      );
-      return lists.reduce((sum, l) => sum + (l.security_groups?.length ?? 0), 0);
-    },
-    refetchInterval: 15_000,
-    enabled: !!cloudId && folderIds.length > 0,
-  });
-
-  // Если folder список пустой и не загружается — counts = 0.
-  const empty = folders.data && folderIds.length === 0;
   return {
-    networks: empty ? 0 : networks.data ?? null,
-    subnets: empty ? 0 : subnets.data ?? null,
-    sgs: empty ? 0 : sgs.data ?? null,
-    foldersCount: folders.data?.folders?.length ?? null,
+    folderIds: q.data?.folders ? q.data.folders.map((f) => f.id) : null,
+    count: q.data?.folders?.length ?? null,
   };
+}
+
+type CountMap = Record<string, number | null>;
+
+/** Counts по stat-метрикам модуля: folder-mode (один folder) или cloud-mode (сумма по folder'ам облака). */
+function useModuleCounts(module: ServiceModule, folderId: string | null, cloudFolderIds: string[] | null): CountMap {
+  const enabled = folderId != null || cloudFolderIds != null;
+  const targetFolders = folderId != null ? [folderId] : cloudFolderIds ?? [];
+  const results = useQueries({
+    queries: module.stats.map((stat) => ({
+      queryKey: ["dash", module.key, stat.key, folderId, cloudFolderIds],
+      enabled,
+      refetchInterval: 15_000,
+      queryFn: async () => {
+        const lists = await Promise.all(
+          targetFolders.map((fid) =>
+            api.list<Record<string, unknown[] | undefined>>(stat.listPath, { folder_id: fid, pageSize: "1000" }),
+          ),
+        );
+        return lists.reduce((sum, l) => sum + (l[stat.payloadKey]?.length ?? 0), 0);
+      },
+    })),
+  });
+  const out: CountMap = {};
+  module.stats.forEach((stat, i) => {
+    out[stat.key] = enabled ? results[i].data ?? null : null;
+  });
+  return out;
 }
 
 export function DashboardPage() {
@@ -167,40 +70,42 @@ export function DashboardPage() {
   const folderId = ctx.folder?.id ?? null;
   const cloudId = ctx.cloud?.id ?? null;
 
-  const folderCounts = useFolderCounts(folderId);
-  const cloudCounts = useCloudCounts(folderId ? null : cloudId);
+  const { folderIds: cloudFolderIds, count: foldersInCloud } = useFoldersInCloud(folderId ? null : cloudId);
 
-  const counts: Counts = folderId ? folderCounts : cloudCounts;
-  const foldersInCloud = cloudCounts.foldersCount;
+  // Counts для каждого модуля (фиксированный список SERVICE_MODULES → хук-вызовы стабильны).
+  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], folderId, cloudFolderIds);
+  const computeCounts = useModuleCounts(SERVICE_MODULES[1], folderId, cloudFolderIds);
+  const countsByModule: Record<string, CountMap> = {
+    [SERVICE_MODULES[0].key]: vpcCounts,
+    [SERVICE_MODULES[1].key]: computeCounts,
+  };
 
-  useBreadcrumb(
-    useMemo(() => <Typography.Text strong>Дашборд</Typography.Text>, []),
-  );
+  useBreadcrumb(useMemo(() => <Typography.Text strong>Все сервисы</Typography.Text>, []));
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const goVpc = () => {
-    if (folderId) navigate(`/folders/${folderId}/vpc/networks`);
-    else if (cloudId) navigate(`/clouds/${cloudId}/folders`);
-    else navigate("/organizations");
-  };
+  const openModule = (m: ServiceModule) => navigate(m.landing(folderId, cloudId));
 
   const caption = (() => {
     if (ctx.folder) return `Каталог: ${ctx.folder.name || ctx.folder.id}`;
-    if (ctx.cloud)
-      return `Облако: ${ctx.cloud.name || ctx.cloud.id}. Выберите каталог чтобы увидеть ресурсы.`;
-    return "Контекст не выбран — выберите Cloud и Folder в шапке или дереве слева.";
+    if (ctx.cloud) return `Облако: ${ctx.cloud.name || ctx.cloud.id} — счётчики суммарно по всем каталогам. Выберите каталог, чтобы перейти к ресурсам.`;
+    return "Контекст не выбран — выберите Cloud и Folder в шапке.";
   })();
 
-  // Tile показываем как только выбран хотя бы Cloud.
-  const tileVisible = !!ctx.cloud;
+  // Плашки показываем как только выбран хотя бы Cloud.
+  const tilesVisible = !!ctx.cloud;
+  const allEmpty =
+    !!ctx.folder &&
+    SERVICE_MODULES.every((m) =>
+      m.stats.every((s) => (countsByModule[m.key]?.[s.key] ?? null) === 0),
+    );
 
   return (
     <div style={{ maxWidth: 1100 }} data-testid="dashboard-page">
       <Space direction="vertical" size={20} style={{ width: "100%" }}>
         <div>
           <Typography.Title level={3} style={{ margin: 0 }}>
-            Ресурсы облака
+            Сервисы облака
           </Typography.Title>
           <Typography.Text type="secondary">{caption}</Typography.Text>
         </div>
@@ -209,7 +114,7 @@ export function DashboardPage() {
           <Alert
             type="info"
             showIcon
-            message="Чтобы увидеть тайлы сервисов — выберите Cloud (через шапку или дерево слева)."
+            message="Чтобы увидеть плашки сервисов — выберите Cloud (через шапку или дерево слева)."
             action={
               <Button
                 size="small"
@@ -223,97 +128,68 @@ export function DashboardPage() {
           />
         )}
 
-        {tileVisible && (
+        {tilesVisible && (
           <Row gutter={[16, 16]}>
-            <Col xs={24} sm={24} md={16} lg={12}>
-              <Card
-                hoverable
-                data-testid="dashboard-tile-vpc"
-                onClick={goVpc}
-                styles={{ body: { padding: 16 } }}
-                title={
-                  <Space>
-                    <ApartmentOutlined style={{ color: "#3D8DF5" }} />
-                    <span>Virtual Private Cloud</span>
-                  </Space>
-                }
-                extra={<ArrowRightOutlined />}
-              >
-                <Typography.Paragraph
-                  type="secondary"
-                  style={{ marginBottom: 12, fontSize: 12 }}
+            {SERVICE_MODULES.map((m) => (
+              <Col key={m.key} xs={24} sm={24} md={12} lg={12}>
+                <Card
+                  hoverable
+                  data-testid={`dashboard-tile-${m.key}`}
+                  onClick={() => openModule(m)}
+                  styles={{ body: { padding: 16 } }}
+                  title={
+                    <Space>
+                      <span style={{ color: m.color, fontSize: 16 }}>{m.icon}</span>
+                      <span>{m.label}</span>
+                    </Space>
+                  }
+                  extra={<ArrowRightOutlined />}
                 >
-                  {ctx.folder
-                    ? "Сети, подсети, группы безопасности, публичные IP."
-                    : "Сети, подсети, группы безопасности — суммарно по всем каталогам облака."}
-                </Typography.Paragraph>
-                <Row gutter={16}>
-                  <Col span={8}>
-                    <Statistic
-                      title="Сетей"
-                      value={counts.networks ?? "—"}
-                      valueStyle={{ fontSize: 22 }}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic
-                      title="Подсетей"
-                      value={counts.subnets ?? "—"}
-                      valueStyle={{ fontSize: 22 }}
-                    />
-                  </Col>
-                  <Col span={8}>
-                    <Statistic
-                      title="Групп безопасности"
-                      value={counts.sgs ?? "—"}
-                      valueStyle={{ fontSize: 22 }}
-                    />
-                  </Col>
-                </Row>
-                {!ctx.folder && foldersInCloud !== null && (
-                  <Typography.Text
-                    type="secondary"
-                    style={{ fontSize: 11, display: "block", marginTop: 12 }}
-                  >
-                    Каталогов в облаке: {foldersInCloud}
-                  </Typography.Text>
-                )}
-              </Card>
-            </Col>
+                  <Typography.Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 12 }}>
+                    {m.description}
+                  </Typography.Paragraph>
+                  <Row gutter={16}>
+                    {m.stats.map((s) => (
+                      <Col key={s.key} span={Math.floor(24 / m.stats.length)}>
+                        <Statistic
+                          title={s.label}
+                          value={countsByModule[m.key]?.[s.key] ?? "—"}
+                          valueStyle={{ fontSize: 22 }}
+                        />
+                      </Col>
+                    ))}
+                  </Row>
+                  {!ctx.folder && foldersInCloud !== null && (
+                    <Typography.Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 12 }}>
+                      Каталогов в облаке: {foldersInCloud}
+                    </Typography.Text>
+                  )}
+                </Card>
+              </Col>
+            ))}
           </Row>
         )}
 
-        {ctx.folder &&
-          counts.networks === 0 &&
-          counts.subnets === 0 &&
-          counts.sgs === 0 && (
-            <Card>
-              <Empty
-                image={
-                  <FolderOpenOutlined style={{ fontSize: 40, color: "#8b8f99" }} />
-                }
-                imageStyle={{ height: 56 }}
-                description={
-                  <Space direction="vertical" size={6}>
-                    <Typography.Text strong>
-                      В каталоге нет ресурсов
-                    </Typography.Text>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Создайте первую сеть, чтобы начать.
-                    </Typography.Text>
-                  </Space>
-                }
-              >
-                <Button
-                  type="primary"
-                  icon={<ArrowRightOutlined />}
-                  onClick={goVpc}
-                >
-                  Перейти в VPC
-                </Button>
-              </Empty>
-            </Card>
-          )}
+        {allEmpty && (
+          <Card>
+            <Empty
+              image={<FolderOpenOutlined style={{ fontSize: 40, color: "#8b8f99" }} />}
+              imageStyle={{ height: 56 }}
+              description={
+                <Space direction="vertical" size={6}>
+                  <Typography.Text strong>В каталоге нет ресурсов</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Выберите сервис на плашке выше, чтобы создать первый ресурс.
+                  </Typography.Text>
+                </Space>
+              }
+            >
+              <Button type="primary" icon={<AppstoreOutlined />} onClick={() => openModule(SERVICE_MODULES[0])}>
+                Перейти в {SERVICE_MODULES[0].short}
+              </Button>
+            </Empty>
+          </Card>
+        )}
       </Space>
     </div>
   );
