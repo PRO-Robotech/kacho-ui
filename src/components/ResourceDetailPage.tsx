@@ -436,6 +436,20 @@ export function ResourceDetailPage({
     getByPath<string>(data, "description")
       ? { label: "Описание", value: getByPath<string>(data, "description")! }
       : null,
+    // Address-specific boolean fields: reserved/used (см. Address в types.ts).
+    // Generic — рендерятся для любого ресурса, у которого эти поля есть.
+    typeof getByPath<boolean>(data, "reserved") === "boolean"
+      ? {
+          label: "Зарезервирован",
+          value: getByPath<boolean>(data, "reserved") ? "Да" : "Нет",
+        }
+      : null,
+    typeof getByPath<boolean>(data, "used") === "boolean"
+      ? {
+          label: "Используется",
+          value: getByPath<boolean>(data, "used") ? "Да" : "Нет",
+        }
+      : null,
     // Network-specific: Группа безопасности по умолчанию.
     spec.id === "networks" && getByPath<string>(data, "default_security_group_id")
       ? {
@@ -542,6 +556,10 @@ export function ResourceDetailPage({
                   children: it.value,
                 }))}
               />
+              {/* Generic — рендерится для любого ресурса с непустым used_by
+                  (kacho.cloud.reference.Reference[]). Для Address — кто
+                  использует адрес (ephemeral compute NIC, и т.д.). */}
+              <UsedByBlock data={data} />
               {overviewExtras && overviewExtras(data)}
             </>
           )}
@@ -613,4 +631,38 @@ export function ResourceDetailPage({
 
   // Suppress unused
   void navigate;
+}
+
+// UsedByBlock — generic "Used by" rendering for any resource whose API response
+// has an output-only `used_by` list of kacho.cloud.reference.Reference. For
+// Address: ephemeral compute NIC addresses come back with
+// used_by=[{referrer:{type:"compute_instance", id:<instance id>}}]; reserved
+// user addresses get the same when attached to an instance. Renders nothing if
+// `used_by` is absent or empty.
+function UsedByBlock({ data }: { data: Record<string, unknown> }) {
+  const raw = getByPath<unknown>(data, "used_by");
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const items = raw as Array<{
+    referrer?: { type?: string; id?: string };
+    type?: string;
+  }>;
+  return (
+    <div className="rounded-lg border border-border p-4 space-y-2">
+      <h3 className="font-semibold text-sm">Used by</h3>
+      <ul className="space-y-1 text-sm">
+        {items.map((r, i) => {
+          const type = r.referrer?.type ?? "?";
+          const id = r.referrer?.id ?? "";
+          return (
+            <li key={`${type}-${id}-${i}`} className="flex items-baseline gap-2">
+              <span className="text-muted-foreground text-xs uppercase tracking-wide">
+                {type}
+              </span>
+              <code className="text-xs">{id || "—"}</code>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }

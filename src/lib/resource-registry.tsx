@@ -14,7 +14,7 @@ export interface ResourceColumn {
   header: string;
   // Путь в плоском объекте: "name", "status", "zone_id"
   path: string;
-  format?: "text" | "uid-short" | "datetime" | "status" | "code" | "list";
+  format?: "text" | "uid-short" | "datetime" | "status" | "code" | "list" | "references";
   className?: string;
   render?: (row: Record<string, unknown>) => ReactNode;
 }
@@ -548,20 +548,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           row.deletion_protection ? "Да" : <span className="text-muted-foreground">Нет</span>,
       },
       {
+        // `used_by` — output-only список kacho.cloud.reference.Reference
+        // (см. Address.used_by в types.ts). Для эфемерных compute-NIC адресов
+        // referrer.type=compute_instance, referrer.id=<instance id>.
+        // Generic rendering — format: "references" из spec-columns.tsx.
         header: "Ресурс",
-        path: "references",
-        render: (row) => {
-          const refs = (row.references as Array<{ type?: string; referrer?: string }> | undefined) ?? [];
-          if (refs.length === 0) return <span className="text-muted-foreground">—</span>;
-          const r = refs[0];
-          return (
-            <span className="text-xs">
-              {r.type ? `${r.type}: ` : ""}
-              <span className="font-mono">{r.referrer ?? "—"}</span>
-              {refs.length > 1 ? ` +${refs.length - 1}` : ""}
-            </span>
-          );
-        },
+        path: "used_by",
+        format: "references",
       },
       {
         header: "Дата создания",

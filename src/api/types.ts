@@ -105,6 +105,16 @@ export interface SubnetList {
   next_page_token?: string;
 }
 
+// Reference — minimal shape of kacho.cloud.reference.Reference as it appears on
+// the JSON wire (camelCase → snake_case adapter in api/client.ts strips the
+// envelope, so `referrer.type` / `referrer.id` come through as-is). `type` on
+// the outer object is the Reference.Type enum serialized as a string
+// ("USED_BY" / "MANAGED_BY" / "TYPE_UNSPECIFIED").
+export interface ResourceReference {
+  referrer?: { type?: string; id?: string };
+  type?: string;
+}
+
 export interface Address {
   id: string;
   folder_id?: string;
@@ -120,6 +130,11 @@ export interface Address {
   ip_version?: string;
   deletion_protection?: boolean;
   dns_record?: string;
+  // Output-only: who uses this address. Populated by kacho-vpc
+  // AddressService.Get/List (an `Address.used_by` list of kacho.cloud.reference.Reference).
+  // For ephemeral compute NIC addresses each entry's `referrer.type` is
+  // "compute_instance" and `referrer.id` is the instance id.
+  used_by?: ResourceReference[];
 }
 
 export interface AddressList {
