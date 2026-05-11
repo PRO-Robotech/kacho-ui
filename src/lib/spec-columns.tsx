@@ -74,6 +74,34 @@ export function formatCellByFormat(
         );
       }
       return <Typography.Text type="secondary">—</Typography.Text>;
+    case "references":
+      // Generic renderer для output-only списков kacho.cloud.reference.Reference
+      // (типичный shape: [{ referrer: { type, id }, type }, ...]). Показываем
+      // первый referrer как "<type> <short-id>"; полный id — в tooltip;
+      // "+N" — если рефереров больше одного.
+      if (Array.isArray(v) && v.length > 0) {
+        const first = v[0] as { referrer?: { type?: string; id?: string } } | undefined;
+        const refType = first?.referrer?.type ?? "?";
+        const refId = first?.referrer?.id ?? "";
+        const shortId = refId.length > 12 ? `${refId.slice(0, 12)}…` : refId;
+        const more = v.length > 1 ? ` +${v.length - 1}` : "";
+        return (
+          <span style={{ fontSize: 12 }} title={refId || undefined}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {refType}
+            </Typography.Text>{" "}
+            <Typography.Text code style={{ fontSize: 12 }}>
+              {shortId || "—"}
+            </Typography.Text>
+            {more && (
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {more}
+              </Typography.Text>
+            )}
+          </span>
+        );
+      }
+      return <Typography.Text type="secondary">—</Typography.Text>;
     case "text":
     default:
       if (v == null || v === "")
