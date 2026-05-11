@@ -33,7 +33,7 @@ import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { api, ApiError } from "@/api/client";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
-import { referrerHref } from "@/lib/spec-columns";
+import { ReferrerLink } from "@/lib/spec-columns";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
@@ -639,10 +639,12 @@ export function ResourceDetailPage({
 // Address: ephemeral compute NIC addresses come back with
 // used_by=[{referrer:{type:"compute_instance", id:<instance id>}}]; reserved
 // user addresses get the same when attached to an instance. Renders nothing if
-// `used_by` is absent or empty. Для известных referrer-типов id рендерится
-// SPA-<Link> на detail-страницу ресурса (через referrerHref); прочие — plain
-// <code> (forward-compat fallback). folderId берём из data.folder_id, либо
-// из URL-параметров (:folderId) как fallback.
+// `used_by` is absent or empty. Каждый referrer рендерится как «<Tag>{label}</Tag>
+// {id}» в одном кликабельном <Link> (для известных referrer-типов) либо plain
+// (для unknown — forward-compat fallback), через общий ReferrerLink helper
+// (та же визуальная форма, что и в list-view used_by column). folderId берём
+// из data.folder_id, либо из URL-параметров (:folderId) как fallback. В отличие
+// от list-view, здесь все рефереры показаны полностью (нет "+N" — stack-вью).
 function UsedByBlock({ data }: { data: Record<string, unknown> }) {
   const params = useParams();
   const folderId =
@@ -660,19 +662,9 @@ function UsedByBlock({ data }: { data: Record<string, unknown> }) {
         {items.map((r, i) => {
           const type = r.referrer?.type ?? "?";
           const id = r.referrer?.id ?? "";
-          const href = referrerHref(folderId, r.referrer);
           return (
-            <li key={`${type}-${id}-${i}`} className="flex items-baseline gap-2">
-              <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                {type}
-              </span>
-              {href ? (
-                <Link to={href}>
-                  <code className="text-xs">{id || "—"}</code>
-                </Link>
-              ) : (
-                <code className="text-xs">{id || "—"}</code>
-              )}
+            <li key={`${type}-${id}-${i}`} className="flex items-center gap-2">
+              <ReferrerLink folderId={folderId} referrer={r.referrer} />
             </li>
           );
         })}

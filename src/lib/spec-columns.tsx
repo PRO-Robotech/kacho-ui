@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Typography } from "antd";
+import { Tag, Typography } from "antd";
 import type { Column } from "@/components/ResourceTable";
 import { CopyableId } from "@/components/CopyableId";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -37,6 +37,70 @@ export function referrerHref(
     default:
       return null;
   }
+}
+
+// referrerMeta — human-readable label + цвет antd-<Tag> для типа referrer'а.
+// Известные типы получают короткие user-facing метки ("VM", "Disk", ...) и
+// семантический цвет; unknown — fallback на сам `type` без цвета (neutral Tag),
+// чтобы forward-compat при появлении новых referrer-типов работал визуально.
+// Цвета — из стандартной палитры antd (см. https://ant.design/components/tag).
+export function referrerMeta(type: string | undefined): { label: string; color?: string } {
+  switch (type) {
+    case "compute_instance":
+      return { label: "VM", color: "blue" };
+    case "compute_disk":
+      return { label: "Disk", color: "cyan" };
+    case "compute_image":
+      return { label: "Image", color: "geekblue" };
+    case "compute_snapshot":
+      return { label: "Snapshot", color: "purple" };
+    case "nlb_target_group":
+      return { label: "NLB TG", color: "gold" };
+    default:
+      return { label: type || "?" };
+  }
+}
+
+// ReferrerLink — общий рендер одного referrer'а как «<Tag>{label}</Tag> {id}»,
+// обёрнутого в <Link> если href доступен (compute_instance → SPA-route), либо
+// в plain <span> для unknown referrer-типов (forward-compat fallback). Клик по
+// link останавливает propagation, чтобы row-onClick в ResourceTable не
+// триггерил navigation на parent-ресурс (см. ResourceTable.tsx — там есть
+// дополнительный skip на closest('a'), это просто defense-in-depth).
+export function ReferrerLink({
+  folderId,
+  referrer,
+}: {
+  folderId: string | null | undefined;
+  referrer: { type?: string; id?: string } | undefined;
+}): ReactNode {
+  const meta = referrerMeta(referrer?.type);
+  const id = referrer?.id ?? "";
+  const href = referrerHref(folderId, referrer);
+  const inner = (
+    <>
+      <Tag color={meta.color} style={{ margin: 0, fontSize: 11 }}>
+        {meta.label}
+      </Tag>
+      <Typography.Text code style={{ fontSize: 12 }} title={id || undefined}>
+        {id || "—"}
+      </Typography.Text>
+    </>
+  );
+  if (href) {
+    return (
+      <Link
+        to={href}
+        onClick={(e) => e.stopPropagation()}
+        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{inner}</span>
+  );
 }
 
 export function buildSpecColumns(
@@ -108,41 +172,29 @@ export function formatCellByFormat(
     case "references":
       // Generic renderer для output-only списков kacho.cloud.reference.Reference
       // (типичный shape: [{ referrer: { type, id }, type }, ...]). Показываем
-      // первый referrer как "<type> <short-id>"; полный id — в tooltip;
-      // "+N" — если рефереров больше одного. Для известных referrer-типов
-      // short-id рендерится как SPA-<Link> на detail-страницу ресурса
-      // (compute_instance → /folders/<f>/compute/instances/<id>); для прочих —
-      // plain code (forward-compat fallback). Клик внутри <a> не триггерит
-      // row-navigation (см. ResourceTable.tsx — есть skip на `closest('a')`).
+      // первый referrer как «<Tag>{label}</Tag> {id}»; full id — в tooltip + as
+      // visible text (~20 chars, помещается в cell); "+N" — `<Tag>` если
+      // рефереров больше одного. Для известных referrer-типов вся группа
+      // обёрнута в SPA-<Link>; для прочих — plain (forward-compat fallback).
+      // Клик внутри <a> не триггерит row-navigation (см. ResourceTable.tsx —
+      // есть skip на `closest('a')`).
       if (Array.isArray(v) && v.length > 0) {
         const first = v[0] as { referrer?: { type?: string; id?: string } } | undefined;
-        const refType = first?.referrer?.type ?? "?";
-        const refId = first?.referrer?.id ?? "";
-        const shortId = refId.length > 12 ? `${refId.slice(0, 12)}…` : refId;
-        const more = v.length > 1 ? ` +${v.length - 1}` : "";
+        const more = v.length > 1 ? v.length - 1 : 0;
         const folderId =
           opts.folderId ?? (getByPath<string>(row, "folder_id") || null);
-        const href = referrerHref(folderId, first?.referrer);
+        const restTitle = more
+          ? (v.slice(1) as Array<{ referrer?: { type?: string; id?: string } }>)
+              .map((r) => `${r.referrer?.type ?? "?"} ${r.referrer?.id ?? ""}`)
+              .join("\n")
+          : undefined;
         return (
-          <span style={{ fontSize: 12 }} title={refId || undefined}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {refType}
-            </Typography.Text>{" "}
-            {href ? (
-              <Link to={href} onClick={(e) => e.stopPropagation()}>
-                <Typography.Text code style={{ fontSize: 12 }}>
-                  {shortId || "—"}
-                </Typography.Text>
-              </Link>
-            ) : (
-              <Typography.Text code style={{ fontSize: 12 }}>
-                {shortId || "—"}
-              </Typography.Text>
-            )}
-            {more && (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {more}
-              </Typography.Text>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <ReferrerLink folderId={folderId} referrer={first?.referrer} />
+            {more > 0 && (
+              <Tag style={{ margin: 0, fontSize: 11 }} title={restTitle}>
+                +{more}
+              </Tag>
             )}
           </span>
         );
