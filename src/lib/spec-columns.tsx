@@ -5,7 +5,7 @@
 
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Tag, Typography } from "antd";
+import { Typography } from "antd";
 import type { Column } from "@/components/ResourceTable";
 import { CopyableId } from "@/components/CopyableId";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -39,31 +39,33 @@ export function referrerHref(
   }
 }
 
-// referrerMeta — human-readable label + цвет antd-<Tag> для типа referrer'а.
+// referrerMeta — human-readable label + цвет текста для типа referrer'а.
 // Известные типы получают короткие user-facing метки ("VM", "Disk", ...) и
-// семантический цвет; unknown — fallback на сам `type` без цвета (neutral Tag),
+// семантический цвет; unknown — fallback на сам `type` без цвета (neutral),
 // чтобы forward-compat при появлении новых referrer-типов работал визуально.
-// Цвета — из стандартной палитры antd (см. https://ant.design/components/tag).
+// Цвета — hex'ы из стандартной палитры antd (https://ant.design/docs/spec/colors).
 export function referrerMeta(type: string | undefined): { label: string; color?: string } {
   switch (type) {
     case "compute_instance":
-      return { label: "VM", color: "blue" };
+      return { label: "VM", color: "#1677ff" };
     case "compute_disk":
-      return { label: "Disk", color: "cyan" };
+      return { label: "Disk", color: "#13c2c2" };
     case "compute_image":
-      return { label: "Image", color: "geekblue" };
+      return { label: "Image", color: "#2f54eb" };
     case "compute_snapshot":
-      return { label: "Snapshot", color: "purple" };
+      return { label: "Snapshot", color: "#722ed1" };
     case "nlb_target_group":
-      return { label: "NLB TG", color: "gold" };
+      return { label: "NLB TG", color: "#faad14" };
     default:
       return { label: type || "?" };
   }
 }
 
-// ReferrerLink — общий рендер одного referrer'а как «<Tag>{label}</Tag> {id}»,
-// обёрнутого в <Link> если href доступен (compute_instance → SPA-route), либо
-// в plain <span> для unknown referrer-типов (forward-compat fallback). Клик по
+// ReferrerLink — общий рендер одного referrer'а как «{label} {id}» (plain text,
+// no chip), где label — короткая type-метка с семантическим цветом текста, id —
+// monospace (<Typography.Text code>, это не чип — просто моно-стиль). Всё
+// обёрнуто в один <Link> если href доступен (compute_instance → SPA-route),
+// либо в <span> для unknown referrer-типов (forward-compat fallback). Клик по
 // link останавливает propagation, чтобы row-onClick в ResourceTable не
 // триггерил navigation на parent-ресурс (см. ResourceTable.tsx — там есть
 // дополнительный skip на closest('a'), это просто defense-in-depth).
@@ -79,9 +81,9 @@ export function ReferrerLink({
   const href = referrerHref(folderId, referrer);
   const inner = (
     <>
-      <Tag color={meta.color} style={{ margin: 0, fontSize: 11 }}>
+      <span style={{ color: meta.color, fontWeight: 500, fontSize: 12 }}>
         {meta.label}
-      </Tag>
+      </span>
       <Typography.Text code style={{ fontSize: 12 }} title={id || undefined}>
         {id || "—"}
       </Typography.Text>
@@ -92,14 +94,14 @@ export function ReferrerLink({
       <Link
         to={href}
         onClick={(e) => e.stopPropagation()}
-        style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}
       >
         {inner}
       </Link>
     );
   }
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>{inner}</span>
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>{inner}</span>
   );
 }
 
@@ -172,12 +174,13 @@ export function formatCellByFormat(
     case "references":
       // Generic renderer для output-only списков kacho.cloud.reference.Reference
       // (типичный shape: [{ referrer: { type, id }, type }, ...]). Показываем
-      // первый referrer как «<Tag>{label}</Tag> {id}»; full id — в tooltip + as
-      // visible text (~20 chars, помещается в cell); "+N" — `<Tag>` если
-      // рефереров больше одного. Для известных referrer-типов вся группа
-      // обёрнута в SPA-<Link>; для прочих — plain (forward-compat fallback).
-      // Клик внутри <a> не триггерит row-navigation (см. ResourceTable.tsx —
-      // есть skip на `closest('a')`).
+      // первый referrer как «{label} {id}» (plain text + link, без chip); full
+      // id — в tooltip + as visible text (~20 chars, помещается в cell); "+N
+      // more" — тихий subtle <span> (тоже без chip) если рефереров больше
+      // одного, с tooltip-listing остальных. Для известных referrer-типов
+      // первый элемент обёрнут в SPA-<Link>; для прочих — plain (forward-compat
+      // fallback). Клик внутри <a> не триггерит row-navigation (см.
+      // ResourceTable.tsx — есть skip на `closest('a')`).
       if (Array.isArray(v) && v.length > 0) {
         const first = v[0] as { referrer?: { type?: string; id?: string } } | undefined;
         const more = v.length > 1 ? v.length - 1 : 0;
@@ -189,12 +192,12 @@ export function formatCellByFormat(
               .join("\n")
           : undefined;
         return (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+          <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, fontSize: 12 }}>
             <ReferrerLink folderId={folderId} referrer={first?.referrer} />
             {more > 0 && (
-              <Tag style={{ margin: 0, fontSize: 11 }} title={restTitle}>
-                +{more}
-              </Tag>
+              <span style={{ color: "rgba(0,0,0,.45)", fontSize: 11 }} title={restTitle}>
+                +{more} more
+              </span>
             )}
           </span>
         );
