@@ -1,8 +1,9 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
 import ruRU from "antd/locale/ru_RU";
 import { Layout } from "@/components/Layout";
+import { AdminLayout } from "@/components/AdminLayout";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceCreatePage } from "@/components/ResourceCreatePage";
@@ -13,6 +14,10 @@ import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
+import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
+import { AddressDetailPage } from "@/pages/AddressDetailPage";
+import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
+import { OperationsPage } from "@/pages/OperationsPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 
@@ -27,9 +32,32 @@ const queryClient = new QueryClient({
 });
 
 // Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
-const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups"]
+const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "gateways"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
+
+// Folder-scoped Compute ресурсы (Disk/Image/Snapshot/Instance). URL-сегмент — `compute`.
+const COMPUTE_SCOPED = ["compute-disks", "compute-images", "compute-snapshots", "compute-instances"]
+  .map((id) => REGISTRY[id])
+  .filter(Boolean);
+
+// LegacySegmentRedirect — редирект старых/RefNameLink flat-URL `/folders/<id>/<route>/...`
+// на новые `/folders/<id>/<segment>/<route>/...` (segment = "vpc" | "compute").
+// Сохраняет хвост path + query.
+function LegacySegmentRedirect({ segment, route }: { segment: string; route: string }) {
+  const { folderId } = useParams();
+  const location = useLocation();
+  const prefix = `/folders/${folderId}/${route}`;
+  const tail = location.pathname.startsWith(prefix)
+    ? location.pathname.slice(prefix.length)
+    : "";
+  return (
+    <Navigate
+      to={`/folders/${folderId}/${segment}/${route}${tail}${location.search}`}
+      replace
+    />
+  );
+}
 
 export default function App() {
   return (
@@ -145,11 +173,11 @@ export default function App() {
             />
 
             {/* === Folder-scoped VPC ресурсы === */}
-            {/* /folders/:folderId/{networks|subnets|addresses|route-tables} */}
+            {/* /folders/:folderId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
             {FOLDER_SCOPED.map((spec) => (
               <Route key={spec.id}>
                 <Route
-                  path={`/folders/:folderId/${spec.route}`}
+                  path={`/folders/:folderId/vpc/${spec.route}`}
                   element={
                     <ResourceListPage
                       spec={spec}
@@ -159,7 +187,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/${spec.route}/create`}
+                  path={`/folders/:folderId/vpc/${spec.route}/create`}
                   element={
                     <ResourceCreatePage
                       spec={spec}
@@ -169,7 +197,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/${spec.route}/:uid`}
+                  path={`/folders/:folderId/vpc/${spec.route}/:uid`}
                   element={
                     spec.id === "networks"
                       ? <NetworkDetailPage />
@@ -180,12 +208,184 @@ export default function App() {
                           : <ResourceDetailPage spec={spec} />
                   }
                 />
+                {/* /edit URL ведёт на ту же detail-страницу — она авто-
+                    детектит /edit-суффикс и разворачивает inline-форму
+                    редактирования в правой панели вместо "Общее". */}
                 <Route
-                  path={`/folders/:folderId/${spec.route}/:uid/edit`}
-                  element={<ResourceEditPage spec={spec} />}
+                  path={`/folders/:folderId/vpc/${spec.route}/:uid/edit`}
+                  element={
+                    spec.id === "networks"
+                      ? <NetworkDetailPage />
+                      : spec.id === "subnets"
+                        ? <SubnetDetailPage />
+                        : spec.id === "security-groups"
+                          ? <SecurityGroupDetailPage />
+                          : <ResourceDetailPage spec={spec} />
+                  }
+                />
+                {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
+                    автоматически редиректятся на /folders/X/vpc/<resource>/... */}
+                <Route
+                  path={`/folders/:folderId/${spec.route}/*`}
+                  element={<LegacySegmentRedirect segment="vpc" route={spec.route} />}
                 />
               </Route>
             ))}
+
+            {/* === Folder-scoped Compute ресурсы === */}
+            {/* /folders/:folderId/compute/{disks|images|snapshots|instances} */}
+            {COMPUTE_SCOPED.map((spec) => (
+              <Route key={spec.id}>
+                <Route
+                  path={`/folders/:folderId/compute/${spec.route}`}
+                  element={
+                    <ResourceListPage
+                      spec={spec}
+                      parentField="folder_id"
+                      parentParam="folderId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/folders/:folderId/compute/${spec.route}/create`}
+                  element={
+                    <ResourceCreatePage
+                      spec={spec}
+                      parentField="folder_id"
+                      parentParam="folderId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/folders/:folderId/compute/${spec.route}/:uid`}
+                  element={
+                    spec.id === "compute-instances"
+                      ? <InstanceDetailPage />
+                      : <ResourceDetailPage spec={spec} />
+                  }
+                />
+                <Route
+                  path={`/folders/:folderId/compute/${spec.route}/:uid/edit`}
+                  element={
+                    spec.id === "compute-instances"
+                      ? <InstanceDetailPage />
+                      : <ResourceDetailPage spec={spec} />
+                  }
+                />
+                {/* Legacy/RefNameLink redirect: `/folders/X/<route>/...` → `/folders/X/compute/<route>/...` */}
+                <Route
+                  path={`/folders/:folderId/${spec.route}/*`}
+                  element={<LegacySegmentRedirect segment="compute" route={spec.route} />}
+                />
+              </Route>
+            ))}
+
+            {/* === Network-nested CREATE для дочерних ресурсов === */}
+            {/* Сохраняет network-context: при создании RT/SG из network detail
+                URL остаётся под /networks/<n>/. */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/route-tables/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY["route-tables"]}
+                  parentField="folder_id"
+                  parentParam="folderId"
+                />
+              }
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/security-groups/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY["security-groups"]}
+                  parentField="folder_id"
+                  parentParam="folderId"
+                />
+              }
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY.subnets}
+                  parentField="folder_id"
+                  parentParam="folderId"
+                />
+              }
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY.addresses}
+                  parentField="folder_id"
+                  parentParam="folderId"
+                />
+              }
+            />
+            <Route
+              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/create"
+              element={
+                <ResourceCreatePage
+                  spec={REGISTRY.addresses}
+                  parentField="folder_id"
+                  parentParam="folderId"
+                />
+              }
+            />
+
+            {/* === Global VPC Operations (folder-scoped) === */}
+            <Route
+              path="/folders/:folderId/vpc/operations"
+              element={<OperationsPage />}
+            />
+
+            {/* === Network-nested ресурсы (YC-style URL) === */}
+            {/* /folders/:folderId/vpc/networks/:networkId/subnets/:uid */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid"
+              element={<SubnetDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid/edit"
+              element={<SubnetDetailPage />}
+            />
+            {/* /folders/:folderId/vpc/networks/:networkId/route-tables/:uid */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/route-tables/:uid"
+              element={<RouteTableDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/route-tables/:uid/edit"
+              element={<RouteTableDetailPage />}
+            />
+            {/* /folders/:folderId/vpc/networks/:networkId/security-groups/:uid */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/security-groups/:uid"
+              element={<SecurityGroupDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/security-groups/:uid/edit"
+              element={<SecurityGroupDetailPage />}
+            />
+            {/* /folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid"
+              element={<AddressDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid/edit"
+              element={<AddressDetailPage />}
+            />
+            {/* /folders/:folderId/vpc/subnets/:subnetId/addresses/:uid (flat-subnet-context) */}
+            <Route
+              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/:uid"
+              element={<AddressDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/:uid/edit"
+              element={<AddressDetailPage />}
+            />
 
             {/* /folders/:folderId — редирект на dashboard */}
             <Route
@@ -218,16 +418,21 @@ export default function App() {
 
             {/* === System (admin-only, kacho-only) === */}
             {/* Region/Zone/AddressPool — глобальные ресурсы. Не публикуются на
-                external TLS endpoint, см. CLAUDE.md kacho-vpc §16. */}
-            <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
+                external TLS endpoint, см. CLAUDE.md kacho-vpc §16.
+                List-страницы обёрнуты в AdminLayout с горизонтальными табами
+                навигации между admin-сущностями + кнопкой "Создать <singular>"
+                в правом header-slot. */}
+            <Route element={<AdminLayout />}>
+              <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
+              <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
+              <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
+            </Route>
             <Route path="/system/regions/create" element={<ResourceCreatePage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid/edit" element={<ResourceEditPage spec={REGISTRY.regions} />} />
-            <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/create" element={<ResourceCreatePage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/:uid" element={<ResourceDetailPage spec={REGISTRY.zones} />} />
             <Route path="/system/zones/:uid/edit" element={<ResourceEditPage spec={REGISTRY.zones} />} />
-            <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/create" element={<ResourceCreatePage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
             <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
@@ -245,7 +450,6 @@ export default function App() {
 }
 
 // FolderDefaultRedirect: /folders/:folderId → /folders/:folderId/dashboard
-import { useParams } from "react-router-dom";
 function FolderDefaultRedirect() {
   const { folderId } = useParams();
   return <Navigate to={`/folders/${folderId}/dashboard`} replace />;

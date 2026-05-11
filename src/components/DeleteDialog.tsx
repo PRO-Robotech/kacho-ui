@@ -1,13 +1,12 @@
-// DeleteDialog — confirm-modal с реальным DELETE → Operation poll через
-// operationStore (sticky banner). Заменяет DeleteConfirmStub.
+// DeleteDialog — confirm-modal с реальным DELETE и polling Operation
+// прямо из диалога (Удалить-кнопка остаётся в loading-состоянии до op.done).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Modal, Typography, Alert, Input } from "antd";
+import { Modal, Typography, Input } from "antd";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
-import { useInvalidateResourceList } from "@/lib/use-operation";
-import { operationStore } from "@/lib/use-operation-store";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
 interface Props {
@@ -40,53 +39,63 @@ export function DeleteDialog({
   requireNameConfirm,
 }: Props) {
   const [confirmText, setConfirmText] = useState("");
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
   const invalidate = useInvalidateResourceList();
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
 
   const mutation = useMutation({
     mutationFn: () => api.delete(apiPath),
     onSuccess: (resp) => {
-      setSubmitErr(null);
       const opId = extractOperationId(resp);
       if (opId) {
-        operationStore.start({
-          id: opId,
-          title: `Удаление ${resourceLabel.toLowerCase()} ${name}`,
-          resourceId,
-          folderUid: folderUid ?? null,
-        });
+        setPendingOpId(opId);
       } else {
         invalidate(resourceId, folderUid ?? null);
+        onOpenChange(false);
+        setConfirmText("");
+        onSuccess?.();
       }
-      onOpenChange(false);
-      setConfirmText("");
-      onSuccess?.();
     },
     onError: (e) => {
       const m = e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message;
-      setSubmitErr(m);
       toast.error(`Удалить ${resourceLabel} ${name}: ${m}`);
     },
   });
 
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      toast.error(`Удалить ${resourceLabel} ${name}: ${op.error.message ?? "ошибка"}`);
+    } else {
+      invalidate(resourceId, folderUid ?? null);
+      toast.success(`${resourceLabel} ${name} удалён`);
+      onSuccess?.();
+    }
+    setPendingOpId(null);
+    onOpenChange(false);
+    setConfirmText("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
+  const pending = mutation.isPending || pendingOpId !== null;
   const canConfirm = !requireNameConfirm || confirmText.trim() === name;
 
   return (
     <Modal
       open={open}
       onCancel={() => {
-        if (mutation.isPending) return;
+        if (pending) return;
         onOpenChange(false);
         setConfirmText("");
-        setSubmitErr(null);
       }}
       onOk={() => mutation.mutate()}
       okText="Удалить"
       okButtonProps={{
         danger: true,
-        loading: mutation.isPending,
-        disabled: !canConfirm || mutation.isPending,
+        loading: pending,
+        disabled: !canConfirm || pending,
       }}
+      cancelButtonProps={{ disabled: pending }}
       cancelText="Отмена"
       title={`Удалить ${resourceLabel.toLowerCase()}?`}
       destroyOnClose
@@ -118,7 +127,6 @@ export function DeleteDialog({
           </div>
         )}
 
-        {submitErr && <Alert type="error" message={submitErr} />}
       </div>
     </Modal>
   );

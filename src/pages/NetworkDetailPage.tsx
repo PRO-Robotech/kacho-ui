@@ -8,11 +8,14 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Alert, Button, Empty, Input, Space, Typography } from "antd";
+import { Button, Input, Space, Typography } from "antd";
+import { ErrorResult } from "@/components/ErrorResult";
 import { PlusOutlined } from "@ant-design/icons";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
+import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
@@ -26,6 +29,14 @@ export function NetworkDetailPage() {
   const sgSpec = REGISTRY["security-groups"];
 
   const subnetSpec = REGISTRY["subnets"];
+
+  // Inline-create state: при true в правой панели Обзора (или соответствующем
+  // tab'е) вместо списка/Descriptions разворачивается форма создания
+  // дочерней сущности с pre-filled network_id (locked). Cancel/Success
+  // возвращают обычный вид. URL не меняется — context network сохраняется.
+  const [creatingSubnet, setCreatingSubnet] = useState(false);
+  const [creatingRouteTable, setCreatingRouteTable] = useState(false);
+  const [creatingSecurityGroup, setCreatingSecurityGroup] = useState(false);
 
   const { data: subnetData } = useQuery({
     queryKey: ["subnets", "list", folderId],
@@ -73,9 +84,13 @@ export function NetworkDetailPage() {
     [sgData, networkId],
   );
 
-  const subnetColumns = useChildColumns(subnetSpec, folderId);
-  const rtColumns = useChildColumns(rtSpec, folderId);
-  const sgColumns = useChildColumns(sgSpec, folderId);
+  // RowActionsMenu Edit-кнопка ведёт на `${basePath}/${id}/edit` — для child-resources
+  // на network-detail передаём nested basePath, чтобы edit URL остался под networks/.
+  const nestedBase = (route: string) =>
+    folderId && networkId ? `/folders/${folderId}/vpc/networks/${networkId}/${route}` : null;
+  const subnetColumns = useChildColumns(subnetSpec, folderId, nestedBase("subnets"));
+  const rtColumns = useChildColumns(rtSpec, folderId, nestedBase("route-tables"));
+  const sgColumns = useChildColumns(sgSpec, folderId, nestedBase("security-groups"));
 
   const overviewExtras = useCallback(
     () => (
@@ -85,11 +100,13 @@ export function NetworkDetailPage() {
         columns={subnetColumns}
         emptyText="В сети нет подсетей."
         onClick={(id) =>
-          folderId && navigate(`/folders/${folderId}/subnets/${id}`)
+          folderId &&
+          networkId &&
+          navigate(`/folders/${folderId}/vpc/networks/${networkId}/subnets/${id}`)
         }
       />
     ),
-    [networkSubnets, subnetColumns, folderId, navigate],
+    [networkSubnets, subnetColumns, folderId, networkId, navigate],
   );
 
   const extraTabs = useMemo(
@@ -99,89 +116,112 @@ export function NetworkDetailPage() {
           id: "route-tables",
           label: "Таблицы маршрутизации",
           count: networkRouteTables.length,
-          render: () => (
-            <ChildSection
-              title="Таблицы маршрутизации"
-              rows={networkRouteTables}
-              columns={rtColumns}
-              emptyText="К сети не привязано ни одной таблицы маршрутизации."
-              onClick={(id) =>
-                folderId && navigate(`/folders/${folderId}/route-tables/${id}`)
-              }
-            />
-          ),
+          render: () =>
+            creatingRouteTable && folderId && networkId ? (
+              <InlineResourceCreateForm
+                spec={rtSpec}
+                ctx={{ folderId }}
+                presetFields={{ network_id: networkId }}
+                folderUid={folderId}
+                title="Создание таблицы маршрутизации"
+                onCancel={() => setCreatingRouteTable(false)}
+              />
+            ) : (
+              <ChildSection
+                title="Таблицы маршрутизации"
+                rows={networkRouteTables}
+                columns={rtColumns}
+                emptyText="К сети не привязано ни одной таблицы маршрутизации."
+                onClick={(id) =>
+                  folderId &&
+                  networkId &&
+                  navigate(
+                    `/folders/${folderId}/vpc/networks/${networkId}/route-tables/${id}`,
+                  )
+                }
+              />
+            ),
         },
         {
           id: "security-groups",
           label: "Группы безопасности",
           count: networkSGs.length,
-          render: () => (
-            <ChildSection
-              title="Группы безопасности"
-              rows={networkSGs}
-              columns={sgColumns}
-              emptyText="В сети нет групп безопасности."
-              onClick={(id) =>
-                folderId && navigate(`/folders/${folderId}/security-groups/${id}`)
-              }
-            />
-          ),
+          render: () =>
+            creatingSecurityGroup && folderId && networkId ? (
+              <InlineResourceCreateForm
+                spec={sgSpec}
+                ctx={{ folderId }}
+                presetFields={{ network_id: networkId }}
+                folderUid={folderId}
+                title="Создание группы безопасности"
+                onCancel={() => setCreatingSecurityGroup(false)}
+              />
+            ) : (
+              <ChildSection
+                title="Группы безопасности"
+                rows={networkSGs}
+                columns={sgColumns}
+                emptyText="В сети нет групп безопасности."
+                onClick={(id) =>
+                  folderId &&
+                  networkId &&
+                  navigate(
+                    `/folders/${folderId}/vpc/networks/${networkId}/security-groups/${id}`,
+                  )
+                }
+              />
+            ),
         },
         {
           id: "dns-zones",
           label: "DNS зоны",
           render: () => (
-            <Empty
-              description={
-                <Typography.Text type="secondary">
-                  DNS зоны пока не поддерживаются в Kachō (запланировано в дорожной карте).
-                </Typography.Text>
-              }
+            <ErrorResult
+              status="404"
+              subTitle="DNS зоны пока не поддерживаются в Kachō (запланировано в дорожной карте)."
             />
           ),
         },
-        {
-          id: "operations",
-          label: "Операции",
-          render: () => (
-            <Alert
-              type="info"
-              showIcon
-              message="История операций"
-              description="OperationService пока не поддерживает фильтр по resource_id. Список операций по этой сети появится после соответствующего изменения backend (см. план §11.1)."
-            />
-          ),
-        },
+        // tab "Операции" автоматически добавляется ResourceDetailPage —
+        // не дублируем здесь.
       ],
-    [networkRouteTables, networkSGs, rtColumns, sgColumns, folderId, navigate],
+    [
+      networkRouteTables,
+      networkSGs,
+      rtColumns,
+      sgColumns,
+      folderId,
+      networkId,
+      navigate,
+      creatingRouteTable,
+      creatingSecurityGroup,
+      rtSpec,
+      sgSpec,
+    ],
   );
 
   const headerActionsByTab = useCallback(
     (tabId: string) => {
       if (!folderId) return null;
-      if (tabId === "route-tables") {
+      if (tabId === "route-tables" && !creatingRouteTable) {
         return (
           <Button
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() =>
-              navigate(`/folders/${folderId}/route-tables/create?network_id=${networkId}`)
-            }
+            onClick={() => setCreatingRouteTable(true)}
           >
             Создать таблицу маршрутизации
           </Button>
         );
       }
-      if (tabId === "security-groups") {
+      if (tabId === "security-groups" && !creatingSecurityGroup) {
         return (
           <Button
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() =>
-              navigate(`/folders/${folderId}/security-groups/create?network_id=${networkId}`)
-            }
+            onClick={() => setCreatingSecurityGroup(true)}
           >
             Создать группу безопасности
           </Button>
@@ -189,42 +229,59 @@ export function NetworkDetailPage() {
       }
       return null;
     },
-    [folderId, networkId, navigate],
+    [folderId, creatingRouteTable, creatingSecurityGroup],
   );
 
-  // На Network detail логично создавать подсеть из текущей сети, а не ещё одну сеть.
+  // На Network detail "Создать подсеть" разворачивает форму inline в правой
+  // панели вместо навигации на отдельную /subnets/create страницу.
   const overviewCreateOverride = useMemo(
     () =>
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () =>
-              navigate(`/folders/${folderId}/subnets/create?network_id=${networkId}`),
+            onClick: () => setCreatingSubnet(true),
           }
         : undefined,
-    [folderId, networkId, navigate],
+    [folderId, networkId],
   );
+
+  const overviewReplace = useMemo(() => {
+    if (!creatingSubnet || !folderId || !networkId) return undefined;
+    return () => (
+      <InlineSubnetCreateForm
+        folderId={folderId}
+        networkId={networkId}
+        onCancel={() => setCreatingSubnet(false)}
+      />
+    );
+  }, [creatingSubnet, folderId, networkId]);
 
   return (
     <ResourceDetailPage
       spec={networkSpec}
       extraTabs={extraTabs}
-      hideJsonTab
       headerActionsByTab={headerActionsByTab}
       overviewCreateOverride={overviewCreateOverride}
       overviewExtras={overviewExtras}
+      overviewReplace={overviewReplace}
+      hideOverviewCreate={creatingSubnet}
     />
   );
 }
 
 // useChildColumns — buildSpecColumns + actions-колонка для child-tabs.
+// basePathOverride — если задан, используется вместо flat /folders/<f>/<route>;
+// нужно для nested-контекстов (RT/SG/Subnet под network) чтобы edit/delete
+// links оставались под parent-путём.
 function useChildColumns(
   spec: ResourceSpec,
   folderId: string | undefined,
+  basePathOverride?: string | null,
 ): Column<Record<string, unknown>>[] {
   return useMemo(() => {
     const cols = buildSpecColumns(spec);
-    const basePath = folderId ? `/folders/${folderId}/${spec.route}` : null;
+    const basePath =
+      basePathOverride ?? (folderId ? `/folders/${folderId}/${spec.route}` : null);
     if (basePath) {
       cols.push({
         header: "",
@@ -240,7 +297,7 @@ function useChildColumns(
       });
     }
     return cols;
-  }, [spec, folderId]);
+  }, [spec, folderId, basePathOverride]);
 }
 
 // ChildSection — Title + filter + table. Используется на каждой

@@ -9,7 +9,6 @@ import { CopyableId } from "@/components/CopyableId";
 import { CopyableName } from "@/components/CopyableName";
 import { RefNameLink } from "@/components/RefNameLink";
 import { LabelsCell } from "@/components/LabelsCell";
-import { StatusBadge } from "@/components/StatusBadge";
 
 export interface ResourceColumn {
   header: string;
@@ -64,12 +63,11 @@ export interface ResourceSpec {
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
 }
 
-// Pool kinds — соответствуют proto enum AddressPoolKind.
-const POOL_KINDS = [
-  { value: "EXTERNAL_PUBLIC", label: "EXTERNAL_PUBLIC" },
-  { value: "EXTERNAL_TEST", label: "EXTERNAL_TEST" },
-  { value: "RESERVED_INTERNAL", label: "RESERVED_INTERNAL" },
-];
+// Pool kinds — UI упрощено до одного типа "External". Backend enum
+// AddressPoolKind остаётся (UNSPECIFIED/EXTERNAL_PUBLIC/EXTERNAL_TEST/
+// RESERVED_INTERNAL) — мы всегда отправляем EXTERNAL_PUBLIC. EXTERNAL_TEST/
+// RESERVED_INTERNAL — legacy/future, скрыты от пользователя.
+const POOL_KINDS = [{ value: "EXTERNAL_PUBLIC", label: "External" }];
 
 // Общие колонки
 const COL_NAME: ResourceColumn = {
@@ -113,6 +111,17 @@ const FIELD_NAME_VPC: FormField = {
   pattern: "^([a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?)?$",
 };
 
+// Compute name-regex — lowercase-only (kacho-compute/CLAUDE.md §5,
+// verbatim YC `/|[a-z]([-_a-z0-9]{0,61}[a-z0-9])?/`). НЕ NameVPC (там uppercase ок).
+const FIELD_NAME_COMPUTE: FormField = {
+  name: "name",
+  label: "Name",
+  type: "string",
+  placeholder: "my-disk",
+  description: "Lowercase, цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  pattern: "^([a-z]([-_a-z0-9]{0,61}[a-z0-9])?)?$",
+};
+
 const FIELD_DESCRIPTION: FormField = {
   name: "description",
   label: "Description",
@@ -128,6 +137,14 @@ const FIELD_FOLDER_ID: FormField = {
   hidden: true,
 };
 
+// Generic labels editor — map<string,string> через LabelsEditor (key=value rows
+// + "Добавить метку"). Подключается ко всем VPC-ресурсам.
+const FIELD_LABELS: FormField = {
+  name: "labels",
+  label: "Метки",
+  type: "labels",
+};
+
 export const REGISTRY: Record<string, ResourceSpec> = {
   // ====== organization-manager ======
   // proto: GET /organization-manager/v1/organizations
@@ -139,7 +156,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "organizations",
     singular: "Organization",
     plural: "Organizations",
-    description: "Корневой уровень иерархии ресурсов Kachō.",
     serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -152,6 +168,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     fields: [
       FIELD_NAME,
       { name: "title", label: "Title", type: "string", placeholder: "My Organization" },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
     childRoute: "/organizations/:id/clouds",
@@ -168,7 +185,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "clouds",
     singular: "Cloud",
     plural: "Clouds",
-    description: "Billing-scope внутри Organization.",
     serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -187,6 +203,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "organizations",
         required: true,
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
     childRoute: "/clouds/:id/folders",
@@ -206,7 +223,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "folders",
     singular: "Folder",
     plural: "Folders",
-    description: "Isolation-scope для domain-ресурсов.",
     serviceTitle: "Resource Manager",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -226,6 +242,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "clouds",
         required: true,
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
     // Folder drill-down → /folders/:id; FolderDefaultRedirect там перебрасывает
@@ -248,7 +265,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "networks",
     singular: "Network",
     plural: "Облачные сети",
-    description: "VPC Networks.",
     serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
@@ -280,11 +296,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ),
       },
       {
-        header: "Статус",
-        path: "status",
-        render: (row) => <StatusBadge state={row.status as string | undefined} />,
-      },
-      {
         header: "Дата создания",
         path: "created_at",
         format: "datetime",
@@ -299,6 +310,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ],
     fields: [
       FIELD_NAME_VPC,
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
@@ -319,7 +331,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "subnets",
     singular: "Subnet",
     plural: "Подсети",
-    description: "VPC Subnets (folder-scoped).",
     serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
@@ -360,11 +371,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         header: "Зона доступности",
         path: "zone_id",
         format: "text",
-      },
-      {
-        header: "Статус",
-        path: "status",
-        render: (row) => <StatusBadge state={row.status as string | undefined} />,
       },
       {
         header: "Метки",
@@ -415,14 +421,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // SubnetCidrManager на DetailPage (verbs :add-cidr-blocks /
         // :remove-cidr-blocks). См. YC verbatim Subnet docs.
         editHidden: true,
-        newItem: () => ({ value: "10.0.0.0/24" }),
+        newItem: () => ({ value: "" }),
         itemFields: [
           {
             name: "value",
             label: "CIDR",
             type: "string",
             required: true,
-            placeholder: "10.0.0.0/24",
+            placeholder: "<ip>/<prefix>",
           },
         ],
       },
@@ -435,6 +441,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         placeholder: "— без таблицы —",
         description: "Опционально. Если задано, маршрутизация подсети идёт через этот RT.",
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
@@ -443,7 +450,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       name: "",
       network_id: "",
       zone_id: "",
-      v4_cidr_blocks: [{ value: "10.0.0.0/24" }],
+      v4_cidr_blocks: [{ value: "" }],
       description: "",
     }),
     // Конвертирует [{value: "10.0.0.0/24"}, ...] → ["10.0.0.0/24", ...] для wire format.
@@ -571,6 +578,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ],
     fields: [
       FIELD_NAME_VPC,
+      // Discriminator + spec'ы — create-only (Address spec иммутабелен, см.
+      // CLAUDE.md kacho-vpc §4.4). Скрываем в edit-форме.
       {
         name: "_address_kind",
         label: "Address Kind",
@@ -582,8 +591,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           { value: "external", label: "External IPv4" },
           { value: "internal", label: "Internal IPv4" },
         ],
+        editHidden: true,
       },
-      // External fields — видны только при _address_kind=external (oneof активная ветка).
       {
         name: "external_ipv4_address_spec.zone_id",
         label: "Zone (External)",
@@ -591,6 +600,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "zones",
         description: "Зона для External IP. Оставьте address пустым для auto-allocation.",
         visibleWhen: { field: "_address_kind", equals: "external" },
+        editHidden: true,
       },
       {
         name: "external_ipv4_address_spec.address",
@@ -599,8 +609,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         placeholder: "пусто = auto-allocated",
         description: "Если пусто — адрес выделяется автоматически.",
         visibleWhen: { field: "_address_kind", equals: "external" },
+        editHidden: true,
       },
-      // Internal fields — видны только при _address_kind=internal.
       {
         name: "internal_ipv4_address_spec.subnet_id",
         label: "Subnet (Internal)",
@@ -609,6 +619,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refFolderScoped: true,
         description: "Subnet для Internal IP. Адрес выделяется автоматически.",
         visibleWhen: { field: "_address_kind", equals: "internal" },
+        editHidden: true,
       },
       {
         name: "internal_ipv4_address_spec.address",
@@ -617,6 +628,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         placeholder: "пусто = auto-allocated",
         description: "Если пусто — адрес выделяется из subnet автоматически.",
         visibleWhen: { field: "_address_kind", equals: "internal" },
+        editHidden: true,
       },
       {
         name: "deletion_protection",
@@ -624,6 +636,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "bool",
         default: false,
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
@@ -740,24 +753,25 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "Route",
         description: "Full-replace при Update.",
-        newItem: () => ({ destination_prefix: "10.10.0.0/16", next_hop_address: "10.0.0.1" }),
+        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
         itemFields: [
           {
             name: "destination_prefix",
             label: "Destination CIDR",
             type: "string",
             required: true,
-            placeholder: "10.10.0.0/16",
+            placeholder: "<ip>/<prefix>",
           },
           {
             name: "next_hop_address",
             label: "Next Hop",
             type: "string",
             required: true,
-            placeholder: "10.0.0.1",
+            placeholder: "<ip-address>",
           },
         ],
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
@@ -779,7 +793,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "security_groups",
     singular: "Security Group",
     plural: "Группы безопасности",
-    description: "VPC Security Groups (folder-scoped, привязаны к Network).",
     serviceTitle: "Virtual Private Cloud",
     scope: "folder",
     ops: { create: true, update: true, delete: true },
@@ -801,12 +814,17 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refFolderScoped: true,
         required: true,
       },
+      FIELD_LABELS,
       FIELD_DESCRIPTION,
       {
         name: "rules",
         label: "Rules",
         type: "sg-rules",
         description: "Direction + protocol/ports + target (cidr | другая SG | predefined). Без правил — default-deny.",
+        // В Update RPC backend ждёт `rule_specs`, не `rules` (verbatim YC).
+        // В edit-форме скрываем — правила меняются через спец-RPC UpdateRules /
+        // UpdateRule на отдельной вкладке.
+        editHidden: true,
       },
       FIELD_FOLDER_ID,
     ],
@@ -827,6 +845,487 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
   },
 
+  // proto: GET /vpc/v1/gateways
+
+  gateways: {
+    id: "gateways",
+    route: "gateways",
+    apiPath: "/vpc/v1/gateways",
+    payloadKey: "gateways",
+    singular: "Gateway",
+    plural: "Шлюзы",
+    serviceTitle: "Virtual Private Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Описание",
+        path: "description",
+        format: "text",
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
+      COL_CREATED,
+    ],
+    fields: [
+      FIELD_NAME_VPC,
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      // shared_egress_gateway — пока единственный oneof-вариант, без полей.
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      description: "",
+      shared_egress_gateway: {},
+    }),
+  },
+
+  // ====== compute (Disk / Image / Snapshot / Instance) ======
+  // proto: GET /compute/v1/{disks|images|snapshots|instances}. Name-regex lowercase-only
+  // (kacho-compute/CLAUDE.md §5: `^([a-z]([-_a-z0-9]{0,61}[a-z0-9])?)?$`).
+
+  // disk-types — read-only справочник, используется как refResource в dropdown'ах.
+  "disk-types": {
+    id: "disk-types",
+    route: "disk-types",
+    apiPath: "/compute/v1/diskTypes",
+    payloadKey: "disk_types",
+    singular: "Disk Type",
+    plural: "Типы дисков",
+    serviceTitle: "Compute Cloud",
+    scope: "global",
+    ops: { create: false, update: false, delete: false },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Описание", path: "description", format: "text" },
+      { header: "Зоны", path: "zone_ids", format: "list" },
+    ],
+    template: () => ({}),
+  },
+
+  // compute-zones — read-only справочник зон compute-домена (зеркало vpc zones).
+  // Отдельная registry-запись от vpc `zones` — apiPath другой (/compute/v1/zones).
+  "compute-zones": {
+    id: "compute-zones",
+    route: "compute-zones",
+    apiPath: "/compute/v1/zones",
+    payloadKey: "zones",
+    singular: "Zone",
+    plural: "Зоны (Compute)",
+    serviceTitle: "Compute Cloud",
+    scope: "global",
+    ops: { create: false, update: false, delete: false },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Регион", path: "region_id", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+    ],
+    template: () => ({}),
+  },
+
+  "compute-disks": {
+    id: "compute-disks",
+    route: "disks",
+    apiPath: "/compute/v1/disks",
+    payloadKey: "disks",
+    singular: "Disk",
+    plural: "Диски",
+    serviceTitle: "Compute Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      { header: "Идентификатор", path: "id", render: (row) => <CopyableId id={(row.id as string) ?? ""} /> },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "Зона", path: "zone_id", format: "text" },
+      { header: "Тип", path: "type_id", format: "text" },
+      {
+        header: "Размер",
+        path: "size",
+        render: (row) => <span className="font-mono text-xs">{fmtBytesGiB(row.size)}</span>,
+      },
+      {
+        header: "Источник",
+        path: "source_image_id",
+        render: (row) => {
+          const img = row.source_image_id as string | undefined;
+          const snap = row.source_snapshot_id as string | undefined;
+          if (img) return <RefNameLink specId="compute-images" refId={img} asTag />;
+          if (snap) return <RefNameLink specId="compute-snapshots" refId={snap} asTag />;
+          return <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "Привязан к ВМ",
+        path: "instance_ids",
+        render: (row) => {
+          const ids = (row.instance_ids as string[] | undefined) ?? [];
+          if (ids.length === 0) return <span className="text-muted-foreground">—</span>;
+          return <RefNameLink specId="compute-instances" refId={ids[0]} asTag />;
+        },
+      },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      { name: "zone_id", label: "Зона", type: "ref", refResource: "compute-zones", required: true, immutable: true },
+      { name: "type_id", label: "Тип диска", type: "ref", refResource: "disk-types", immutable: true,
+        placeholder: "network-ssd (по умолчанию)" },
+      { name: "size", label: "Размер (ГиБ)", type: "int", required: true, default: 10, min: 4,
+        description: "Минимум — размер источника (image/snapshot), либо 4 ГиБ. В Update только увеличение." },
+      {
+        name: "_disk_source", label: "Источник", type: "enum", default: "blank",
+        description: "Пустой диск, либо клон из образа / снимка.",
+        options: [
+          { value: "blank", label: "Пустой диск" },
+          { value: "image", label: "Из образа" },
+          { value: "snapshot", label: "Из снимка" },
+        ],
+        editHidden: true,
+      },
+      { name: "image_id", label: "Образ", type: "ref", refResource: "compute-images", refFolderScoped: true,
+        visibleWhen: { field: "_disk_source", equals: "image" }, editHidden: true },
+      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refFolderScoped: true,
+        visibleWhen: { field: "_disk_source", equals: "snapshot" }, editHidden: true },
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      zone_id: "",
+      type_id: "",
+      size: 10,
+      _disk_source: "blank",
+      description: "",
+      labels: {},
+    }),
+    // ГиБ → байты для size; вырезаем _disk_source-дискриминатор и неактивный oneof.
+    sanitize: (obj) => {
+      const out: Record<string, unknown> = {};
+      const src = obj["_disk_source"];
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === "_disk_source") continue;
+        if (k === "image_id" && src !== "image") continue;
+        if (k === "snapshot_id" && src !== "snapshot") continue;
+        if (k === "size") { out[k] = gibToBytes(v); continue; }
+        out[k] = v;
+      }
+      return out;
+    },
+  },
+
+  "compute-images": {
+    id: "compute-images",
+    route: "images",
+    apiPath: "/compute/v1/images",
+    payloadKey: "images",
+    singular: "Image",
+    plural: "Образы",
+    serviceTitle: "Compute Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      { header: "Идентификатор", path: "id", render: (row) => <CopyableId id={(row.id as string) ?? ""} /> },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "Семейство", path: "family", format: "text" },
+      {
+        header: "Мин. размер диска",
+        path: "min_disk_size",
+        render: (row) => <span className="font-mono text-xs">{fmtBytesGiB(row.min_disk_size)}</span>,
+      },
+      {
+        header: "ОС",
+        path: "os.type",
+        render: (row) => {
+          const t = (row.os as { type?: string } | undefined)?.type;
+          return t ? t : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      { name: "family", label: "Семейство", type: "string", placeholder: "ubuntu-2204-lts",
+        description: "Опционально. Lowercase, 3..63, начинается с буквы.", immutable: true,
+        pattern: "^([a-z][-a-z0-9]{1,61}[a-z0-9])?$" },
+      {
+        name: "_image_source", label: "Источник", type: "enum", default: "disk", required: true,
+        options: [
+          { value: "disk", label: "Из диска" },
+          { value: "snapshot", label: "Из снимка" },
+          { value: "image", label: "Из другого образа" },
+          { value: "uri", label: "По URI (pre-signed URL)" },
+        ],
+        editHidden: true,
+      },
+      { name: "disk_id", label: "Диск", type: "ref", refResource: "compute-disks", refFolderScoped: true,
+        visibleWhen: { field: "_image_source", equals: "disk" }, editHidden: true },
+      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refFolderScoped: true,
+        visibleWhen: { field: "_image_source", equals: "snapshot" }, editHidden: true },
+      { name: "image_id", label: "Исходный образ", type: "ref", refResource: "compute-images", refFolderScoped: true,
+        visibleWhen: { field: "_image_source", equals: "image" }, editHidden: true },
+      { name: "uri", label: "URI", type: "string", placeholder: "https://...", visibleWhen: { field: "_image_source", equals: "uri" }, editHidden: true },
+      { name: "min_disk_size", label: "Мин. размер диска (ГиБ)", type: "int", min: 4,
+        description: "Опционально. Если задано — диски из образа не могут быть меньше.", immutable: true },
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      _image_source: "disk",
+      description: "",
+      labels: {},
+    }),
+    sanitize: (obj) => {
+      const out: Record<string, unknown> = {};
+      const src = obj["_image_source"];
+      for (const [k, v] of Object.entries(obj)) {
+        if (k === "_image_source") continue;
+        if (k === "disk_id" && src !== "disk") continue;
+        if (k === "snapshot_id" && src !== "snapshot") continue;
+        if (k === "image_id" && src !== "image") continue;
+        if (k === "uri" && src !== "uri") continue;
+        if (k === "min_disk_size") {
+          if (v === undefined || v === null || v === "") continue;
+          out[k] = gibToBytes(v); continue;
+        }
+        if (k === "family" && (v === undefined || v === "")) continue;
+        out[k] = v;
+      }
+      return out;
+    },
+  },
+
+  "compute-snapshots": {
+    id: "compute-snapshots",
+    route: "snapshots",
+    apiPath: "/compute/v1/snapshots",
+    payloadKey: "snapshots",
+    singular: "Snapshot",
+    plural: "Снимки дисков",
+    serviceTitle: "Compute Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      { header: "Идентификатор", path: "id", render: (row) => <CopyableId id={(row.id as string) ?? ""} /> },
+      { header: "Статус", path: "status", format: "status" },
+      {
+        header: "Исходный диск",
+        path: "source_disk_id",
+        render: (row) => <RefNameLink specId="compute-disks" refId={row.source_disk_id as string | undefined} asTag />,
+      },
+      {
+        header: "Размер диска",
+        path: "disk_size",
+        render: (row) => <span className="font-mono text-xs">{fmtBytesGiB(row.disk_size)}</span>,
+      },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      { name: "disk_id", label: "Исходный диск", type: "ref", refResource: "compute-disks", refFolderScoped: true,
+        required: true, immutable: true },
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      disk_id: "",
+      description: "",
+      labels: {},
+    }),
+  },
+
+  "compute-instances": {
+    id: "compute-instances",
+    route: "instances",
+    apiPath: "/compute/v1/instances",
+    payloadKey: "instances",
+    singular: "Instance",
+    plural: "Виртуальные машины",
+    serviceTitle: "Compute Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true, start: true, stop: true, restart: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      { header: "Идентификатор", path: "id", render: (row) => <CopyableId id={(row.id as string) ?? ""} /> },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "Зона", path: "zone_id", format: "text" },
+      { header: "Платформа", path: "platform_id", format: "text" },
+      {
+        header: "vCPU / RAM",
+        path: "resources",
+        render: (row) => {
+          const r = row.resources as { cores?: string | number; memory?: string | number } | undefined;
+          if (!r) return <span className="text-muted-foreground">—</span>;
+          return <span className="font-mono text-xs">{r.cores ?? "?"} vCPU · {fmtBytesGiB(r.memory)}</span>;
+        },
+      },
+      {
+        header: "Внутренний IP",
+        path: "network_interfaces",
+        render: (row) => {
+          const nics = (row.network_interfaces as Array<{ primary_v4_address?: { address?: string } }> | undefined) ?? [];
+          const ip = nics[0]?.primary_v4_address?.address;
+          return ip ? <span className="font-mono text-xs">{ip}</span> : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "Загрузочный диск",
+        path: "boot_disk.disk_id",
+        render: (row) => {
+          const bd = (row.boot_disk as { disk_id?: string } | undefined)?.disk_id;
+          return <RefNameLink specId="compute-disks" refId={bd} asTag />;
+        },
+      },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      { name: "zone_id", label: "Зона", type: "ref", refResource: "compute-zones", required: true, immutable: true },
+      {
+        name: "platform_id", label: "Платформа", type: "enum", required: true, default: "standard-v3",
+        options: [
+          { value: "standard-v1", label: "Intel Broadwell (standard-v1)" },
+          { value: "standard-v2", label: "Intel Cascade Lake (standard-v2)" },
+          { value: "standard-v3", label: "Intel Ice Lake (standard-v3)" },
+          { value: "highfreq-v3", label: "Intel Ice Lake, 3.1 GHz (highfreq-v3)" },
+        ],
+        immutable: true,
+        description: "Менять platform_id можно только когда ВМ остановлена.",
+      },
+      { name: "resources_spec.cores", label: "vCPU (cores)", type: "int", required: true, default: 2, min: 2,
+        description: "2,4,6,8,...; зависит от платформы. Менять только когда ВМ остановлена.", editHidden: true },
+      { name: "resources_spec.memory_gib", label: "RAM (ГиБ)", type: "int", required: true, default: 2, min: 1,
+        description: "Кратно 1 ГиБ. Менять только когда ВМ остановлена.", editHidden: true },
+      { name: "resources_spec.core_fraction", label: "Гарантированная доля vCPU, %", type: "enum", default: "100",
+        options: [
+          { value: "5", label: "5%" },
+          { value: "20", label: "20%" },
+          { value: "50", label: "50%" },
+          { value: "100", label: "100%" },
+        ],
+        editHidden: true,
+      },
+      {
+        name: "_boot_source", label: "Загрузочный диск", type: "enum", default: "image", required: true,
+        options: [
+          { value: "image", label: "Создать из образа" },
+          { value: "disk", label: "Использовать существующий диск" },
+        ],
+        editHidden: true,
+      },
+      { name: "boot_disk_spec.disk_spec.image_id", label: "Образ для загрузочного диска", type: "ref",
+        refResource: "compute-images", refFolderScoped: true,
+        visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
+      { name: "boot_disk_spec.disk_spec.size_gib", label: "Размер загрузочного диска (ГиБ)", type: "int", default: 10, min: 4,
+        visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
+      { name: "boot_disk_spec.disk_spec.type_id", label: "Тип загрузочного диска", type: "ref",
+        refResource: "disk-types", placeholder: "network-ssd (по умолчанию)",
+        visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
+      { name: "boot_disk_spec.disk_id", label: "Существующий диск", type: "ref", refResource: "compute-disks",
+        refFolderScoped: true, visibleWhen: { field: "_boot_source", equals: "disk" }, editHidden: true },
+      { name: "boot_disk_spec.auto_delete", label: "Удалять загрузочный диск вместе с ВМ", type: "bool", default: true, editHidden: true },
+      {
+        name: "network_interface_specs", label: "Сетевые интерфейсы", type: "array", itemLabel: "Интерфейс",
+        description: "Минимум один. Подсеть должна быть в той же зоне, что и ВМ.",
+        editHidden: true,
+        newItem: () => ({ subnet_id: "", _nat: false }),
+        itemFields: [
+          { name: "subnet_id", label: "Подсеть", type: "ref", refResource: "subnets", refFolderScoped: true, required: true },
+          { name: "_nat", label: "Публичный IP (one-to-one NAT)", type: "bool", default: false },
+          {
+            name: "security_group_ids", label: "Группы безопасности", type: "array", itemLabel: "SG",
+            newItem: () => ({ value: "" }),
+            itemFields: [
+              { name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true },
+            ],
+          },
+        ],
+      },
+      { name: "hostname", label: "Hostname", type: "string", placeholder: "(= id если пусто)",
+        pattern: "^([a-z]([-_a-z0-9]{0,61}[a-z0-9])?)?$", editHidden: true },
+      { name: "service_account_id", label: "Service Account ID", type: "string", placeholder: "(опционально)" },
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      zone_id: "",
+      platform_id: "standard-v3",
+      resources_spec: { cores: 2, memory_gib: 2, core_fraction: "100" },
+      _boot_source: "image",
+      boot_disk_spec: { auto_delete: true, disk_spec: { size_gib: 10, type_id: "" } },
+      network_interface_specs: [{ subnet_id: "", _nat: false }],
+      description: "",
+      labels: {},
+    }),
+    sanitize: (obj) => sanitizeInstanceCreate(obj),
+  },
+
   // ====== System (kacho-only admin: Region / Zone / AddressPool) ======
   // НЕ verbatim-YC: эти ресурсы exposed через apiGW REST для admin UI.
   // На external TLS endpoint (yc CLI compat) НЕ публикуются — см. kacho-vpc CLAUDE.md.
@@ -839,7 +1338,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "regions",
     singular: "Region",
     plural: "Регионы",
-    description: "Глобальные регионы инфраструктуры. Admin-only.",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -855,11 +1353,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "string",
         required: true,
         immutable: true,
-        placeholder: "ru-central1",
+        placeholder: "<region-id>",
         description: "Lower-snake-kebab. Immutable PK.",
         pattern: "^[a-z][a-z0-9-]*$",
       },
-      { name: "name", label: "Name", type: "string", placeholder: "Russia Central 1" },
+      { name: "name", label: "Name", type: "string", placeholder: "Region display name" },
     ],
     template: () => ({ id: "", name: "" }),
   },
@@ -871,7 +1369,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "zones",
     singular: "Zone",
     plural: "Зоны",
-    description: "Зоны доступности внутри Region. Admin-only.",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -888,7 +1385,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "string",
         required: true,
         immutable: true,
-        placeholder: "ru-central1-a",
+        placeholder: "<zone-id>",
         pattern: "^[a-z][a-z0-9-]*$",
       },
       {
@@ -899,7 +1396,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         required: true,
         immutable: true,
       },
-      { name: "name", label: "Name", type: "string", placeholder: "Zone A" },
+      { name: "name", label: "Name", type: "string", placeholder: "Zone display name" },
     ],
     template: () => ({ id: "", region_id: "", name: "" }),
   },
@@ -911,13 +1408,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "pools",
     singular: "Address Pool",
     plural: "Пулы адресов",
-    description: "Глобальные пулы внешних IP. Admin-only. Привязка к Zone опциональна (NULL = global default).",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Kind", path: "kind", format: "text" },
       { header: "Zone", path: "zone_id", format: "text" },
       { header: "CIDRs", path: "cidr_blocks", format: "list" },
       { header: "Default", path: "is_default", format: "text" },
@@ -929,10 +1424,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         name: "name",
         label: "Name",
         type: "string",
-        placeholder: "default-zone-a",
+        placeholder: "<pool-name>",
       },
       { name: "description", label: "Description", type: "text", rows: 2 },
       {
+        // kind — UI ограничен одним значением, скрыт; backend требует поле в payload.
         name: "kind",
         label: "Kind",
         type: "enum",
@@ -940,6 +1436,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         required: true,
         default: "EXTERNAL_PUBLIC",
         immutable: true,
+        hidden: true,
       },
       {
         name: "zone_id",
@@ -955,14 +1452,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "CIDR",
         description: "IPv4 CIDR-блоки, из которых аллоцируются адреса.",
-        newItem: () => ({ value: "198.51.100.0/24" }),
+        newItem: () => ({ value: "" }),
         itemFields: [
           {
             name: "value",
             label: "CIDR",
             type: "string",
             required: true,
-            placeholder: "198.51.100.0/24",
+            placeholder: "<ip>/<prefix>",
           },
         ],
       },
@@ -986,7 +1483,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       kind: "EXTERNAL_PUBLIC",
       zone_id: "",
-      cidr_blocks: [{ value: "198.51.100.0/24" }],
+      cidr_blocks: [{ value: "" }],
       is_default: false,
       selector_priority: 0,
     }),
@@ -1055,6 +1552,80 @@ export function sanitizeSgRule(r: Record<string, unknown>): Record<string, unkno
     delete out.security_group_id;
   }
   return out;
+}
+
+// === compute byte/GiB helpers ===
+const GIB = 1024 * 1024 * 1024;
+
+/** fmtBytesGiB — отображает число байт как "<N> ГиБ" (округление вверх до целых). */
+export function fmtBytesGiB(v: unknown): string {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+  if (!Number.isFinite(n) || n <= 0) return "—";
+  const gib = n / GIB;
+  return `${gib >= 10 ? Math.round(gib) : Math.round(gib * 10) / 10} ГиБ`;
+}
+
+/** gibToBytes — конвертирует значение из ГиБ-инпута в строку байт для wire format. */
+export function gibToBytes(v: unknown): string | undefined {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return String(Math.round(n * GIB));
+}
+
+/** sanitizeInstanceCreate — превращает form-internal представление CreateInstanceRequest
+ *  в wire format: memory_gib→memory (байты), size_gib→size, core_fraction строка→число,
+ *  boot_disk oneof (disk_spec vs disk_id), one-to-one NAT toggle → one_to_one_nat_spec,
+ *  security_group_ids [{value}]→[ids]; вырезает _boot_source и пустые поля. */
+export function sanitizeInstanceCreate(obj: Record<string, unknown>): Record<string, unknown> {
+  const o = { ...obj } as Record<string, unknown>;
+
+  // resources_spec
+  const rs = { ...((o["resources_spec"] as Record<string, unknown>) ?? {}) };
+  if (rs["memory_gib"] !== undefined) {
+    rs["memory"] = gibToBytes(rs["memory_gib"]);
+    delete rs["memory_gib"];
+  }
+  if (rs["cores"] !== undefined && rs["cores"] !== "") rs["cores"] = Number(rs["cores"]);
+  if (rs["core_fraction"] !== undefined && rs["core_fraction"] !== "") rs["core_fraction"] = Number(rs["core_fraction"]);
+  o["resources_spec"] = rs;
+
+  // boot_disk_spec
+  const bootSource = o["_boot_source"];
+  const bds = { ...((o["boot_disk_spec"] as Record<string, unknown>) ?? {}) };
+  if (bootSource === "image") {
+    const ds = { ...((bds["disk_spec"] as Record<string, unknown>) ?? {}) };
+    if (ds["size_gib"] !== undefined) { ds["size"] = gibToBytes(ds["size_gib"]); delete ds["size_gib"]; }
+    if (ds["type_id"] === "" || ds["type_id"] === undefined) delete ds["type_id"];
+    if (ds["image_id"] === "" || ds["image_id"] === undefined) delete ds["image_id"];
+    bds["disk_spec"] = ds;
+    delete bds["disk_id"];
+  } else {
+    // existing disk
+    delete bds["disk_spec"];
+  }
+  o["boot_disk_spec"] = bds;
+  delete o["_boot_source"];
+
+  // network_interface_specs
+  const nics = Array.isArray(o["network_interface_specs"]) ? (o["network_interface_specs"] as Record<string, unknown>[]) : [];
+  o["network_interface_specs"] = nics.map((nic) => {
+    const out: Record<string, unknown> = {};
+    if (nic["subnet_id"]) out["subnet_id"] = nic["subnet_id"];
+    const sgs = Array.isArray(nic["security_group_ids"])
+      ? (nic["security_group_ids"] as unknown[])
+          .map((it) => (typeof it === "object" && it !== null && "value" in (it as object) ? (it as Record<string, unknown>)["value"] : it))
+          .filter((v) => typeof v === "string" && v)
+      : [];
+    if (sgs.length > 0) out["security_group_ids"] = sgs;
+    if (nic["_nat"] === true) out["primary_v4_address_spec"] = { one_to_one_nat_spec: { ip_version: "IPV4" } };
+    return out;
+  });
+
+  // strip optional empties
+  for (const k of ["hostname", "service_account_id"]) {
+    if (o[k] === "" || o[k] === undefined) delete o[k];
+  }
+  return o;
 }
 
 export function getResource(id: string): ResourceSpec | undefined {

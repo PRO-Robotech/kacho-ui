@@ -4,10 +4,13 @@
 
 import { useMemo, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { Alert, Button, Input, Typography, Space } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Input, Select, Typography, Space } from "antd";
+import { ErrorResult } from "@/components/ErrorResult";
 import { PlusOutlined } from "@ant-design/icons";
+import { api } from "@/api/client";
+import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
-import { CopyableId } from "@/components/CopyableId";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
 import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
@@ -75,15 +78,63 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
+  // Дополнительный фильтр "Зона доступности" — для ресурсов, у которых есть
+  // понятие zone. Subnet хранит zone напрямую, Address — внутри
+  // internal_ipv4_address.zone_id / external_ipv4_address.zone_id.
+  const hasZoneFilter = spec.id === "subnets" || spec.id === "addresses";
+  const [zone, setZone] = useState<string>("all");
+  const zoneSpec = REGISTRY["zones"];
+  const { data: zoneData } = useQuery({
+    queryKey: ["zones", "list-for-filter"],
+    queryFn: () =>
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
+        pageSize: "200",
+      }),
+    enabled: hasZoneFilter,
+    staleTime: 60_000,
+  });
+  const zoneOptions = useMemo(
+    () => [
+      { value: "all", label: "Все зоны доступности" },
+      ...((zoneData?.zones ?? []).map((z) => ({
+        value: z.id,
+        label: z.name || z.id,
+      })) as { value: string; label: string }[]),
+    ],
+    [zoneData],
+  );
+
+  function rowZone(row: Record<string, unknown>): string | undefined {
+    if (spec.id === "subnets") return getByPath<string>(row, "zone_id");
+    if (spec.id === "addresses") {
+      return (
+        getByPath<string>(row, "internal_ipv4_address.zone_id") ??
+        getByPath<string>(row, "external_ipv4_address.zone_id")
+      );
+    }
+    return undefined;
+  }
+
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
     return items.filter((row) => {
+      // "Публичные IP" — это external addresses; internal IPs показываются
+      // только в subnet detail (IP-адреса tab). Фильтруем по наличию
+      // external_ipv4_address (либо external_ipv6_address в будущем).
+      if (spec.id === "addresses") {
+        const ext =
+          getByPath<unknown>(row, "external_ipv4_address") ??
+          getByPath<unknown>(row, "external_ipv6_address");
+        if (!ext) return false;
+      }
+      if (hasZoneFilter && zone !== "all" && rowZone(row) !== zone) return false;
+      if (!q) return true;
       const name = (getByPath<string>(row, "name") ?? "").toLowerCase();
       const id = (getByPath<string>(row, "id") ?? "").toLowerCase();
       return name.includes(q) || id.includes(q);
     });
-  }, [items, query]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, query, zone, hasZoneFilter, spec.id]);
 
   const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec);
 
@@ -121,17 +172,19 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
           style={{ width: 360 }}
           allowClear
         />
-        {parentField && filterValue && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {parentField}: <CopyableId id={filterValue} />
-          </Typography.Text>
+        {hasZoneFilter && (
+          <Select
+            value={zone}
+            onChange={setZone}
+            options={zoneOptions}
+            style={{ width: 240 }}
+          />
         )}
       </Space>
 
-      {isError && (
-        <Alert type="error" message={`Ошибка: ${(error as Error).message}`} />
-      )}
-
+      {isError ? (
+        <ErrorResult error={error} />
+      ) : (
       <ResourceTable
         rows={filteredItems}
         loading={isLoading && items.length === 0}
@@ -147,6 +200,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
           navigate(target);
         }}
       />
+      )}
     </Space>
   );
 }

@@ -7,28 +7,46 @@ import { useCallback, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { Alert, Button as AntButton, Input, Space, Typography } from "antd";
+import { Button as AntButton, Input, Space, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { Button } from "@/components/ui/button";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
+import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
+import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import type { DetailTab } from "@/components/DetailShell";
 
 export function SubnetDetailPage() {
-  const { uid: subnetId, folderId } = useParams();
+  const { uid: subnetId, folderId, networkId } = useParams();
   const navigate = useNavigate();
   const spec = REGISTRY["subnets"];
   const addrSpec = REGISTRY["addresses"];
 
+  const { segments: breadcrumbSegments, backHref: backHrefOverride } =
+    useNestedBreadcrumb({
+      folderId,
+      networkId,
+      currentResourcePlural: spec.plural,
+    });
+
   const reserveLink =
     folderId && subnetId
-      ? `/folders/${folderId}/addresses/create?subnet_id=${subnetId}&kind=internal`
+      ? networkId
+        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}/addresses/create?kind=internal`
+        : `/folders/${folderId}/vpc/subnets/${subnetId}/addresses/create?kind=internal`
       : null;
-  const addressesBasePath = folderId ? `/folders/${folderId}/addresses` : null;
+  // Адреса под subnet всегда nested под subnet'ом (с/без network в цепочке).
+  const addressesBasePath =
+    folderId && subnetId
+      ? networkId
+        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}/addresses`
+        : `/folders/${folderId}/vpc/subnets/${subnetId}/addresses`
+      : null;
 
   // Address-ресурсы folder'а — будем фильтровать по subnet_id client-side.
   const { data: addrList } = useQuery({
@@ -70,6 +88,8 @@ export function SubnetDetailPage() {
     return cols;
   }, [addrSpec, addressesBasePath, folderId]);
 
+  const [creatingAddress, setCreatingAddress] = useState(false);
+
   const extraTabs = useMemo(
     () =>
       (): DetailTab[] => [
@@ -77,42 +97,55 @@ export function SubnetDetailPage() {
           id: "addresses",
           label: "IP-адреса",
           count: subnetAddresses.length,
-          render: () => (
-            <AddressesSection
-              rows={subnetAddresses}
-              columns={addrColumns}
-              reserveLink={reserveLink}
-              onClick={(id) =>
-                addressesBasePath && navigate(`${addressesBasePath}/${id}`)
-              }
-            />
-          ),
+          render: () =>
+            creatingAddress && folderId && subnetId ? (
+              <InlineResourceCreateForm
+                spec={addrSpec}
+                ctx={{ folderId }}
+                presetFields={{
+                  _address_kind: "internal",
+                  "internal_ipv4_address_spec.subnet_id": subnetId,
+                }}
+                folderUid={folderId}
+                title="Резервирование IP-адреса"
+                onCancel={() => setCreatingAddress(false)}
+              />
+            ) : (
+              <AddressesSection
+                rows={subnetAddresses}
+                columns={addrColumns}
+                reserveLink={reserveLink}
+                onClick={(id) =>
+                  addressesBasePath && navigate(`${addressesBasePath}/${id}`)
+                }
+              />
+            ),
         },
-        {
-          id: "operations",
-          label: "Операции",
-          render: () => (
-            <Alert
-              type="info"
-              showIcon
-              message="История операций"
-              description="OperationService пока не поддерживает фильтр по resource_id. Список операций по этой подсети появится после соответствующего изменения backend (см. план §11.1)."
-            />
-          ),
-        },
+        // tab "Операции" автоматически добавляется ResourceDetailPage —
+        // не дублируем здесь.
       ],
-    [reserveLink, subnetAddresses, addrColumns, addressesBasePath, navigate],
+    [
+      reserveLink,
+      subnetAddresses,
+      addrColumns,
+      addressesBasePath,
+      navigate,
+      creatingAddress,
+      folderId,
+      subnetId,
+      addrSpec,
+    ],
   );
 
   const headerActionsByTab = useCallback(
     (tabId: string) => {
-      if (tabId === "addresses" && reserveLink) {
+      if (tabId === "addresses" && reserveLink && !creatingAddress) {
         return (
           <AntButton
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => navigate(reserveLink)}
+            onClick={() => setCreatingAddress(true)}
           >
             Зарезервировать IP-адрес
           </AntButton>
@@ -120,15 +153,29 @@ export function SubnetDetailPage() {
       }
       return null;
     },
-    [reserveLink, navigate],
+    [reserveLink, creatingAddress],
+  );
+
+  const renderInlineEdit = useCallback(
+    (_data: Record<string, unknown>, exitEdit: () => void) =>
+      folderId && subnetId ? (
+        <InlineSubnetEditForm
+          folderId={folderId}
+          subnetId={subnetId}
+          onCancel={exitEdit}
+        />
+      ) : null,
+    [folderId, subnetId],
   );
 
   return (
     <ResourceDetailPage
       spec={spec}
       extraTabs={extraTabs}
-      hideJsonTab
       headerActionsByTab={headerActionsByTab}
+      backHrefOverride={backHrefOverride}
+      breadcrumbSegments={breadcrumbSegments}
+      renderInlineEdit={renderInlineEdit}
     />
   );
 }

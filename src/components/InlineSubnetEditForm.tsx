@@ -1,0 +1,393 @@
+// InlineSubnetEditForm — inline-форма редактирования подсети, встраиваемая в
+// правую панель Subnet detail вместо "Общее"-Descriptions. Раскладка повторяет
+// InlineSubnetCreateForm; иммутабельные поля (Зона доступности, CIDR-блоки,
+// Network) показываются read-only с подсказкой.
+//
+// Wire: PATCH /vpc/v1/subnets/<id> с update_mask, перечисляющим только
+// действительно изменённые mutable-поля.
+
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Select,
+  Space,
+  Tooltip,
+  Typography,
+} from "antd";
+import { SubnetCidrManager } from "@/components/SubnetCidrManager";
+import {
+  PlusOutlined,
+  QuestionCircleOutlined,
+  DeleteOutlined,
+  LockOutlined,
+} from "@ant-design/icons";
+import { ApiError, api } from "@/api/client";
+import { extractOperationId } from "@/components/OperationDialog";
+import { DopplerButton } from "@/components/DopplerButton";
+import { REGISTRY, getByPath } from "@/lib/resource-registry";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
+
+interface Props {
+  folderId: string;
+  subnetId: string;
+  onCancel: () => void;
+  onSuccess?: () => void;
+}
+
+interface LabelEntry {
+  key: string;
+  value: string;
+}
+
+const MUTABLE_FIELDS = [
+  "name",
+  "description",
+  "labels",
+  "route_table_id",
+  "dhcp_options",
+] as const;
+
+function labelsToEntries(labels?: Record<string, string>): LabelEntry[] {
+  if (!labels) return [];
+  return Object.entries(labels).map(([key, value]) => ({ key, value }));
+}
+
+function entriesToLabels(entries: LabelEntry[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const e of entries) {
+    if (e.key.trim()) out[e.key.trim()] = e.value;
+  }
+  return out;
+}
+
+export function InlineSubnetEditForm({
+  folderId,
+  subnetId,
+  onCancel,
+  onSuccess,
+}: Props) {
+  const invalidate = useInvalidateResourceList();
+  const subnetSpec = REGISTRY["subnets"];
+  const rtSpec = REGISTRY["route-tables"];
+
+  const { data: subnet, isLoading } = useQuery({
+    queryKey: [subnetSpec.id, "detail", subnetId],
+    queryFn: () =>
+      api.get<Record<string, unknown>>(`${subnetSpec.apiPath}/${subnetId}`),
+    enabled: !!subnetId,
+    staleTime: 0,
+  });
+
+  const networkId = (subnet?.network_id as string | undefined) ?? "";
+  const zoneId = (subnet?.zone_id as string | undefined) ?? "";
+  const v4Cidrs = (subnet?.v4_cidr_blocks as string[] | undefined) ?? [];
+
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [labels, setLabels] = useState<LabelEntry[]>([]);
+  const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
+  const [dhcpDomainName, setDhcpDomainName] = useState("");
+  const [dhcpDns, setDhcpDns] = useState<string[]>([]);
+  const [dhcpNtp, setDhcpNtp] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate state из subnet один раз после первого fetch.
+  useEffect(() => {
+    if (!subnet || hydrated) return;
+    setName((subnet.name as string) ?? "");
+    setDescription((subnet.description as string) ?? "");
+    setLabels(labelsToEntries(subnet.labels as Record<string, string> | undefined));
+    setRouteTableId((subnet.route_table_id as string | undefined) || undefined);
+    const dhcp = subnet.dhcp_options as
+      | {
+          domain_name?: string;
+          domain_name_servers?: string[];
+          ntp_servers?: string[];
+        }
+      | undefined;
+    setDhcpDomainName(dhcp?.domain_name ?? "");
+    setDhcpDns(dhcp?.domain_name_servers ?? []);
+    setDhcpNtp(dhcp?.ntp_servers ?? []);
+    setHydrated(true);
+  }, [subnet, hydrated]);
+
+  const { data: rtData } = useQuery({
+    queryKey: ["route-tables", "list", folderId, networkId],
+    queryFn: () =>
+      api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
+        folder_id: folderId,
+        pageSize: "500",
+      }),
+    enabled: !!folderId && !!networkId,
+    staleTime: 30_000,
+  });
+  const rtOptions = useMemo(
+    () =>
+      (rtData?.route_tables ?? [])
+        .filter((r) => r.network_id === networkId)
+        .map((r) => ({
+          value: r.id as string,
+          label: ((r.name as string) || (r.id as string)) ?? "",
+        })),
+    [rtData, networkId],
+  );
+
+  const mutation = useMutation({
+    mutationFn: (item: unknown) => api.update(`${subnetSpec.apiPath}/${subnetId}`, item),
+    onSuccess: (resp) => {
+      const opId = extractOperationId(resp);
+      if (opId) {
+        setPendingOpId(opId);
+      } else {
+        invalidate(subnetSpec.id, folderId);
+        onSuccess?.();
+        onCancel();
+      }
+    },
+    onError: (err) => {
+      const m =
+        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      toast.error(`Сохранить подсеть: ${m}`);
+    },
+  });
+
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      toast.error(`Сохранить подсеть: ${op.error.message ?? "ошибка"}`);
+    } else {
+      invalidate(subnetSpec.id, folderId);
+      toast.success(`Подсеть ${name} сохранена`);
+      onSuccess?.();
+    }
+    setPendingOpId(null);
+    onCancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
+  const submit = () => {
+    if (!subnet) return;
+
+    const labelMap = entriesToLabels(labels);
+    const dhcp =
+      dhcpDomainName || dhcpDns.length > 0 || dhcpNtp.length > 0
+        ? {
+            domain_name: dhcpDomainName || undefined,
+            domain_name_servers: dhcpDns.length > 0 ? dhcpDns : undefined,
+            ntp_servers: dhcpNtp.length > 0 ? dhcpNtp : undefined,
+          }
+        : undefined;
+
+    const next = {
+      name,
+      description: description || "",
+      labels: labelMap,
+      route_table_id: routeTableId || "",
+      dhcp_options: dhcp,
+    };
+
+    // Diff против текущего объекта — определяем актуальные изменения.
+    const mask: string[] = [];
+    if ((subnet.name as string) !== name) mask.push("name");
+    if (((subnet.description as string) ?? "") !== description) mask.push("description");
+    const origLabels = JSON.stringify(subnet.labels ?? {});
+    const newLabels = JSON.stringify(labelMap);
+    if (origLabels !== newLabels) mask.push("labels");
+    const origRt = (subnet.route_table_id as string) ?? "";
+    if (origRt !== (routeTableId ?? "")) mask.push("route_table_id");
+    const origDhcp = JSON.stringify(subnet.dhcp_options ?? null);
+    const newDhcp = JSON.stringify(dhcp ?? null);
+    if (origDhcp !== newDhcp) mask.push("dhcp_options");
+
+    if (mask.length === 0) {
+      onCancel();
+      return;
+    }
+
+    mutation.mutate({
+      ...next,
+      update_mask: mask.join(","),
+    });
+  };
+
+  if (isLoading || !subnet) {
+    return (
+      <div style={{ padding: 24 }}>
+        <Typography.Text type="secondary">Загрузка…</Typography.Text>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
+        Редактирование подсети
+      </Typography.Title>
+
+      <Form
+        layout="horizontal"
+        labelCol={{ flex: "200px" }}
+        wrapperCol={{ flex: "auto" }}
+        labelAlign="left"
+        colon={false}
+        size="middle"
+      >
+        <Form.Item label="Имя" required>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Form.Item>
+
+        <Form.Item label="Описание">
+          <Input.TextArea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
+        </Form.Item>
+
+        <Form.Item label="Метки">
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            {labels.map((l, idx) => (
+              <Space key={idx} size={4} style={{ width: "100%" }}>
+                <Input
+                  placeholder="ключ"
+                  value={l.key}
+                  onChange={(e) => {
+                    const next = [...labels];
+                    next[idx] = { ...next[idx], key: e.target.value };
+                    setLabels(next);
+                  }}
+                  style={{ width: 200 }}
+                />
+                <span>=</span>
+                <Input
+                  placeholder="значение"
+                  value={l.value}
+                  onChange={(e) => {
+                    const next = [...labels];
+                    next[idx] = { ...next[idx], value: e.target.value };
+                    setLabels(next);
+                  }}
+                  style={{ width: 240 }}
+                />
+                <Button
+                  type="text"
+                  icon={<DeleteOutlined />}
+                  onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
+                />
+              </Space>
+            ))}
+            <Button
+              onClick={() => setLabels([...labels, { key: "", value: "" }])}
+              icon={<PlusOutlined />}
+            >
+              Добавить метку
+            </Button>
+          </Space>
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              Зона доступности
+              <Tooltip title="Иммутабельно после Subnet.Create">
+                <LockOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Input value={zoneId} disabled />
+        </Form.Item>
+
+        <Form.Item label="Таблица маршрутизации">
+          <Select
+            value={routeTableId}
+            onChange={(v) => setRouteTableId(v)}
+            options={rtOptions}
+            allowClear
+            placeholder=""
+          />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              IPv4 CIDR
+              <Tooltip title="Управляется через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <SubnetCidrManager subnetId={subnetId} blocks={v4Cidrs} />
+        </Form.Item>
+
+        <div style={{ margin: "16px 0" }}>
+          <Collapse
+            ghost
+            items={[
+              {
+                key: "dhcp",
+                label: <Typography.Text strong>Настройки DHCP</Typography.Text>,
+                children: (
+                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                    <Form.Item label="Domain name" style={{ marginBottom: 0 }}>
+                      <Input
+                        value={dhcpDomainName}
+                        onChange={(e) => setDhcpDomainName(e.target.value)}
+                      />
+                    </Form.Item>
+                    <Form.Item label="DNS servers" style={{ marginBottom: 0 }}>
+                      <Select
+                        mode="tags"
+                        value={dhcpDns}
+                        onChange={setDhcpDns}
+                        tokenSeparators={[",", " "]}
+                      />
+                    </Form.Item>
+                    <Form.Item label="NTP servers" style={{ marginBottom: 0 }}>
+                      <Select
+                        mode="tags"
+                        value={dhcpNtp}
+                        onChange={setDhcpNtp}
+                        tokenSeparators={[",", " "]}
+                      />
+                    </Form.Item>
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        </div>
+
+        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
+          <Space>
+            <DopplerButton
+              type="primary"
+              onClick={submit}
+              pulsing={mutation.isPending || pendingOpId !== null}
+            >
+              Сохранить
+            </DopplerButton>
+            <Button
+              onClick={onCancel}
+              disabled={mutation.isPending || pendingOpId !== null}
+            >
+              Отменить
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </div>
+  );
+
+  // Suppress unused
+  void getByPath;
+  void MUTABLE_FIELDS;
+}

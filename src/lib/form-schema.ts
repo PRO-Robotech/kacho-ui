@@ -9,7 +9,8 @@ export type FormField =
   | RefField
   | ArrayField
   | BoolField
-  | SgRulesField;
+  | SgRulesField
+  | LabelsField;
 
 interface BaseField {
   name: string; // dotted-path: "metadata.name", "spec.rules[0].direction"
@@ -82,6 +83,12 @@ export interface ArrayField extends BaseField {
   minItems?: number;
   // Default для нового элемента
   newItem?: () => Record<string, unknown>;
+}
+
+// Editor для map<string,string> (Yandex Cloud labels). Хранится в obj как
+// объект {key: value}; UI рендерит через LabelsEditor с rows-style редактором.
+export interface LabelsField extends BaseField {
+  type: "labels";
 }
 
 // Специализированный editor для VPC SecurityGroup rules — слишком много conditional

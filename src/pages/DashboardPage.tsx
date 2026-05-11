@@ -180,7 +180,7 @@ export function DashboardPage() {
   usePageTitle(null);
 
   const goVpc = () => {
-    if (folderId) navigate(`/folders/${folderId}/networks`);
+    if (folderId) navigate(`/folders/${folderId}/vpc/networks`);
     else if (cloudId) navigate(`/clouds/${cloudId}/folders`);
     else navigate("/organizations");
   };

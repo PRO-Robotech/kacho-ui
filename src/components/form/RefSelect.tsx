@@ -9,6 +9,7 @@ import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
 import { useFolderStore } from "@/lib/folder-store";
 import { CopyableId } from "@/components/CopyableId";
+import { ErrorResult } from "@/components/ErrorResult";
 
 interface Props {
   refResource: string;
@@ -70,7 +71,7 @@ export function RefSelect({ refResource, refFolderScoped, value, onChange, place
       {isLoading && (
         <p className="text-xs text-muted-foreground">Загрузка списка {spec.plural}…</p>
       )}
-      {error && <p className="text-xs text-rose-600">Ошибка: {(error as Error).message}</p>}
+      {error && <ErrorResult error={error} />}
       {value && options.length > 0 && !options.find((o) => o.uid === value) && (
         <p className="text-xs text-amber-600">
           ID не найден в списке (возможно ресурс удалён).

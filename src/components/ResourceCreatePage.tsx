@@ -1,18 +1,18 @@
 // ResourceCreatePage — full-page форма Create (не modal).
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Card, Space, Tag, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
+import { DopplerButton } from "@/components/DopplerButton";
 import { extractOperationId } from "@/components/OperationDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { setByPath } from "@/lib/path";
-import { useInvalidateResourceList } from "@/lib/use-operation";
-import { operationStore } from "@/lib/use-operation-store";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
 interface Props {
@@ -39,10 +39,13 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
     [parentField, filterValue],
   );
 
+  // Контекст приходит либо из nested-URL params (`/networks/<n>/.../create`),
+  // либо из query (`?network_id=...&subnet_id=...&kind=...`) для обратной
+  // совместимости и для случая create-из-list-page с pre-selected parent.
   const presetFields = useMemo(() => {
     const out: Record<string, unknown> = {};
-    const subnetId = searchParams.get("subnet_id");
-    const networkId = searchParams.get("network_id");
+    const subnetId = (params.subnetId as string | undefined) ?? searchParams.get("subnet_id");
+    const networkId = (params.networkId as string | undefined) ?? searchParams.get("network_id");
     const kind = searchParams.get("kind");
     if (kind) out["_address_kind"] = kind;
     if (subnetId) {
@@ -54,7 +57,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
     }
     if (networkId) out["network_id"] = networkId;
     return out;
-  }, [searchParams, spec.id]);
+  }, [params.subnetId, params.networkId, searchParams, spec.id]);
 
   const initialObj = useMemo(() => {
     const tpl = spec.template(ctx);
@@ -66,19 +69,40 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
     for (const [path, val] of Object.entries(presetFields)) {
       merged = setByPath(merged, path, val);
     }
+    // Auto-name: пустое name + UNIQUE на (folder_id, name) → ALREADY_EXISTS
+    // на повторе. Генерируем <route>-NNNNNN.
+    if (
+      spec.fields?.some((f) => f.name === "name") &&
+      (!merged.name || merged.name === "")
+    ) {
+      const stem = spec.route.replace(/-/g, "");
+      merged.name = `${stem}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
     return merged;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [obj, setObj] = useState<Record<string, unknown>>(initialObj);
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
 
   const lockedPathsRef = useRef(new Set(Object.keys(presetFields)));
 
-  // Back = текущий path без /create суффикса (универсально работает для
-  // /folders/X/<resource>/create, /organizations/create, /clouds/X/folders/create
-  // и /system/<resource>/create).
-  const backHref = location.pathname.replace(/\/create$/, "") || "/";
+  // Back = текущий path без /create суффикса. Для nested URL вида
+  //   /folders/X/vpc/networks/Y/route-tables/create
+  // полученный URL `/folders/X/vpc/networks/Y/route-tables` не существует —
+  // вместо этого возвращаемся к parent detail (network detail с табом).
+  const rawBack = location.pathname.replace(/\/create$/, "") || "/";
+  const folderId = params.folderId as string | undefined;
+  const networkId = params.networkId as string | undefined;
+  const subnetId = params.subnetId as string | undefined;
+  const isNestedUnderSubnet = !!(folderId && subnetId);
+  const isNestedUnderNetwork = !!(folderId && networkId);
+  const backHref = isNestedUnderSubnet
+    ? networkId
+      ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
+      : `/folders/${folderId}/vpc/subnets/${subnetId}?tab=addresses`
+    : isNestedUnderNetwork
+      ? `/folders/${folderId}/vpc/networks/${networkId}?tab=${spec.route}`
+      : rawBack;
 
   const breadcrumb = useMemo(
     () => (
@@ -102,36 +126,44 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   const noHeaderRight = useMemo(() => null, []);
   useHeaderRight(noHeaderRight);
 
+  // Doppler-flow: после POST дожидаемся op.done через polling. Кнопка
+  // пульсирует пока pending. По завершении — toast + navigate на список.
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
+
   const mutation = useMutation({
     mutationFn: (item: unknown) => api.create(spec.apiPath, item),
-    onSuccess: (resp, variables) => {
-      setSubmitErr(null);
+    onSuccess: (resp) => {
       const id = extractOperationId(resp);
-      const name = (variables as Record<string, unknown> | null | undefined)?.["name"];
-      const titleSuffix = typeof name === "string" && name.length > 0 ? ` ${name}` : "";
       if (id) {
-        // Async: пушим в OperationBanner и сразу redirect.
-        operationStore.start({
-          id,
-          title: `Создание ${spec.singular.toLowerCase()}${titleSuffix}`,
-          resourceId: spec.id,
-          folderUid: filterValue ?? null,
-        });
+        setPendingOpId(id);
       } else {
         // Sync (Region/Zone/AddressPool — admin RPC без Operation envelope).
         invalidate(spec.id, filterValue ?? null);
+        navigate(backHref);
       }
-      navigate(backHref);
     },
     onError: (err) => {
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setSubmitErr(m);
       toast.error(`Создать ${spec.singular}: ${m}`);
     },
   });
 
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      toast.error(`Создать ${spec.singular}: ${op.error.message ?? "ошибка"}`);
+      setPendingOpId(null);
+    } else {
+      invalidate(spec.id, filterValue ?? null);
+      toast.success(`${spec.singular} создан`);
+      setPendingOpId(null);
+      navigate(backHref);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
   const submit = () => {
-    setSubmitErr(null);
     let parsed: Record<string, unknown> = obj;
     if (spec.sanitize) parsed = spec.sanitize(parsed);
     mutation.mutate(parsed);
@@ -193,18 +225,19 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
             </Space>
           </Card>
 
-          {submitErr && <Alert type="error" message={submitErr} />}
 
           <Space>
-            <Button
+            <DopplerButton
               type="primary"
               onClick={submit}
-              loading={mutation.isPending}
+              pulsing={mutation.isPending || pendingOpId !== null}
             >
               Создать {spec.singular.toLowerCase()}
-            </Button>
+            </DopplerButton>
             <Link to={backHref}>
-              <Button>Отменить</Button>
+              <Button disabled={mutation.isPending || pendingOpId !== null}>
+                Отменить
+              </Button>
             </Link>
           </Space>
         </Space>

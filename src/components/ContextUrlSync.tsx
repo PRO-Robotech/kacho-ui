@@ -7,7 +7,7 @@
 //   /clouds/:cloudId/folders                           — folders list
 //   /folders/:folderId                                 — folder dashboard
 //   /folders/:folderId/networks (subnets, ...)         — folder selected, vpc list
-//   /folders/:folderId/networks/:uid                   — detail
+//   /folders/:folderId/vpc/networks/:uid                   — detail
 //
 // При смене URL → парсинг → обновление context-store. Имена ресурсов в context
 // заполняются позже когда BreadcrumbSelector загрузит соответствующий list.

@@ -4,7 +4,6 @@ import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
 import { VpcSidebar } from "@/components/VpcSidebar";
-import { OperationBanner } from "@/components/OperationBanner";
 import {
   HeaderRightSlot,
   HeaderBreadcrumbSlot,
@@ -107,7 +106,6 @@ function LayoutInner() {
         </div>
       </Header>
 
-      <OperationBanner />
 
       <AntLayout>
         <Sider
@@ -127,13 +125,17 @@ function LayoutInner() {
 
         <Content
           style={{
-            padding: "20px 24px",
             overflow: "auto",
             minWidth: 0,
             background: token.colorBgLayout,
           }}
         >
-          <Outlet />
+          {/* min-width: max-content гарантирует, что широкие таблицы не сжимают
+              cells, а раздвигают page-level horizontal scrollbar (Content
+              имеет overflow:auto). */}
+          <div style={{ minWidth: "max-content", padding: "20px 24px" }}>
+            <Outlet />
+          </div>
         </Content>
       </AntLayout>
     </AntLayout>

@@ -6,16 +6,18 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, Button, Card, Space, Spin, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
+import { ErrorResult } from "@/components/ErrorResult";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { extractOperationId } from "@/components/OperationDialog";
+import { DopplerButton } from "@/components/DopplerButton";
 import { computeUpdateMask, snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
-import { useInvalidateResourceList } from "@/lib/use-operation";
-import { operationStore } from "@/lib/use-operation-store";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import { useFolderStore } from "@/lib/folder-store";
+import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 
 interface Props {
   spec: ResourceSpec;
@@ -44,7 +46,6 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
   const fields = spec.fields;
   const originalRef = useRef<Record<string, unknown> | null>(null);
   const [obj, setObj] = useState<Record<string, unknown>>({});
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -58,8 +59,21 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
 
   const name = (data?.name as string | undefined) ?? uid ?? "";
 
-  const breadcrumb = useMemo(
-    () => (
+  // Auto-detect nested-context из URL params (folderId/networkId/subnetId).
+  // Возвращает дополнительные breadcrumb-сегменты для тех ресурсов, чей
+  // detail-URL nested под Network/Subnet.
+  const nested = useNestedBreadcrumb({
+    folderId: params.folderId,
+    networkId: params.networkId,
+    subnetId: params.subnetId,
+    currentResourcePlural: spec.plural,
+  });
+
+  const breadcrumb = useMemo(() => {
+    const tailSegments = nested.segments ?? [
+      { label: spec.plural, href: backHref.replace(/\/[^/]+$/, "") },
+    ];
+    return (
       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         {spec.serviceTitle && (
           <>
@@ -67,50 +81,70 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
             <Typography.Text type="secondary">/</Typography.Text>
           </>
         )}
-        <Link to={backHref.replace(/\/[^/]+$/, "")}>
-          <Typography.Text type="secondary">{spec.plural}</Typography.Text>
-        </Link>
-        <Typography.Text type="secondary">/</Typography.Text>
+        {tailSegments.map((seg, i) => (
+          <span
+            key={i}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            {seg.href ? (
+              <Link to={seg.href}>
+                <Typography.Text type="secondary">{seg.label}</Typography.Text>
+              </Link>
+            ) : (
+              <Typography.Text type="secondary">{seg.label}</Typography.Text>
+            )}
+            <Typography.Text type="secondary">/</Typography.Text>
+          </span>
+        ))}
         <Link to={backHref}>
           <Typography.Text type="secondary">{name}</Typography.Text>
         </Link>
         <Typography.Text type="secondary">/</Typography.Text>
         <Typography.Text strong>Редактировать</Typography.Text>
       </span>
-    ),
-    [backHref, spec.plural, spec.serviceTitle, name],
-  );
+    );
+  }, [backHref, spec.plural, spec.serviceTitle, name, nested.segments]);
   useBreadcrumb(breadcrumb);
   const noHeaderRight = useMemo(() => null, []);
   useHeaderRight(noHeaderRight);
 
+  // Doppler-flow: ждём op.done через polling, кнопка пульсирует.
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
+
   const mutation = useMutation({
     mutationFn: (item: unknown) => api.update(`${spec.apiPath}/${uid}`, item),
     onSuccess: (resp) => {
-      setSubmitErr(null);
       const opId = extractOperationId(resp);
       if (opId) {
-        operationStore.start({
-          id: opId,
-          title: `Сохранение ${spec.singular.toLowerCase()} ${name}`,
-          resourceId: spec.id,
-          folderUid: folder?.uid ?? null,
-        });
+        setPendingOpId(opId);
       } else {
         invalidate(spec.id, folder?.uid ?? null);
+        navigate(backHref);
       }
-      navigate(backHref);
     },
     onError: (err) => {
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setSubmitErr(m);
       toast.error(`Сохранить ${spec.singular}: ${m}`);
     },
   });
 
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      toast.error(`Сохранить ${spec.singular}: ${op.error.message ?? "ошибка"}`);
+      setPendingOpId(null);
+    } else {
+      invalidate(spec.id, folder?.uid ?? null);
+      toast.success(`${spec.singular} сохранён`);
+      setPendingOpId(null);
+      navigate(backHref);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
   const submit = () => {
     if (!fields || !originalRef.current) return;
-    setSubmitErr(null);
     let parsed: Record<string, unknown> = obj;
     if (spec.sanitize) parsed = spec.sanitize(parsed);
     const mask = computeUpdateMask(originalRef.current, parsed, fields);
@@ -144,15 +178,16 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
 
   if (isError || !data) {
     return (
-      <Space direction="vertical" style={{ width: "100%" }} size={12}>
-        <Link to={backHref}>
-          <Button size="small" icon={<ArrowLeftOutlined />}>Назад</Button>
-        </Link>
-        <Alert
-          type="error"
-          message={`Ошибка загрузки: ${(error as Error)?.message ?? "ресурс не найден"}`}
-        />
-      </Space>
+      <ErrorResult
+        error={error ?? undefined}
+        status={!isError && !data ? "404" : undefined}
+        subTitle={!isError && !data ? "Ресурс не найден." : undefined}
+        extra={
+          <Link to={backHref}>
+            <Button icon={<ArrowLeftOutlined />}>Назад</Button>
+          </Link>
+        }
+      />
     );
   }
 
@@ -185,12 +220,15 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
           </Space>
         </Card>
 
-        {submitErr && <Alert type="error" message={submitErr} />}
 
         <Space>
-          <Button type="primary" onClick={submit} loading={mutation.isPending}>
+          <DopplerButton
+            type="primary"
+            onClick={submit}
+            pulsing={mutation.isPending || pendingOpId !== null}
+          >
             Сохранить
-          </Button>
+          </DopplerButton>
           <Link to={backHref}>
             <Button>Отменить</Button>
           </Link>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Modal, Select, Typography, Alert, Form } from "antd";
+import { Alert, Modal, Select, Typography, Form } from "antd";
 import { extractOperationId } from "@/components/OperationDialog";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { ApiError, api } from "@/api/client";
@@ -33,7 +33,6 @@ export function SubnetRelocateDialog({
   folderUid,
 }: Props) {
   const [targetZone, setTargetZone] = useState<string | undefined>();
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [opId, setOpId] = useState<string | null>(null);
   const invalidate = useInvalidateResourceList();
 
@@ -52,7 +51,6 @@ export function SubnetRelocateDialog({
         destination_zone_id: targetZone,
       }),
     onSuccess: (resp) => {
-      setSubmitErr(null);
       const id = extractOperationId(resp);
       if (id) setOpId(id);
       else {
@@ -62,7 +60,6 @@ export function SubnetRelocateDialog({
     },
     onError: (err) => {
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setSubmitErr(m);
       toast.error(`Перенос подсети ${subnetName}: ${m}`);
     },
   });
@@ -73,7 +70,6 @@ export function SubnetRelocateDialog({
         open={open}
         onCancel={() => {
           setTargetZone(undefined);
-          setSubmitErr(null);
           onOpenChange(false);
         }}
         onOk={() => mutation.mutate()}
@@ -120,7 +116,6 @@ export function SubnetRelocateDialog({
             />
           </Form.Item>
         </Form>
-        {submitErr && <Alert type="error" message={submitErr} />}
       </Modal>
 
       <OperationToastWatcher

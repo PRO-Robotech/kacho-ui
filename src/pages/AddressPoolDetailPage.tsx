@@ -138,7 +138,7 @@ export function AddressPoolDetailPage() {
                           <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
                           <td className="px-3 py-2">
                             <Link
-                              to={`/folders/${a.folder_id}/addresses/${a.id}`}
+                              to={`/folders/${a.folder_id}/vpc/addresses/${a.id}`}
                               className="text-blue-400 hover:underline"
                             >
                               {a.name || a.id.slice(0, 12) + "…"}

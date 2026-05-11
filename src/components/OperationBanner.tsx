@@ -4,11 +4,12 @@
 // Заменяет блокирующий OperationDialog modal для Create-flow.
 
 import { useEffect } from "react";
-import { Loader2, CheckCircle2, XCircle, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { theme } from "antd";
 import { useOperation } from "@/lib/use-operation";
 import { operationStore, useOperationEntry } from "@/lib/use-operation-store";
 import { useInvalidateResourceList } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
 
 export function OperationBanner() {
   const entry = useOperationEntry();
@@ -22,43 +23,34 @@ export function OperationBanner() {
   useEffect(() => {
     if (!entry || entry.status !== "pending" || !op) return;
     if (!op.done) return;
-    // done=true: либо success, либо error.
+    // done=true: финальные нотификации идут как toast снизу-справа
+    // (consistency со всеми остальными уведомлениями), банер dismiss'им.
     if (op.error) {
-      operationStore.markError(op.error.message ?? "Operation failed");
+      const isCancelled = Number(op.error.code) === 1;
+      const msg = op.error.message ?? (isCancelled ? "отменена" : "ошибка");
+      if (isCancelled) {
+        toast.info(`${entry.title}: ${msg}`);
+      } else {
+        toast.error(`${entry.title}: ${msg}`);
+      }
     } else {
       if (entry.resourceId) {
         invalidate(entry.resourceId, entry.folderUid ?? null);
       }
-      operationStore.markDone();
+      toast.success(`${entry.title} — готово`);
     }
+    operationStore.dismiss();
   }, [op, entry, invalidate]);
 
-  if (!entry) return null;
+  // Банер показываем ТОЛЬКО для pending — финальные состояния уезжают в toast.
+  if (!entry || entry.status !== "pending") return null;
 
-  const palette = (() => {
-    if (entry.status === "success") {
-      return {
-        bg: "rgba(16, 185, 129, 0.08)",
-        border: "rgba(16, 185, 129, 0.4)",
-        text: token.colorText,
-        icon: <CheckCircle2 size={16} color="#34d399" />,
-      };
-    }
-    if (entry.status === "error") {
-      return {
-        bg: "rgba(244, 63, 94, 0.08)",
-        border: "rgba(244, 63, 94, 0.4)",
-        text: token.colorText,
-        icon: <XCircle size={16} color="#f87171" />,
-      };
-    }
-    return {
-      bg: token.colorBgElevated,
-      border: token.colorBorderSecondary,
-      text: token.colorText,
-      icon: <Loader2 size={16} className="animate-spin" color={token.colorPrimary} />,
-    };
-  })();
+  const palette = {
+    bg: token.colorBgElevated,
+    border: token.colorBorderSecondary,
+    text: token.colorText,
+    icon: <Loader2 size={16} className="animate-spin" color={token.colorPrimary} />,
+  };
 
   return (
     <div
@@ -81,16 +73,9 @@ export function OperationBanner() {
       {palette.icon}
       <div style={{ flex: 1, minWidth: 0 }}>
         <span style={{ fontWeight: 500 }}>{entry.title}</span>
-        {entry.status === "pending" && (
-          <span style={{ marginLeft: 8, color: token.colorTextSecondary, fontSize: 12 }}>
-            операция выполняется…
-          </span>
-        )}
-        {entry.status === "error" && entry.errorMessage && (
-          <span style={{ marginLeft: 8, color: "#fca5a5", fontSize: 12 }}>
-            {entry.errorMessage}
-          </span>
-        )}
+        <span style={{ marginLeft: 8, color: token.colorTextSecondary, fontSize: 12 }}>
+          операция выполняется…
+        </span>
       </div>
       <button
         type="button"

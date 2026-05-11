@@ -4,9 +4,12 @@
 // Каждый tab фильтрует rules по direction и рендерит YC-style таблицу:
 // Протокол | Диапазон портов | Тип источника | Источник | Описание.
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
 import { REGISTRY } from "@/lib/resource-registry";
+import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 import type { DetailTab } from "@/components/DetailShell";
 
 interface SgRule {
@@ -88,6 +91,14 @@ function RulesTable({ rules }: { rules: SgRule[] }) {
 
 export function SecurityGroupDetailPage() {
   const spec = REGISTRY["security-groups"];
+  const { folderId, networkId } = useParams();
+
+  const { segments: breadcrumbSegments, backHref: backHrefOverride } =
+    useNestedBreadcrumb({
+      folderId,
+      networkId,
+      currentResourcePlural: spec.plural,
+    });
 
   const extraTabs = useMemo(
     () => (data: Record<string, unknown>): DetailTab[] => {
@@ -112,5 +123,29 @@ export function SecurityGroupDetailPage() {
     [],
   );
 
-  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} />;
+  const renderInlineEdit = useCallback(
+    (data: Record<string, unknown>, exitEdit: () => void) => {
+      const id = (data.id as string | undefined) ?? "";
+      const fid = (data.folder_id as string | undefined) ?? folderId ?? "";
+      if (!id || !fid) return null;
+      return (
+        <InlineSecurityGroupEditForm
+          folderId={fid}
+          sgId={id}
+          onCancel={exitEdit}
+        />
+      );
+    },
+    [folderId],
+  );
+
+  return (
+    <ResourceDetailPage
+      spec={spec}
+      extraTabs={extraTabs}
+      backHrefOverride={backHrefOverride}
+      breadcrumbSegments={breadcrumbSegments}
+      renderInlineEdit={renderInlineEdit}
+    />
+  );
 }

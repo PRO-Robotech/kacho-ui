@@ -51,20 +51,37 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
   const isNetwork = spec.id === "networks";
   const currentFolderId = params.folderId ?? folderUid ?? null;
 
+  // antd Dropdown menu items рендерятся в portal, но React-event bubble идёт
+  // через virtual-tree (а не DOM-tree). Без stopPropagation на domEvent клик по
+  // menu-item доходит до строки таблицы и триггерит onRowClick → навигация
+  // съедает наш setOpen / navigate. domEvent.stopPropagation() обязательно
+  // на каждом item.
+  const stop = (fn: () => void) => ({
+    domEvent,
+  }: {
+    domEvent: React.MouseEvent | React.KeyboardEvent;
+  }) => {
+    domEvent.stopPropagation();
+    fn();
+  };
+
   const items: MenuProps["items"] = [
     {
       key: "open",
       icon: drillIsChild ? <ArrowRightOutlined /> : <EyeOutlined />,
       label: drillIsChild ? "Открыть" : "Просмотр",
-      onClick: () => navigate(drillTarget),
+      onClick: stop(() => navigate(drillTarget)),
     },
     isNetwork && currentFolderId
       ? {
           key: "create-subnet",
           icon: <PlusOutlined />,
           label: "Создать подсеть",
-          onClick: () =>
-            navigate(`/folders/${currentFolderId}/subnets/create?network_id=${id}`),
+          onClick: stop(() =>
+            navigate(
+              `/folders/${currentFolderId}/vpc/networks/${id}/subnets/create`,
+            ),
+          ),
         }
       : null,
     spec.ops.update
@@ -72,7 +89,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "edit",
           icon: <EditOutlined />,
           label: "Редактировать",
-          onClick: () => navigate(`${basePath}/${id}/edit`),
+          onClick: stop(() => navigate(`${basePath}/${id}/edit`)),
         }
       : null,
     moveCapable
@@ -80,7 +97,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "move",
           icon: <DragOutlined />,
           label: "Переместить",
-          onClick: () => setMoveOpen(true),
+          onClick: stop(() => setMoveOpen(true)),
         }
       : null,
     showDelete ? { type: "divider" as const } : null,
@@ -90,7 +107,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           icon: <DeleteOutlined />,
           label: "Удалить",
           danger: true,
-          onClick: () => setDeleteOpen(true),
+          onClick: stop(() => setDeleteOpen(true)),
         }
       : null,
   ].filter(Boolean) as MenuProps["items"];

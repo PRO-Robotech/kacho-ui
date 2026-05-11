@@ -77,7 +77,20 @@ export function ResourceTable<T extends object>({
     },
     onRow: onRowClick
       ? (row) => ({
-          onClick: () => onRowClick(row),
+          onClick: (e) => {
+            // Click внутри button / link / dropdown-menu / modal / form-control —
+            // НЕ триггерит row-navigation. Иначе клик на kebab в action-cell
+            // съедает Delete/Move (state ставится, но компонент unmount'ится).
+            const target = e.target as HTMLElement | null;
+            if (
+              target?.closest(
+                "button, a, input, select, textarea, .ant-dropdown, .ant-select, .ant-modal-root",
+              )
+            ) {
+              return;
+            }
+            onRowClick(row);
+          },
           style: { cursor: "pointer" },
         })
       : undefined,

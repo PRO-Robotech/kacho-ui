@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Modal, Button, Segmented, Alert } from "antd";
+import { Alert, Modal, Button, Segmented } from "antd";
 import { PlusOutlined, EditOutlined, FormOutlined, CodeOutlined } from "@ant-design/icons";
 import { JsonEditor } from "@/components/JsonEditor";
 import { FormFieldRenderer } from "@/components/form/FormField";
@@ -56,7 +56,6 @@ export function ResourceFormDialog({
   const [view, setView] = useState<"form" | "json">(fields ? "form" : "json");
   const [obj, setObj] = useState<Record<string, unknown>>(() => normalize(template, fields));
   const [text, setText] = useState(() => JSON.stringify(template, null, 2));
-  const [submitErr, setSubmitErr] = useState<string | null>(null);
   const [opId, setOpId] = useState<string | null>(null);
 
   const invalidate = useInvalidateResourceList();
@@ -71,7 +70,6 @@ export function ResourceFormDialog({
       const snap = snapshotRef.current;
       setObj(normalize(snap.template, snap.fields));
       setText(JSON.stringify(snap.template, null, 2));
-      setSubmitErr(null);
       setOpId(null);
       setView(snap.fields ? "form" : "json");
       originalRef.current =
@@ -87,7 +85,6 @@ export function ResourceFormDialog({
       return api.update(apiPath, item);
     },
     onSuccess: (resp) => {
-      setSubmitErr(null);
       const id = extractOperationId(resp);
       if (id) setOpId(id);
       else {
@@ -98,13 +95,11 @@ export function ResourceFormDialog({
     },
     onError: (err) => {
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      setSubmitErr(m);
       toast.error(`${title}: ${m}`);
     },
   });
 
   const submit = () => {
-    setSubmitErr(null);
     let parsed: unknown;
     if (view === "form") {
       parsed = obj;
@@ -112,7 +107,6 @@ export function ResourceFormDialog({
       try {
         parsed = JSON.parse(text);
       } catch (e) {
-        setSubmitErr(`JSON parse: ${(e as Error).message}`);
         return;
       }
     }
@@ -229,7 +223,6 @@ export function ResourceFormDialog({
           )}
         </div>
 
-        {submitErr && <Alert type="error" message={submitErr} style={{ marginTop: 12 }} />}
       </Modal>
 
       <OperationToastWatcher
@@ -265,6 +258,10 @@ export function computeUpdateMask(
   for (const f of fields) {
     if (f.hidden) continue;
     if (f.immutable) continue;
+    // editHidden — поле в edit-форме не рендерится, его не должны включать
+    // в update_mask (например, sg-rules управляются через спец-RPC, и backend
+    // отвергает `rules` в Update mask с reason="unknown field").
+    if (f.editHidden) continue;
     if (f.name.startsWith("_")) continue;
     const o = getByPath(original, f.name);
     const c = getByPath(current, f.name);

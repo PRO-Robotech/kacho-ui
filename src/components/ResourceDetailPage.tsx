@@ -2,10 +2,10 @@
 // Поллит GET <spec.apiPath>/{id} каждые 3 сек.
 // Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Alert, Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
+import { Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
   ArrowLeftOutlined,
@@ -18,13 +18,16 @@ import {
   MoreOutlined,
   DragOutlined,
 } from "@ant-design/icons";
-import { JsonView } from "@/components/JsonView";
+import { JsonMonacoView } from "@/components/JsonMonacoView";
+import { ErrorResult } from "@/components/ErrorResult";
+import { RefNameLink } from "@/components/RefNameLink";
+import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
+import { OperationsTab } from "@/components/OperationsTab";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CopyableId } from "@/components/CopyableId";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
-import { SubnetCidrManager } from "@/components/SubnetCidrManager";
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { api, ApiError } from "@/api/client";
@@ -40,6 +43,10 @@ interface Props {
   secondaryActions?: (data: Record<string, unknown>) => React.ReactNode;
   /** По умолчанию показывается JSON-tab последним. Установить true чтобы скрыть. */
   hideJsonTab?: boolean;
+  /** По умолчанию для VPC-ресурсов добавляется tab "Операции" с per-resource
+   *  ListOperations. Установить true чтобы скрыть (например, для admin-ресурсов
+   *  без LRO — Region/Zone/AddressPool). */
+  hideOperationsTab?: boolean;
   /** Per-tab override header-right slot. Возвращает null/undefined → fallback на default
    *  (Создать <singular> + Редактировать + kebab Move/Delete). */
   headerActionsByTab?: (
@@ -52,6 +59,33 @@ interface Props {
   /** Добавить дополнительные секции в Обзор-tab после "Общее"-Descriptions.
    *  Используется для inline-таблиц дочерних ресурсов (Network → Подсети). */
   overviewExtras?: (data: Record<string, unknown>) => React.ReactNode;
+  /** Полностью заменить содержимое Обзор-tab (вместо Descriptions + overviewExtras).
+   *  Используется когда Overview переходит в edit-state inline (например,
+   *  Network detail → "Создать подсеть" разворачивает форму на месте "Общее"). */
+  overviewReplace?: (data: Record<string, unknown>) => React.ReactNode;
+  /** Если true — primary-create кнопка в default overview-actions скрыта.
+   *  Полезно когда форма создания уже развёрнута через overviewReplace. */
+  hideOverviewCreate?: boolean;
+  /** Опциональный override URL для back-навигации и breadcrumb-ссылки на список.
+   *  По умолчанию вычисляется как `/folders/<folderId>/<spec.route>`. Используется
+   *  для nested-роутов (Subnet под Network → back к network detail). */
+  backHrefOverride?: string;
+  /** Опциональный override label для back-link breadcrumb (если задан). */
+  backLabelOverride?: string;
+  /** Опциональная цепочка breadcrumb-сегментов между serviceTitle и текущим
+   *  ресурсом. Сегмент без href — не кликабелен. По умолчанию используется
+   *  один сегмент `{label: spec.plural, href: backHref}`. */
+  breadcrumbSegments?: Array<{ label: string; href?: string }>;
+  /** Если задано — клик по "Редактировать" вызовет этот callback вместо
+   *  встроенной inline-edit логики. Редко нужен. */
+  onEditClick?: () => void;
+  /** Опциональный override inline-edit формы. Если задан — рендерится вместо
+   *  generic InlineResourceEditForm когда detail в edit-mode. Используется для
+   *  resource-specific layouts (например, YC-style формы для subnet). */
+  renderInlineEdit?: (
+    data: Record<string, unknown>,
+    exitEdit: () => void,
+  ) => React.ReactNode;
 }
 
 export function ResourceDetailPage({
@@ -60,9 +94,17 @@ export function ResourceDetailPage({
   extraTabs,
   secondaryActions,
   hideJsonTab,
+  hideOperationsTab,
   headerActionsByTab,
   overviewCreateOverride,
   overviewExtras,
+  overviewReplace,
+  hideOverviewCreate,
+  backHrefOverride,
+  backLabelOverride,
+  breadcrumbSegments,
+  onEditClick,
+  renderInlineEdit,
 }: Props) {
   const params = useParams();
   const uid = params[paramKey];
@@ -74,6 +116,29 @@ export function ResourceDetailPage({
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+
+  // Inline-edit: edit-mode определяется наличием /edit-суффикса в pathname.
+  // "Редактировать" в overviewActions переключает URL на /edit без полной
+  // перезагрузки страницы (replace=false → можно вернуться через "Назад"),
+  // Сохранить/Отменить возвращают URL без /edit (replace=true).
+  const isEditUrl = location.pathname.endsWith("/edit");
+  const detailPath = isEditUrl
+    ? location.pathname.slice(0, -"/edit".length)
+    : location.pathname;
+  const [editing, setEditing] = useState(isEditUrl);
+  useEffect(() => {
+    setEditing(isEditUrl);
+  }, [isEditUrl]);
+
+  const enterEdit = useCallback(() => {
+    setEditing(true);
+    if (!isEditUrl) navigate(`${detailPath}/edit`, { replace: false });
+  }, [isEditUrl, detailPath, navigate]);
+
+  const exitEdit = useCallback(() => {
+    setEditing(false);
+    if (isEditUrl) navigate(detailPath, { replace: true });
+  }, [isEditUrl, detailPath, navigate]);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],
@@ -117,6 +182,7 @@ export function ResourceDetailPage({
   const editPath = `${spec.apiPath}/${resourceId}`;
 
   const backHref = useMemo(() => {
+    if (backHrefOverride) return backHrefOverride;
     const folderId = params.folderId;
     if (folderId) return `/folders/${folderId}/${spec.route}`;
     if (spec.id === "clouds" && data) {
@@ -128,7 +194,15 @@ export function ResourceDetailPage({
       return cloudId ? `/clouds/${cloudId}/folders` : "/organizations";
     }
     return "/organizations";
-  }, [params.folderId, spec.id, spec.route, data]);
+  }, [params.folderId, spec.id, spec.route, data, backHrefOverride]);
+
+  const segments = useMemo(
+    () =>
+      breadcrumbSegments && breadcrumbSegments.length > 0
+        ? breadcrumbSegments
+        : [{ label: backLabelOverride ?? spec.plural, href: backHref }],
+    [breadcrumbSegments, backLabelOverride, spec.plural, backHref],
+  );
 
   const breadcrumb = useMemo(
     () => (
@@ -139,16 +213,24 @@ export function ResourceDetailPage({
             <Typography.Text type="secondary">/</Typography.Text>
           </>
         )}
-        <Link to={backHref}>
-          <Typography.Text type="secondary">{spec.plural}</Typography.Text>
-        </Link>
-        <Typography.Text type="secondary">/</Typography.Text>
+        {segments.map((seg, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {seg.href ? (
+              <Link to={seg.href}>
+                <Typography.Text type="secondary">{seg.label}</Typography.Text>
+              </Link>
+            ) : (
+              <Typography.Text type="secondary">{seg.label}</Typography.Text>
+            )}
+            <Typography.Text type="secondary">/</Typography.Text>
+          </span>
+        ))}
         <Typography.Text strong style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
           {name || resourceId}
         </Typography.Text>
       </span>
     ),
-    [backHref, spec.plural, spec.serviceTitle, name, resourceId],
+    [segments, spec.serviceTitle, name, resourceId],
   );
   useBreadcrumb(breadcrumb);
 
@@ -189,7 +271,12 @@ export function ResourceDetailPage({
 
     return (
       <Space size="small">
-        {overviewCreateOverride ? (
+        {/* Primary "Создать ..." кнопка показывается ТОЛЬКО когда detail-страница
+            явно объявляет дочернюю сущность через overviewCreateOverride
+            (например, Network → "Создать подсеть"). Default "Создать <self>"
+            убран: на detail-странице ресурса логично создавать связанные
+            сущности, а не клонировать сам ресурс — для этого есть list. */}
+        {hideOverviewCreate || !overviewCreateOverride ? null : (
           <Button
             type="primary"
             size="small"
@@ -198,16 +285,7 @@ export function ResourceDetailPage({
           >
             {overviewCreateOverride.label}
           </Button>
-        ) : spec.ops.create ? (
-          <Button
-            type="primary"
-            size="small"
-            icon={<PlusOutlined />}
-            onClick={() => navigate(`${backHref}/create`)}
-          >
-            Создать {spec.singular.toLowerCase()}
-          </Button>
-        ) : null}
+        )}
         {spec.ops.restart && (
           <Button
             size="small"
@@ -238,11 +316,11 @@ export function ResourceDetailPage({
             Остановить
           </Button>
         )}
-        {spec.ops.update && data && (
+        {spec.ops.update && data && !editing && (
           <Button
             size="small"
             icon={<EditOutlined />}
-            onClick={() => navigate(`${location.pathname}/edit`)}
+            onClick={() => (onEditClick ? onEditClick() : enterEdit())}
           >
             Редактировать
           </Button>
@@ -261,6 +339,10 @@ export function ResourceDetailPage({
     moveCapable,
     backHref,
     overviewCreateOverride,
+    hideOverviewCreate,
+    onEditClick,
+    enterEdit,
+    editing,
     location.pathname,
     actionMutation.isPending,
     actionMutation.variables,
@@ -287,23 +369,28 @@ export function ResourceDetailPage({
 
   if (isError && !data) {
     return (
-      <Space direction="vertical" style={{ width: "100%" }} size={12}>
-        <Link to={backHref}>
-          <Button size="small" icon={<ArrowLeftOutlined />}>Назад</Button>
-        </Link>
-        <Alert type="error" message={`Ошибка: ${(error as Error).message}`} />
-      </Space>
+      <ErrorResult
+        error={error}
+        extra={
+          <Link to={backHref}>
+            <Button icon={<ArrowLeftOutlined />}>Назад</Button>
+          </Link>
+        }
+      />
     );
   }
 
   if (!data) {
     return (
-      <Space direction="vertical" style={{ width: "100%" }} size={12}>
-        <Link to={backHref}>
-          <Button size="small" icon={<ArrowLeftOutlined />}>Назад</Button>
-        </Link>
-        <Alert type="warning" message="Ресурс не найден." />
-      </Space>
+      <ErrorResult
+        status="404"
+        subTitle="Ресурс не найден."
+        extra={
+          <Link to={backHref}>
+            <Button icon={<ArrowLeftOutlined />}>Назад</Button>
+          </Link>
+        }
+      />
     );
   }
 
@@ -336,10 +423,83 @@ export function ResourceDetailPage({
         }
       : null,
     getByPath<string>(data, "network_id")
-      ? { label: "Сеть", value: <CopyableId id={getByPath<string>(data, "network_id")!} /> }
+      ? {
+          label: "Сеть",
+          value: (
+            <RefNameLink
+              specId="networks"
+              refId={getByPath<string>(data, "network_id")!}
+            />
+          ),
+        }
       : null,
     getByPath<string>(data, "description")
       ? { label: "Описание", value: getByPath<string>(data, "description")! }
+      : null,
+    // Network-specific: Группа безопасности по умолчанию.
+    spec.id === "networks" && getByPath<string>(data, "default_security_group_id")
+      ? {
+          label: "Группа безопасности по умолчанию",
+          value: (
+            <RefNameLink
+              specId="security-groups"
+              refId={getByPath<string>(data, "default_security_group_id")!}
+            />
+          ),
+        }
+      : null,
+    // SecurityGroup-specific: Правила (count + empty state).
+    spec.id === "security-groups"
+      ? {
+          label: "Правила",
+          value: (() => {
+            const rules =
+              (getByPath<unknown[]>(data, "rules") ?? []) as unknown[];
+            if (rules.length === 0) {
+              return (
+                <Space direction="vertical" size={2}>
+                  <Typography.Text type="secondary">empty</Typography.Text>
+                  <Typography.Text strong>
+                    Задайте правила для группы безопасности
+                  </Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Правила управляют входящим трафиком ВМ.
+                  </Typography.Text>
+                </Space>
+              );
+            }
+            return (
+              <Typography.Text>{rules.length} правило(а)</Typography.Text>
+            );
+          })(),
+        }
+      : null,
+    // Subnet-specific: IPv4 CIDR (multi-line) + Route Table.
+    spec.id === "subnets"
+      ? {
+          label: "IPv4 CIDR",
+          value: (() => {
+            const cidrs =
+              (getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[];
+            if (cidrs.length === 0)
+              return <Typography.Text type="secondary">—</Typography.Text>;
+            return (
+              <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                {cidrs.map((c, i) => (
+                  <Typography.Text key={i} code style={{ fontFamily: "monospace" }}>
+                    {c}
+                  </Typography.Text>
+                ))}
+              </Space>
+            );
+          })(),
+        }
+      : null,
+    spec.id === "subnets" && getByPath<string>(data, "route_table_id")
+      ? {
+          label: "Таблица маршрутизации",
+          value: <CopyableId id={getByPath<string>(data, "route_table_id")!} />,
+        }
       : null,
   ].filter(Boolean) as { label: string; value: React.ReactNode }[];
 
@@ -347,39 +507,64 @@ export function ResourceDetailPage({
     {
       id: "overview",
       label: "Обзор",
-      render: () => (
+      render: () =>
+        actionErr ? (
+          // При ошибке action (Restart/Start/Stop/etc) показываем ТОЛЬКО ErrorResult,
+          // скрывая Общее + overviewExtras + inline-edit. Иначе таблицы дочерних
+          // ресурсов остаются ниже центрированного Result — визуальный bug.
+          <ErrorResult subTitle={actionErr} />
+        ) : (
         <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          {actionErr && <Alert type="error" message={actionErr} />}
-          {spec.id === "subnets" && (
-            <SubnetCidrManager
-              subnetId={resourceId}
-              blocks={(getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[]}
-            />
+          {editing && spec.ops.update ? (
+            renderInlineEdit ? (
+              renderInlineEdit(data, exitEdit)
+            ) : (
+              <InlineResourceEditForm
+                spec={spec}
+                data={data}
+                folderUid={folder?.uid ?? null}
+                onCancel={exitEdit}
+              />
+            )
+          ) : overviewReplace ? (
+            overviewReplace(data)
+          ) : (
+            <>
+              <Descriptions
+                title="Общее"
+                bordered
+                column={1}
+                size="small"
+                labelStyle={{ width: 200 }}
+                items={overviewItems.map((it, i) => ({
+                  key: String(i),
+                  label: it.label,
+                  children: it.value,
+                }))}
+              />
+              {overviewExtras && overviewExtras(data)}
+            </>
           )}
-          <Descriptions
-            title="Общее"
-            bordered
-            column={1}
-            size="small"
-            labelStyle={{ width: 200 }}
-            items={overviewItems.map((it, i) => ({
-              key: String(i),
-              label: it.label,
-              children: it.value,
-            }))}
-          />
-          {overviewExtras && overviewExtras(data)}
         </Space>
-      ),
+        ),
     },
     ...(extraTabs ? extraTabs(data) : []),
+    ...(hideOperationsTab
+      ? []
+      : [
+          {
+            id: "operations",
+            label: "Операции",
+            render: () => <OperationsTab spec={spec} resourceId={resourceId} />,
+          },
+        ]),
     ...(hideJsonTab
       ? []
       : [
           {
             id: "raw",
             label: "JSON",
-            render: () => <JsonView data={data} />,
+            render: () => <JsonMonacoView data={data} />,
           },
         ]),
   ];

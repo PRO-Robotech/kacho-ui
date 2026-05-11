@@ -4,6 +4,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
+import { LabelsEditor } from "@/components/form/LabelsEditor";
 import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 import type { FormField as FF, ArrayField } from "@/lib/form-schema";
 
@@ -44,6 +45,20 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
         onChange={onChange}
         path={path}
         description={field.description}
+      />
+    );
+  }
+  if (field.type === "labels") {
+    const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
+    return (
+      <LabelsEditor
+        pathPrefix={pathPrefix}
+        value={value}
+        onChange={onChange}
+        path={path}
+        label={field.label}
+        description={field.description}
+        disabled={disabled}
       />
     );
   }
