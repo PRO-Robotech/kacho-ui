@@ -279,7 +279,7 @@ function useChildColumns(
   basePathOverride?: string | null,
 ): Column<Record<string, unknown>>[] {
   return useMemo(() => {
-    const cols = buildSpecColumns(spec);
+    const cols = buildSpecColumns(spec, { folderId });
     const basePath =
       basePathOverride ?? (folderId ? `/folders/${folderId}/${spec.route}` : null);
     if (basePath) {

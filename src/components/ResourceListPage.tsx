@@ -136,7 +136,12 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, query, zone, hasZoneFilter, spec.id]);
 
-  const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec);
+  // params.folderId доступен для folder-scoped listов (/folders/:folderId/...);
+  // прокидываем в buildSpecColumns, чтобы format: "references" (used_by) мог
+  // отрендерить ссылку на /folders/<folderId>/compute/instances/<id> и т.п.
+  const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec, {
+    folderId: params.folderId,
+  });
 
   columns.push({
     header: "",
