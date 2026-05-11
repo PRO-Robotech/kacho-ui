@@ -1,0 +1,173 @@
+// InlineResourceCreateForm — встраиваемая форма создания ресурса.
+// Используется когда форма должна жить внутри detail-страницы родителя
+// (Network detail → Создать подсеть), а не как отдельный route.
+//
+// Mirror'ит submit-логику ResourceCreatePage, но без navigate/breadcrumb-side-effects.
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Alert, Button, Space, Typography } from "antd";
+import { FormFieldRenderer } from "@/components/form/FormField";
+import { DopplerButton } from "@/components/DopplerButton";
+import { extractOperationId } from "@/components/OperationDialog";
+import { ApiError, api } from "@/api/client";
+import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
+import { setByPath } from "@/lib/path";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
+
+interface Props {
+  spec: ResourceSpec;
+  /** Контекст для ResourceSpec.template — передаётся в applyFieldDefaults. */
+  ctx: { folderId?: string; cloudId?: string; organizationId?: string };
+  /** Поля, которые должны быть pre-filled и locked (immutable в форме).
+   *  Ключи — paths (например "network_id" или "internal_ipv4_address_spec.subnet_id"). */
+  presetFields?: Record<string, unknown>;
+  /** folderUid для invalidate + OperationBanner. */
+  folderUid: string | null;
+  /** Title формы. По умолчанию — "Создать <singular>". */
+  title?: string;
+  onCancel: () => void;
+  /** Вызывается после успешного submit (Operation pushed в banner или sync-create). */
+  onSuccess?: () => void;
+}
+
+export function InlineResourceCreateForm({
+  spec,
+  ctx,
+  presetFields,
+  folderUid,
+  title,
+  onCancel,
+  onSuccess,
+}: Props) {
+  const invalidate = useInvalidateResourceList();
+  const presets = useMemo(() => presetFields ?? {}, [presetFields]);
+
+  const initialObj = useMemo(() => {
+    const tpl = spec.template(ctx);
+    const baseObj =
+      typeof tpl === "object" && tpl !== null
+        ? { ...(tpl as Record<string, unknown>) }
+        : {};
+    let merged: Record<string, unknown> = applyFieldDefaults(spec.fields, baseObj);
+    for (const [path, val] of Object.entries(presets)) {
+      merged = setByPath(merged, path, val);
+    }
+    // Auto-name: если у ресурса есть поле name и оно пустое, генерируем
+    // <route>-NNNNNN — иначе backend (UNIQUE по folder_id+name) отвечает
+    // ALREADY_EXISTS на повторный nameless ресурс.
+    if (
+      spec.fields?.some((f) => f.name === "name") &&
+      (!merged.name || merged.name === "")
+    ) {
+      const stem = spec.route.replace(/-/g, "");
+      merged.name = `${stem}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+    return merged;
+    // initial — фиксируем при mount; presets/ctx стабильны через жизненный цикл формы
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [obj, setObj] = useState<Record<string, unknown>>(initialObj);
+  const lockedPathsRef = useRef(new Set(Object.keys(presets)));
+
+  // Doppler-flow: после POST дожидаемся op.done через polling, кнопка
+  // пульсирует, форма не закрывается. По завершении → success/error toast.
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
+
+  const mutation = useMutation({
+    mutationFn: (item: unknown) => api.create(spec.apiPath, item),
+    onSuccess: (resp) => {
+      const id = extractOperationId(resp);
+      if (id) {
+        setPendingOpId(id);
+      } else {
+        // Sync-ответ (admin RPC без Operation envelope) — закрываем сразу.
+        invalidate(spec.id, folderUid);
+        onSuccess?.();
+        onCancel();
+      }
+    },
+    onError: (err) => {
+      const m =
+        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      toast.error(`Создать ${spec.singular}: ${m}`);
+    },
+  });
+
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      const msg = op.error.message ?? "ошибка";
+      toast.error(`Создать ${spec.singular}: ${msg}`);
+    } else {
+      invalidate(spec.id, folderUid);
+      toast.success(`${spec.singular} создан`);
+      onSuccess?.();
+    }
+    setPendingOpId(null);
+    onCancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
+  const submit = () => {
+    let parsed: Record<string, unknown> = obj;
+    if (spec.sanitize) parsed = spec.sanitize(parsed);
+    mutation.mutate(parsed);
+  };
+
+  const fields = spec.fields;
+  if (!fields) {
+    return (
+      <Alert
+        type="warning"
+        message={`У ресурса ${spec.singular} нет form-schema; используйте API напрямую.`}
+      />
+    );
+  }
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Typography.Title level={4} style={{ margin: 0 }}>
+        {title ?? `Создание ${spec.singular.toLowerCase()}`}
+      </Typography.Title>
+
+
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        {fields
+          // Locked поля приходят из URL-context (network_id, subnet_id и т.п.) —
+          // они уже подразумеваются местом, где открыта форма. Не загромождаем
+          // UI и не дублируем выбор.
+          .filter((f) => !lockedPathsRef.current.has(f.name))
+          .map((f) => (
+            <FormFieldRenderer
+              key={f.name}
+              field={f}
+              pathPrefix=""
+              value={obj}
+              onChange={setObj}
+            />
+          ))}
+      </Space>
+
+
+      <Space>
+        <DopplerButton
+          type="primary"
+          onClick={submit}
+          pulsing={mutation.isPending || pendingOpId !== null}
+        >
+          Создать {spec.singular.toLowerCase()}
+        </DopplerButton>
+        <Button
+          onClick={onCancel}
+          disabled={mutation.isPending || pendingOpId !== null}
+        >
+          Отменить
+        </Button>
+      </Space>
+    </Space>
+  );
+}

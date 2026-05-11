@@ -1,99 +1,320 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import {
-  cloudsApi,
-  foldersApi,
-  networksApi,
-  orgsApi,
-  subnetsApi,
-  addressesApi,
-  routeTablesApi,
-} from "@/api/resources";
-import { cn } from "@/lib/utils";
+// DashboardPage — root экран /dashboard. YC-style разводная страница.
+//
+// Уровни context, поддерживаемые tile'ом «Virtual Private Cloud»:
+//   • folder выбран     → counts по folder + click → /folders/X/networks
+//   • cloud выбран      → агрегированные counts по всем folder'ам в cloud
+//                          + click → /clouds/X/folders (выбрать/создать)
+//   • ничего не выбрано → "—" + кнопка-CTA «Перейти к Organizations»
+//
+// На YC console дашборд тоже разводная — показывает плашки сервисов на
+// уровне Cloud (без явного folder).
 
-interface Stat {
-  label: string;
-  value: string | number;
-  to: string;
-  hint?: string;
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Card,
+  Empty,
+  Statistic,
+  Typography,
+  Space,
+  Button,
+  Row,
+  Col,
+  Alert,
+} from "antd";
+import {
+  ApartmentOutlined,
+  ArrowRightOutlined,
+  FolderOpenOutlined,
+} from "@ant-design/icons";
+import {
+  useBreadcrumb,
+  useHeaderRight,
+  usePageTitle,
+} from "@/components/PageHeaderSlot";
+import { api } from "@/api/client";
+import { useContext } from "@/lib/context-store";
+
+interface FolderRow {
+  id: string;
+  name: string;
+  cloud_id: string;
 }
 
-function StatCard({ stat }: { stat: Stat }) {
-  return (
-    <Link
-      to={stat.to}
-      className={cn(
-        "group rounded-lg border border-border p-5 hover:border-primary/40 hover:shadow-sm transition-all bg-card",
-      )}
-    >
-      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-        {stat.label}
-      </div>
-      <div className="text-3xl font-bold tabular-nums mt-1">{stat.value}</div>
-      {stat.hint && <div className="text-xs text-muted-foreground mt-2">{stat.hint}</div>}
-    </Link>
-  );
+type Counts = {
+  networks: number | null;
+  subnets: number | null;
+  sgs: number | null;
+};
+
+/** Counts для одного folder. */
+function useFolderCounts(folderId: string | null): Counts {
+  const networks = useQuery({
+    queryKey: ["dash", "networks", folderId],
+    queryFn: () =>
+      api.list<{ networks?: unknown[] }>("/vpc/v1/networks", {
+        folder_id: folderId!,
+        pageSize: "1000",
+      }),
+    refetchInterval: 15_000,
+    enabled: !!folderId,
+  });
+  const subnets = useQuery({
+    queryKey: ["dash", "subnets", folderId],
+    queryFn: () =>
+      api.list<{ subnets?: unknown[] }>("/vpc/v1/subnets", {
+        folder_id: folderId!,
+        pageSize: "1000",
+      }),
+    refetchInterval: 15_000,
+    enabled: !!folderId,
+  });
+  const sgs = useQuery({
+    queryKey: ["dash", "security-groups", folderId],
+    queryFn: () =>
+      api.list<{ security_groups?: unknown[] }>("/vpc/v1/securityGroups", {
+        folder_id: folderId!,
+        pageSize: "1000",
+      }),
+    refetchInterval: 15_000,
+    enabled: !!folderId,
+  });
+
+  return {
+    networks: networks.data?.networks?.length ?? null,
+    subnets: subnets.data?.subnets?.length ?? null,
+    sgs: sgs.data?.security_groups?.length ?? null,
+  };
+}
+
+/** Counts агрегированно по всем folder'ам в cloud. */
+function useCloudCounts(cloudId: string | null): Counts & { foldersCount: number | null } {
+  const folders = useQuery({
+    queryKey: ["dash", "cloud-folders", cloudId],
+    queryFn: () =>
+      api.list<{ folders: FolderRow[] }>("/resource-manager/v1/folders", {
+        cloud_id: cloudId!,
+      }),
+    refetchInterval: 30_000,
+    enabled: !!cloudId,
+  });
+  const folderIds = folders.data?.folders?.map((f) => f.id) ?? [];
+
+  const networks = useQuery({
+    queryKey: ["dash", "cloud-net", cloudId, folderIds],
+    queryFn: async () => {
+      const lists = await Promise.all(
+        folderIds.map((fid) =>
+          api.list<{ networks?: unknown[] }>("/vpc/v1/networks", {
+            folder_id: fid,
+            pageSize: "1000",
+          }),
+        ),
+      );
+      return lists.reduce((sum, l) => sum + (l.networks?.length ?? 0), 0);
+    },
+    refetchInterval: 15_000,
+    enabled: !!cloudId && folderIds.length > 0,
+  });
+  const subnets = useQuery({
+    queryKey: ["dash", "cloud-sub", cloudId, folderIds],
+    queryFn: async () => {
+      const lists = await Promise.all(
+        folderIds.map((fid) =>
+          api.list<{ subnets?: unknown[] }>("/vpc/v1/subnets", {
+            folder_id: fid,
+            pageSize: "1000",
+          }),
+        ),
+      );
+      return lists.reduce((sum, l) => sum + (l.subnets?.length ?? 0), 0);
+    },
+    refetchInterval: 15_000,
+    enabled: !!cloudId && folderIds.length > 0,
+  });
+  const sgs = useQuery({
+    queryKey: ["dash", "cloud-sg", cloudId, folderIds],
+    queryFn: async () => {
+      const lists = await Promise.all(
+        folderIds.map((fid) =>
+          api.list<{ security_groups?: unknown[] }>("/vpc/v1/securityGroups", {
+            folder_id: fid,
+            pageSize: "1000",
+          }),
+        ),
+      );
+      return lists.reduce((sum, l) => sum + (l.security_groups?.length ?? 0), 0);
+    },
+    refetchInterval: 15_000,
+    enabled: !!cloudId && folderIds.length > 0,
+  });
+
+  // Если folder список пустой и не загружается — counts = 0.
+  const empty = folders.data && folderIds.length === 0;
+  return {
+    networks: empty ? 0 : networks.data ?? null,
+    subnets: empty ? 0 : subnets.data ?? null,
+    sgs: empty ? 0 : sgs.data ?? null,
+    foldersCount: folders.data?.folders?.length ?? null,
+  };
 }
 
 export function DashboardPage() {
-  const orgs = useQuery({ queryKey: ["dash.orgs"], queryFn: () => orgsApi.list(), refetchInterval: 30_000 });
-  const clouds = useQuery({ queryKey: ["dash.clouds"], queryFn: () => cloudsApi.list(), refetchInterval: 30_000 });
-  const folders = useQuery({ queryKey: ["dash.folders"], queryFn: () => foldersApi.list(), refetchInterval: 30_000 });
-  const networks = useQuery({ queryKey: ["dash.networks"], queryFn: () => networksApi.list(), refetchInterval: 15_000 });
-  const subnets = useQuery({ queryKey: ["dash.subnets"], queryFn: () => subnetsApi.list(), refetchInterval: 15_000 });
-  const addresses = useQuery({ queryKey: ["dash.addresses"], queryFn: () => addressesApi.list(), refetchInterval: 15_000 });
-  const routeTables = useQuery({ queryKey: ["dash.route-tables"], queryFn: () => routeTablesApi.list(), refetchInterval: 15_000 });
+  const ctx = useContext((s) => s);
+  const navigate = useNavigate();
 
-  const stats: Stat[] = [
-    { label: "Organizations", value: orgs.data?.organizations.length ?? "—", to: "/organizations" },
-    { label: "Clouds", value: clouds.data?.clouds.length ?? "—", to: "/clouds" },
-    { label: "Folders", value: folders.data?.folders.length ?? "—", to: "/folders" },
-    { label: "Networks", value: networks.data?.networks.length ?? "—", to: "/networks", hint: "VPC layer" },
-    { label: "Subnets", value: subnets.data?.subnets.length ?? "—", to: "/subnets" },
-    { label: "Addresses", value: addresses.data?.addresses.length ?? "—", to: "/addresses" },
-    { label: "Route Tables", value: routeTables.data?.route_tables.length ?? "—", to: "/route-tables" },
-  ];
+  const folderId = ctx.folder?.id ?? null;
+  const cloudId = ctx.cloud?.id ?? null;
+
+  const folderCounts = useFolderCounts(folderId);
+  const cloudCounts = useCloudCounts(folderId ? null : cloudId);
+
+  const counts: Counts = folderId ? folderCounts : cloudCounts;
+  const foldersInCloud = cloudCounts.foldersCount;
+
+  useBreadcrumb(
+    useMemo(() => <Typography.Text strong>Дашборд</Typography.Text>, []),
+  );
+  useHeaderRight(useMemo(() => null, []));
+  usePageTitle(null);
+
+  const goVpc = () => {
+    if (folderId) navigate(`/folders/${folderId}/vpc/networks`);
+    else if (cloudId) navigate(`/clouds/${cloudId}/folders`);
+    else navigate("/organizations");
+  };
+
+  const caption = (() => {
+    if (ctx.folder) return `Каталог: ${ctx.folder.name || ctx.folder.id}`;
+    if (ctx.cloud)
+      return `Облако: ${ctx.cloud.name || ctx.cloud.id}. Выберите каталог чтобы увидеть ресурсы.`;
+    return "Контекст не выбран — выберите Cloud и Folder в шапке или дереве слева.";
+  })();
+
+  // Tile показываем как только выбран хотя бы Cloud.
+  const tileVisible = !!ctx.cloud;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Kachō Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Декларативный control-plane: Organization → Cloud → Folder → ресурсы.
-        </p>
-      </div>
+    <div style={{ maxWidth: 1100 }} data-testid="dashboard-page">
+      <Space direction="vertical" size={20} style={{ width: "100%" }}>
+        <div>
+          <Typography.Title level={3} style={{ margin: 0 }}>
+            Ресурсы облака
+          </Typography.Title>
+          <Typography.Text type="secondary">{caption}</Typography.Text>
+        </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <StatCard key={s.label} stat={s} />
-        ))}
-      </div>
+        {!ctx.cloud && (
+          <Alert
+            type="info"
+            showIcon
+            message="Чтобы увидеть тайлы сервисов — выберите Cloud (через шапку или дерево слева)."
+            action={
+              <Button
+                size="small"
+                icon={<ArrowRightOutlined />}
+                onClick={() => navigate("/organizations")}
+                data-testid="dashboard-go-organizations"
+              >
+                Organizations
+              </Button>
+            }
+          />
+        )}
 
-      <div className="rounded-lg border border-border p-5 bg-card">
-        <h2 className="font-semibold mb-3">Подсказки</h2>
-        <ul className="space-y-1.5 text-sm text-muted-foreground">
-          <li>
-            • Get/List: синхронные{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /&lt;domain&gt;/v1/&lt;resource&gt;</code> с query-параметрами.
-          </li>
-          <li>
-            • Create/Update/Delete возвращают{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">Operation</code> — UI поллит{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">GET /operations/{"{id}"}</code>{" "}
-            до <code className="text-xs bg-muted px-1 py-0.5 rounded">done=true</code>.
-          </li>
-          <li>
-            • Folder-scoped страницы (Networks, Subnets и т.д.) требуют выбранный folder в шапке.
-          </li>
-          <li>
-            • Live-обновление: polling 3–30s в зависимости от ресурса.
-          </li>
-          <li>
-            • Для подробностей — смотрите{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">Raw JSON</code> на странице ресурса.
-          </li>
-        </ul>
-      </div>
+        {tileVisible && (
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={24} md={16} lg={12}>
+              <Card
+                hoverable
+                data-testid="dashboard-tile-vpc"
+                onClick={goVpc}
+                styles={{ body: { padding: 16 } }}
+                title={
+                  <Space>
+                    <ApartmentOutlined style={{ color: "#3D8DF5" }} />
+                    <span>Virtual Private Cloud</span>
+                  </Space>
+                }
+                extra={<ArrowRightOutlined />}
+              >
+                <Typography.Paragraph
+                  type="secondary"
+                  style={{ marginBottom: 12, fontSize: 12 }}
+                >
+                  {ctx.folder
+                    ? "Сети, подсети, группы безопасности, публичные IP."
+                    : "Сети, подсети, группы безопасности — суммарно по всем каталогам облака."}
+                </Typography.Paragraph>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Statistic
+                      title="Сетей"
+                      value={counts.networks ?? "—"}
+                      valueStyle={{ fontSize: 22 }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="Подсетей"
+                      value={counts.subnets ?? "—"}
+                      valueStyle={{ fontSize: 22 }}
+                    />
+                  </Col>
+                  <Col span={8}>
+                    <Statistic
+                      title="Групп безопасности"
+                      value={counts.sgs ?? "—"}
+                      valueStyle={{ fontSize: 22 }}
+                    />
+                  </Col>
+                </Row>
+                {!ctx.folder && foldersInCloud !== null && (
+                  <Typography.Text
+                    type="secondary"
+                    style={{ fontSize: 11, display: "block", marginTop: 12 }}
+                  >
+                    Каталогов в облаке: {foldersInCloud}
+                  </Typography.Text>
+                )}
+              </Card>
+            </Col>
+          </Row>
+        )}
+
+        {ctx.folder &&
+          counts.networks === 0 &&
+          counts.subnets === 0 &&
+          counts.sgs === 0 && (
+            <Card>
+              <Empty
+                image={
+                  <FolderOpenOutlined style={{ fontSize: 40, color: "#8b8f99" }} />
+                }
+                imageStyle={{ height: 56 }}
+                description={
+                  <Space direction="vertical" size={6}>
+                    <Typography.Text strong>
+                      В каталоге нет ресурсов
+                    </Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      Создайте первую сеть, чтобы начать.
+                    </Typography.Text>
+                  </Space>
+                }
+              >
+                <Button
+                  type="primary"
+                  icon={<ArrowRightOutlined />}
+                  onClick={goVpc}
+                >
+                  Перейти в VPC
+                </Button>
+              </Empty>
+            </Card>
+          )}
+      </Space>
     </div>
   );
 }

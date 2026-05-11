@@ -4,6 +4,7 @@ import { Input, Textarea, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
+import { LabelsEditor } from "@/components/form/LabelsEditor";
 import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 import type { FormField as FF, ArrayField } from "@/lib/form-schema";
 
@@ -25,6 +26,14 @@ function fullPath(prefix: string, name: string): string {
 
 export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode }: Props) {
   if (field.hidden) return null;
+  if (editMode && field.editHidden) return null;
+  if (field.visibleWhen) {
+    // visibleWhen.field — всегда top-level path (oneof discriminator живёт у корня формы).
+    const cur = getByPath(value, field.visibleWhen.field) as string | undefined;
+    const want = field.visibleWhen.equals;
+    const matched = Array.isArray(want) ? want.includes(cur ?? "") : cur === want;
+    if (!matched) return null;
+  }
   const disabled = !!(field.immutable && editMode);
   if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} />;
   if (field.type === "sg-rules") {
@@ -36,6 +45,20 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
         onChange={onChange}
         path={path}
         description={field.description}
+      />
+    );
+  }
+  if (field.type === "labels") {
+    const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
+    return (
+      <LabelsEditor
+        pathPrefix={pathPrefix}
+        value={value}
+        onChange={onChange}
+        path={path}
+        label={field.label}
+        description={field.description}
+        disabled={disabled}
       />
     );
   }

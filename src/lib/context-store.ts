@@ -96,6 +96,36 @@ export const contextApi = {
     setState({ org, cloud, folder });
   },
 
+  /** Patch — обновить отдельные поля org/cloud/folder без сброса потомков.
+   *  Используется для hydration после прямого URL: догрузить name/parent
+   *  не теряя текущий folder selection. Если уровень ещё не установлен и
+   *  patch содержит id — создаём с пустыми остальными полями. */
+  hydrate(patch: { org?: Partial<OrgRef>; cloud?: Partial<CloudRef>; folder?: Partial<FolderRef> }) {
+    const next: State = { ...state };
+    if (patch.org) {
+      if (state.org) {
+        next.org = { ...state.org, ...patch.org };
+      } else if (patch.org.id) {
+        next.org = { id: patch.org.id, name: patch.org.name ?? "" };
+      }
+    }
+    if (patch.cloud) {
+      if (state.cloud) {
+        next.cloud = { ...state.cloud, ...patch.cloud };
+      } else if (patch.cloud.id) {
+        next.cloud = {
+          id: patch.cloud.id,
+          name: patch.cloud.name ?? "",
+          organizationId: patch.cloud.organizationId ?? "",
+        };
+      }
+    }
+    if (patch.folder && state.folder) {
+      next.folder = { ...state.folder, ...patch.folder };
+    }
+    setState(next);
+  },
+
   subscribe(l: () => void) {
     listeners.add(l);
     return () => listeners.delete(l);

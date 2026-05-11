@@ -107,8 +107,16 @@ export function extractOperationId(
   resp: Partial<Operation> | { operation?: Operation } | null | undefined,
 ): string | null {
   if (!resp) return null;
-  // Top-level Operation (текущий формат).
-  if ("id" in resp && typeof resp.id === "string") return resp.id;
+  // Top-level Operation: имеет id + done. Если done нет — это sync resource
+  // (Region/Zone/AddressPool — admin-only RPC возвращают объект напрямую).
+  if (
+    "id" in resp &&
+    typeof resp.id === "string" &&
+    "done" in resp &&
+    typeof (resp as Record<string, unknown>).done === "boolean"
+  ) {
+    return resp.id;
+  }
   // Legacy обёртка — на всякий случай.
   if ("operation" in resp && resp.operation) return resp.operation.id ?? null;
   return null;

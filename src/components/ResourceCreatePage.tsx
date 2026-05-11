@@ -1,0 +1,250 @@
+// ResourceCreatePage — full-page форма Create (не modal).
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useMutation } from "@tanstack/react-query";
+import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+import { ArrowLeftOutlined } from "@ant-design/icons";
+import { FormFieldRenderer } from "@/components/form/FormField";
+import { DopplerButton } from "@/components/DopplerButton";
+import { extractOperationId } from "@/components/OperationDialog";
+import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
+import { ApiError, api } from "@/api/client";
+import { applyFieldDefaults, getByPath, type ResourceSpec } from "@/lib/resource-registry";
+import { setByPath } from "@/lib/path";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
+import { toast } from "@/lib/toast";
+
+interface Props {
+  spec: ResourceSpec;
+  parentField?: string;
+  parentParam?: string;
+}
+
+export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
+  const params = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const filterValue = parentParam ? (params[parentParam] ?? null) : null;
+  const invalidate = useInvalidateResourceList();
+
+  const ctx = useMemo(
+    () => ({
+      folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
+      cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
+      organizationId:
+        parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
+    }),
+    [parentField, filterValue],
+  );
+
+  // Контекст приходит либо из nested-URL params (`/networks/<n>/.../create`),
+  // либо из query (`?network_id=...&subnet_id=...&kind=...`) для обратной
+  // совместимости и для случая create-из-list-page с pre-selected parent.
+  const presetFields = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    const subnetId = (params.subnetId as string | undefined) ?? searchParams.get("subnet_id");
+    const networkId = (params.networkId as string | undefined) ?? searchParams.get("network_id");
+    const kind = searchParams.get("kind");
+    if (kind) out["_address_kind"] = kind;
+    if (subnetId) {
+      if (kind === "internal" || (!kind && spec.id === "addresses")) {
+        out["internal_ipv4_address_spec.subnet_id"] = subnetId;
+      } else {
+        out["subnet_id"] = subnetId;
+      }
+    }
+    if (networkId) out["network_id"] = networkId;
+    return out;
+  }, [params.subnetId, params.networkId, searchParams, spec.id]);
+
+  const initialObj = useMemo(() => {
+    const tpl = spec.template(ctx);
+    const baseObj =
+      typeof tpl === "object" && tpl !== null
+        ? { ...(tpl as Record<string, unknown>) }
+        : {};
+    let merged: Record<string, unknown> = applyFieldDefaults(spec.fields, baseObj);
+    for (const [path, val] of Object.entries(presetFields)) {
+      merged = setByPath(merged, path, val);
+    }
+    // Auto-name: пустое name + UNIQUE на (folder_id, name) → ALREADY_EXISTS
+    // на повторе. Генерируем <route>-NNNNNN.
+    if (
+      spec.fields?.some((f) => f.name === "name") &&
+      (!merged.name || merged.name === "")
+    ) {
+      const stem = spec.route.replace(/-/g, "");
+      merged.name = `${stem}-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [obj, setObj] = useState<Record<string, unknown>>(initialObj);
+
+  const lockedPathsRef = useRef(new Set(Object.keys(presetFields)));
+
+  // Back = текущий path без /create суффикса. Для nested URL вида
+  //   /folders/X/vpc/networks/Y/route-tables/create
+  // полученный URL `/folders/X/vpc/networks/Y/route-tables` не существует —
+  // вместо этого возвращаемся к parent detail (network detail с табом).
+  const rawBack = location.pathname.replace(/\/create$/, "") || "/";
+  const folderId = params.folderId as string | undefined;
+  const networkId = params.networkId as string | undefined;
+  const subnetId = params.subnetId as string | undefined;
+  const isNestedUnderSubnet = !!(folderId && subnetId);
+  const isNestedUnderNetwork = !!(folderId && networkId);
+  const backHref = isNestedUnderSubnet
+    ? networkId
+      ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
+      : `/folders/${folderId}/vpc/subnets/${subnetId}?tab=addresses`
+    : isNestedUnderNetwork
+      ? `/folders/${folderId}/vpc/networks/${networkId}?tab=${spec.route}`
+      : rawBack;
+
+  const breadcrumb = useMemo(
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
+        <Link to={backHref}>
+          <Typography.Text type="secondary">{spec.plural}</Typography.Text>
+        </Link>
+        <Typography.Text type="secondary">/</Typography.Text>
+        <Typography.Text strong>Создать</Typography.Text>
+      </span>
+    ),
+    [backHref, spec.plural, spec.serviceTitle],
+  );
+  useBreadcrumb(breadcrumb);
+  const noHeaderRight = useMemo(() => null, []);
+  useHeaderRight(noHeaderRight);
+
+  // Doppler-flow: после POST дожидаемся op.done через polling. Кнопка
+  // пульсирует пока pending. По завершении — toast + navigate на список.
+  const [pendingOpId, setPendingOpId] = useState<string | null>(null);
+  const { data: op } = useOperation(pendingOpId);
+
+  const mutation = useMutation({
+    mutationFn: (item: unknown) => api.create(spec.apiPath, item),
+    onSuccess: (resp) => {
+      const id = extractOperationId(resp);
+      if (id) {
+        setPendingOpId(id);
+      } else {
+        // Sync (Region/Zone/AddressPool — admin RPC без Operation envelope).
+        invalidate(spec.id, filterValue ?? null);
+        navigate(backHref);
+      }
+    },
+    onError: (err) => {
+      const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      toast.error(`Создать ${spec.singular}: ${m}`);
+    },
+  });
+
+  useEffect(() => {
+    if (!pendingOpId || !op?.done) return;
+    if (op.error) {
+      toast.error(`Создать ${spec.singular}: ${op.error.message ?? "ошибка"}`);
+      setPendingOpId(null);
+    } else {
+      invalidate(spec.id, filterValue ?? null);
+      toast.success(`${spec.singular} создан`);
+      setPendingOpId(null);
+      navigate(backHref);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [op?.done, op?.error?.code]);
+
+  const submit = () => {
+    let parsed: Record<string, unknown> = obj;
+    if (spec.sanitize) parsed = spec.sanitize(parsed);
+    mutation.mutate(parsed);
+  };
+
+  const fields = spec.fields;
+  if (!fields) {
+    return (
+      <Alert
+        type="warning"
+        message={`У ресурса ${spec.singular} нет form-schema; используйте API напрямую.`}
+      />
+    );
+  }
+
+  return (
+    <>
+      <div style={{ maxWidth: 760 }}>
+        <Space direction="vertical" size={20} style={{ width: "100%" }}>
+          <div>
+            <Link to={backHref}>
+              <Button type="text" size="small" icon={<ArrowLeftOutlined />} style={{ marginLeft: -8 }}>
+                {spec.plural}
+              </Button>
+            </Link>
+            <Typography.Title level={3} style={{ margin: "4px 0 0 0" }}>
+              Создать {spec.singular.toLowerCase()}
+            </Typography.Title>
+          </div>
+
+          {Object.keys(presetFields).length > 0 && (
+            <Alert
+              type="info"
+              message={
+                <span>
+                  Предзаполнено из контекста:{" "}
+                  {Object.entries(presetFields).map(([k, v]) => (
+                    <Tag key={k} style={{ fontFamily: "monospace", marginRight: 4 }}>
+                      {k}={String(v)}
+                    </Tag>
+                  ))}
+                </span>
+              }
+            />
+          )}
+
+          <Card size="small">
+            <Space direction="vertical" size={16} style={{ width: "100%" }}>
+              {fields.map((f) => (
+                <FormFieldRenderer
+                  key={f.name}
+                  field={lockedPathsRef.current.has(f.name) ? { ...f, immutable: true } : f}
+                  pathPrefix=""
+                  value={obj}
+                  onChange={setObj}
+                  editMode={lockedPathsRef.current.has(f.name)}
+                />
+              ))}
+            </Space>
+          </Card>
+
+
+          <Space>
+            <DopplerButton
+              type="primary"
+              onClick={submit}
+              pulsing={mutation.isPending || pendingOpId !== null}
+            >
+              Создать {spec.singular.toLowerCase()}
+            </DopplerButton>
+            <Link to={backHref}>
+              <Button disabled={mutation.isPending || pendingOpId !== null}>
+                Отменить
+              </Button>
+            </Link>
+          </Space>
+        </Space>
+      </div>
+    </>
+  );
+
+  // Suppress unused getByPath import
+  void getByPath;
+}

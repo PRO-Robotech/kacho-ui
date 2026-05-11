@@ -2,18 +2,34 @@
 // Поллит GET <spec.apiPath>/{id} каждые 3 сек.
 // Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
-import { useCallback, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, Link, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, RotateCw, Play, Square } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { JsonView } from "@/components/JsonView";
+import { Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
+import type { MenuProps } from "antd";
+import {
+  ArrowLeftOutlined,
+  ReloadOutlined,
+  PlayCircleOutlined,
+  PauseCircleOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  MoreOutlined,
+  DragOutlined,
+} from "@ant-design/icons";
+import { JsonMonacoView } from "@/components/JsonMonacoView";
+import { ErrorResult } from "@/components/ErrorResult";
+import { RefNameLink } from "@/components/RefNameLink";
+import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
+import { OperationsTab } from "@/components/OperationsTab";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { DeleteButton } from "@/components/DeleteButton";
+import { CopyableId } from "@/components/CopyableId";
+import { DeleteDialog } from "@/components/DeleteDialog";
+import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { OperationDialog, extractOperationId } from "@/components/OperationDialog";
-import { SubnetCidrManager } from "@/components/SubnetCidrManager";
+import { DetailShell, type DetailTab } from "@/components/DetailShell";
+import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { api, ApiError } from "@/api/client";
 import { useFolderStore } from "@/lib/folder-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
@@ -21,25 +37,110 @@ import { useInvalidateResourceList } from "@/lib/use-operation";
 
 interface Props {
   spec: ResourceSpec;
-  // Имя URL-параметра в роуте (default "uid"). Org/Cloud detail используют
-  // "orgId"/"cloudId", потому что эти же ключи фигурируют в дочерних list-роутах.
   paramKey?: string;
+  extraTabs?: (data: Record<string, unknown>) => DetailTab[];
+  /** Опциональный ряд secondary-actions кнопок над tab content (Subnet «Перенести в зону»). */
+  secondaryActions?: (data: Record<string, unknown>) => React.ReactNode;
+  /** По умолчанию показывается JSON-tab последним. Установить true чтобы скрыть. */
+  hideJsonTab?: boolean;
+  /** По умолчанию для VPC-ресурсов добавляется tab "Операции" с per-resource
+   *  ListOperations. Установить true чтобы скрыть (например, для admin-ресурсов
+   *  без LRO — Region/Zone/AddressPool). */
+  hideOperationsTab?: boolean;
+  /** Per-tab override header-right slot. Возвращает null/undefined → fallback на default
+   *  (Создать <singular> + Редактировать + kebab Move/Delete). */
+  headerActionsByTab?: (
+    tabId: string,
+    data: Record<string, unknown>,
+  ) => React.ReactNode | null | undefined;
+  /** Подменить primary "Создать <singular>" в default overview-actions на другую кнопку.
+   *  Например, на Network detail логично "Создать подсеть" вместо "Создать Network". */
+  overviewCreateOverride?: { label: string; onClick: () => void };
+  /** Добавить дополнительные секции в Обзор-tab после "Общее"-Descriptions.
+   *  Используется для inline-таблиц дочерних ресурсов (Network → Подсети). */
+  overviewExtras?: (data: Record<string, unknown>) => React.ReactNode;
+  /** Полностью заменить содержимое Обзор-tab (вместо Descriptions + overviewExtras).
+   *  Используется когда Overview переходит в edit-state inline (например,
+   *  Network detail → "Создать подсеть" разворачивает форму на месте "Общее"). */
+  overviewReplace?: (data: Record<string, unknown>) => React.ReactNode;
+  /** Если true — primary-create кнопка в default overview-actions скрыта.
+   *  Полезно когда форма создания уже развёрнута через overviewReplace. */
+  hideOverviewCreate?: boolean;
+  /** Опциональный override URL для back-навигации и breadcrumb-ссылки на список.
+   *  По умолчанию вычисляется как `/folders/<folderId>/<spec.route>`. Используется
+   *  для nested-роутов (Subnet под Network → back к network detail). */
+  backHrefOverride?: string;
+  /** Опциональный override label для back-link breadcrumb (если задан). */
+  backLabelOverride?: string;
+  /** Опциональная цепочка breadcrumb-сегментов между serviceTitle и текущим
+   *  ресурсом. Сегмент без href — не кликабелен. По умолчанию используется
+   *  один сегмент `{label: spec.plural, href: backHref}`. */
+  breadcrumbSegments?: Array<{ label: string; href?: string }>;
+  /** Если задано — клик по "Редактировать" вызовет этот callback вместо
+   *  встроенной inline-edit логики. Редко нужен. */
+  onEditClick?: () => void;
+  /** Опциональный override inline-edit формы. Если задан — рендерится вместо
+   *  generic InlineResourceEditForm когда detail в edit-mode. Используется для
+   *  resource-specific layouts (например, YC-style формы для subnet). */
+  renderInlineEdit?: (
+    data: Record<string, unknown>,
+    exitEdit: () => void,
+  ) => React.ReactNode;
 }
 
-export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
+export function ResourceDetailPage({
+  spec,
+  paramKey = "uid",
+  extraTabs,
+  secondaryActions,
+  hideJsonTab,
+  hideOperationsTab,
+  headerActionsByTab,
+  overviewCreateOverride,
+  overviewExtras,
+  overviewReplace,
+  hideOverviewCreate,
+  backHrefOverride,
+  backLabelOverride,
+  breadcrumbSegments,
+  onEditClick,
+  renderInlineEdit,
+}: Props) {
   const params = useParams();
   const uid = params[paramKey];
   const navigate = useNavigate();
+  const location = useLocation();
   const folder = useFolderStore((s) => s.folder);
   const invalidate = useInvalidateResourceList();
+  const [searchParams] = useSearchParams();
 
-  // Polling GET /v1/<plural>/{id}
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+
+  // Inline-edit: edit-mode определяется наличием /edit-суффикса в pathname.
+  // "Редактировать" в overviewActions переключает URL на /edit без полной
+  // перезагрузки страницы (replace=false → можно вернуться через "Назад"),
+  // Сохранить/Отменить возвращают URL без /edit (replace=true).
+  const isEditUrl = location.pathname.endsWith("/edit");
+  const detailPath = isEditUrl
+    ? location.pathname.slice(0, -"/edit".length)
+    : location.pathname;
+  const [editing, setEditing] = useState(isEditUrl);
+  useEffect(() => {
+    setEditing(isEditUrl);
+  }, [isEditUrl]);
+
+  const enterEdit = useCallback(() => {
+    setEditing(true);
+    if (!isEditUrl) navigate(`${detailPath}/edit`, { replace: false });
+  }, [isEditUrl, detailPath, navigate]);
+
+  const exitEdit = useCallback(() => {
+    setEditing(false);
+    if (isEditUrl) navigate(detailPath, { replace: true });
+  }, [isEditUrl, detailPath, navigate]);
+
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],
     queryFn: () => api.get<Record<string, unknown>>(`${spec.apiPath}/${uid}`),
     refetchInterval: 3_000,
@@ -51,32 +152,21 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
   const [actionTitle, setActionTitle] = useState("Action");
   const [actionErr, setActionErr] = useState<string | null>(null);
 
-  const handleActionSuccess = useCallback(() => {
-    setActionOpId(null);
-    invalidate(spec.id, folder?.uid);
-  }, [invalidate, spec.id, folder?.uid]);
-
-  const handleActionClose = useCallback(() => {
+  const handleActionDone = useCallback(() => {
     setActionOpId(null);
     invalidate(spec.id, folder?.uid);
   }, [invalidate, spec.id, folder?.uid]);
 
   const actionMutation = useMutation({
-    mutationFn: (verb: string) =>
-      api.action(`${spec.apiPath}/${uid}:${verb}`),
+    mutationFn: (verb: string) => api.action(`${spec.apiPath}/${uid}:${verb}`),
     onSuccess: (resp) => {
       setActionErr(null);
       const id = extractOperationId(resp);
-      if (id) {
-        setActionOpId(id);
-      } else {
-        invalidate(spec.id, folder?.uid);
-      }
+      if (id) setActionOpId(id);
+      else invalidate(spec.id, folder?.uid);
     },
     onError: (e) => {
-      setActionErr(
-        e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message,
-      );
+      setActionErr(e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message);
     },
   });
 
@@ -86,192 +176,441 @@ export function ResourceDetailPage({ spec, paramKey = "uid" }: Props) {
     actionMutation.mutate(verb);
   };
 
+  const name = data ? (getByPath<string>(data, "name") ?? "") : "";
+  const statusValue = data ? getByPath<string>(data, "status") : undefined;
+  const resourceId = data ? (getByPath<string>(data, "id") ?? uid ?? "") : uid ?? "";
+  const editPath = `${spec.apiPath}/${resourceId}`;
+
+  const backHref = useMemo(() => {
+    if (backHrefOverride) return backHrefOverride;
+    const folderId = params.folderId;
+    if (folderId) return `/folders/${folderId}/${spec.route}`;
+    if (spec.id === "clouds" && data) {
+      const orgId = getByPath<string>(data, "organization_id");
+      return orgId ? `/organizations/${orgId}/clouds` : "/organizations";
+    }
+    if (spec.id === "folders" && data) {
+      const cloudId = getByPath<string>(data, "cloud_id");
+      return cloudId ? `/clouds/${cloudId}/folders` : "/organizations";
+    }
+    return "/organizations";
+  }, [params.folderId, spec.id, spec.route, data, backHrefOverride]);
+
+  const segments = useMemo(
+    () =>
+      breadcrumbSegments && breadcrumbSegments.length > 0
+        ? breadcrumbSegments
+        : [{ label: backLabelOverride ?? spec.plural, href: backHref }],
+    [breadcrumbSegments, backLabelOverride, spec.plural, backHref],
+  );
+
+  const breadcrumb = useMemo(
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
+        {segments.map((seg, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            {seg.href ? (
+              <Link to={seg.href}>
+                <Typography.Text type="secondary">{seg.label}</Typography.Text>
+              </Link>
+            ) : (
+              <Typography.Text type="secondary">{seg.label}</Typography.Text>
+            )}
+            <Typography.Text type="secondary">/</Typography.Text>
+          </span>
+        ))}
+        <Typography.Text strong style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
+          {name || resourceId}
+        </Typography.Text>
+      </span>
+    ),
+    [segments, spec.serviceTitle, name, resourceId],
+  );
+  useBreadcrumb(breadcrumb);
+
+  // Move-capable: те же ресурсы, что в RowActionsMenu (Org/Cloud/Folder/Region/Zone/AddressPool — нет).
+  const moveCapable = useMemo(
+    () =>
+      ![
+        "organizations",
+        "clouds",
+        "folders",
+        "regions",
+        "zones",
+        "address-pools",
+      ].includes(spec.id),
+    [spec.id],
+  );
+
+  const overviewActions = useMemo(() => {
+    const kebabItems: MenuProps["items"] = [
+      moveCapable
+        ? {
+            key: "move",
+            icon: <DragOutlined />,
+            label: "Переместить",
+            onClick: () => setMoveOpen(true),
+          }
+        : null,
+      spec.ops.delete && data
+        ? {
+            key: "delete",
+            icon: <DeleteOutlined />,
+            label: "Удалить",
+            danger: true,
+            onClick: () => setDeleteOpen(true),
+          }
+        : null,
+    ].filter(Boolean) as MenuProps["items"];
+
+    return (
+      <Space size="small">
+        {/* Primary "Создать ..." кнопка показывается ТОЛЬКО когда detail-страница
+            явно объявляет дочернюю сущность через overviewCreateOverride
+            (например, Network → "Создать подсеть"). Default "Создать <self>"
+            убран: на detail-странице ресурса логично создавать связанные
+            сущности, а не клонировать сам ресурс — для этого есть list. */}
+        {hideOverviewCreate || !overviewCreateOverride ? null : (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={overviewCreateOverride.onClick}
+          >
+            {overviewCreateOverride.label}
+          </Button>
+        )}
+        {spec.ops.restart && (
+          <Button
+            size="small"
+            icon={<ReloadOutlined spin={actionMutation.isPending && actionMutation.variables === "restart"} />}
+            onClick={() => doAction("restart", "Restarting")}
+            disabled={actionMutation.isPending}
+          >
+            Перезапустить
+          </Button>
+        )}
+        {spec.ops.start && (
+          <Button
+            size="small"
+            icon={<PlayCircleOutlined />}
+            onClick={() => doAction("start", "Starting")}
+            disabled={actionMutation.isPending}
+          >
+            Запустить
+          </Button>
+        )}
+        {spec.ops.stop && (
+          <Button
+            size="small"
+            icon={<PauseCircleOutlined />}
+            onClick={() => doAction("stop", "Stopping")}
+            disabled={actionMutation.isPending}
+          >
+            Остановить
+          </Button>
+        )}
+        {spec.ops.update && data && !editing && (
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => (onEditClick ? onEditClick() : enterEdit())}
+          >
+            Редактировать
+          </Button>
+        )}
+        {kebabItems && kebabItems.length > 0 && (
+          <Dropdown menu={{ items: kebabItems }} trigger={["click"]} placement="bottomRight">
+            <Button size="small" icon={<MoreOutlined />} aria-label="Действия" />
+          </Dropdown>
+        )}
+      </Space>
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    spec,
+    data,
+    moveCapable,
+    backHref,
+    overviewCreateOverride,
+    hideOverviewCreate,
+    onEditClick,
+    enterEdit,
+    editing,
+    location.pathname,
+    actionMutation.isPending,
+    actionMutation.variables,
+  ]);
+
+  // Per-tab header CTA (через ?tab) — если задано и возвращает не-null,
+  // используется вместо overviewActions. useMemo обязателен, иначе
+  // useHeaderRight видит новый node-ref на каждый рендер и зацикливает setState.
+  const activeTabId = searchParams.get("tab") ?? "overview";
+  const finalHeaderRight = useMemo(() => {
+    if (!data) return null;
+    const override = headerActionsByTab ? headerActionsByTab(activeTabId, data) : null;
+    return override ?? overviewActions;
+  }, [headerActionsByTab, activeTabId, data, overviewActions]);
+  useHeaderRight(finalHeaderRight);
+
   if (isLoading && !data) {
-    return <div className="p-6 text-sm text-muted-foreground">Загрузка…</div>;
+    return (
+      <div style={{ padding: 24 }}>
+        <Spin tip="Загрузка…" />
+      </div>
+    );
   }
 
   if (isError && !data) {
     return (
-      <div className="p-6 space-y-3">
-        <Button asChild variant="outline" size="sm">
-          <Link to={`/${spec.route}`}>
-            <ArrowLeft className="h-4 w-4" /> Back
+      <ErrorResult
+        error={error}
+        extra={
+          <Link to={backHref}>
+            <Button icon={<ArrowLeftOutlined />}>Назад</Button>
           </Link>
-        </Button>
-        <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {(error as Error).message}
-        </div>
-      </div>
+        }
+      />
     );
   }
 
   if (!data) {
     return (
-      <div className="space-y-4">
-        <Button asChild variant="outline" size="sm">
-          <Link to={`/${spec.route}`}>
-            <ArrowLeft className="h-4 w-4" /> Back
+      <ErrorResult
+        status="404"
+        subTitle="Ресурс не найден."
+        extra={
+          <Link to={backHref}>
+            <Button icon={<ArrowLeftOutlined />}>Назад</Button>
           </Link>
-        </Button>
-        <div className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Ресурс не найден.
-        </div>
-      </div>
+        }
+      />
     );
   }
 
-  const name = getByPath<string>(data, "name") ?? "";
-  const statusValue = getByPath<string>(data, "status");
-  const resourceId = getByPath<string>(data, "id") ?? uid ?? "";
+  const overviewItems = [
+    { label: "ID", value: <CopyableId id={resourceId} /> },
+    { label: "Имя", value: name || "—" },
+    statusValue ? { label: "Статус", value: <StatusBadge state={statusValue} /> } : null,
+    getByPath<string>(data, "created_at")
+      ? {
+          label: "Дата создания",
+          value: new Date(getByPath<string>(data, "created_at")!).toLocaleString(),
+        }
+      : null,
+    getByPath<string>(data, "folder_id")
+      ? { label: "Folder", value: <CopyableId id={getByPath<string>(data, "folder_id")!} /> }
+      : null,
+    getByPath<string>(data, "cloud_id")
+      ? { label: "Cloud", value: <CopyableId id={getByPath<string>(data, "cloud_id")!} /> }
+      : null,
+    getByPath<string>(data, "organization_id")
+      ? {
+          label: "Organization",
+          value: <CopyableId id={getByPath<string>(data, "organization_id")!} />,
+        }
+      : null,
+    getByPath<string>(data, "zone_id")
+      ? {
+          label: "Зона",
+          value: <Typography.Text code>{getByPath<string>(data, "zone_id")!}</Typography.Text>,
+        }
+      : null,
+    getByPath<string>(data, "network_id")
+      ? {
+          label: "Сеть",
+          value: (
+            <RefNameLink
+              specId="networks"
+              refId={getByPath<string>(data, "network_id")!}
+            />
+          ),
+        }
+      : null,
+    getByPath<string>(data, "description")
+      ? { label: "Описание", value: getByPath<string>(data, "description")! }
+      : null,
+    // Network-specific: Группа безопасности по умолчанию.
+    spec.id === "networks" && getByPath<string>(data, "default_security_group_id")
+      ? {
+          label: "Группа безопасности по умолчанию",
+          value: (
+            <RefNameLink
+              specId="security-groups"
+              refId={getByPath<string>(data, "default_security_group_id")!}
+            />
+          ),
+        }
+      : null,
+    // SecurityGroup-specific: Правила (count + empty state).
+    spec.id === "security-groups"
+      ? {
+          label: "Правила",
+          value: (() => {
+            const rules =
+              (getByPath<unknown[]>(data, "rules") ?? []) as unknown[];
+            if (rules.length === 0) {
+              return (
+                <Space direction="vertical" size={2}>
+                  <Typography.Text type="secondary">empty</Typography.Text>
+                  <Typography.Text strong>
+                    Задайте правила для группы безопасности
+                  </Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Правила управляют входящим трафиком ВМ.
+                  </Typography.Text>
+                </Space>
+              );
+            }
+            return (
+              <Typography.Text>{rules.length} правило(а)</Typography.Text>
+            );
+          })(),
+        }
+      : null,
+    // Subnet-specific: IPv4 CIDR (multi-line) + Route Table.
+    spec.id === "subnets"
+      ? {
+          label: "IPv4 CIDR",
+          value: (() => {
+            const cidrs =
+              (getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[];
+            if (cidrs.length === 0)
+              return <Typography.Text type="secondary">—</Typography.Text>;
+            return (
+              <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                {cidrs.map((c, i) => (
+                  <Typography.Text key={i} code style={{ fontFamily: "monospace" }}>
+                    {c}
+                  </Typography.Text>
+                ))}
+              </Space>
+            );
+          })(),
+        }
+      : null,
+    spec.id === "subnets" && getByPath<string>(data, "route_table_id")
+      ? {
+          label: "Таблица маршрутизации",
+          value: <CopyableId id={getByPath<string>(data, "route_table_id")!} />,
+        }
+      : null,
+  ].filter(Boolean) as { label: string; value: React.ReactNode }[];
+
+  const tabs: DetailTab[] = [
+    {
+      id: "overview",
+      label: "Обзор",
+      render: () =>
+        actionErr ? (
+          // При ошибке action (Restart/Start/Stop/etc) показываем ТОЛЬКО ErrorResult,
+          // скрывая Общее + overviewExtras + inline-edit. Иначе таблицы дочерних
+          // ресурсов остаются ниже центрированного Result — визуальный bug.
+          <ErrorResult subTitle={actionErr} />
+        ) : (
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          {editing && spec.ops.update ? (
+            renderInlineEdit ? (
+              renderInlineEdit(data, exitEdit)
+            ) : (
+              <InlineResourceEditForm
+                spec={spec}
+                data={data}
+                folderUid={folder?.uid ?? null}
+                onCancel={exitEdit}
+              />
+            )
+          ) : overviewReplace ? (
+            overviewReplace(data)
+          ) : (
+            <>
+              <Descriptions
+                title="Общее"
+                bordered
+                column={1}
+                size="small"
+                labelStyle={{ width: 200 }}
+                items={overviewItems.map((it, i) => ({
+                  key: String(i),
+                  label: it.label,
+                  children: it.value,
+                }))}
+              />
+              {overviewExtras && overviewExtras(data)}
+            </>
+          )}
+        </Space>
+        ),
+    },
+    ...(extraTabs ? extraTabs(data) : []),
+    ...(hideOperationsTab
+      ? []
+      : [
+          {
+            id: "operations",
+            label: "Операции",
+            render: () => <OperationsTab spec={spec} resourceId={resourceId} />,
+          },
+        ]),
+    ...(hideJsonTab
+      ? []
+      : [
+          {
+            id: "raw",
+            label: "JSON",
+            render: () => <JsonMonacoView data={data} />,
+          },
+        ]),
+  ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-2">
-          <Button asChild variant="ghost" size="sm" className="h-7 px-2 -ml-2">
-            <Link to={`/${spec.route}`}>
-              <ArrowLeft className="h-4 w-4" /> {spec.plural}
-            </Link>
-          </Button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{name}</h1>
-            {statusValue && <StatusBadge state={statusValue} />}
-          </div>
-          <div className="text-xs text-muted-foreground font-mono">{resourceId}</div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {spec.ops.restart && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => doAction("restart", "Restarting Instance")}
-              disabled={actionMutation.isPending}
-            >
-              <RotateCw
-                className={`h-4 w-4 ${actionMutation.isPending && actionMutation.variables === "restart" ? "animate-spin" : ""}`}
-              />{" "}
-              Restart
-            </Button>
-          )}
-          {spec.ops.start && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => doAction("start", "Starting Instance")}
-              disabled={actionMutation.isPending}
-            >
-              <Play className="h-4 w-4" /> Start
-            </Button>
-          )}
-          {spec.ops.stop && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => doAction("stop", "Stopping Instance")}
-              disabled={actionMutation.isPending}
-            >
-              <Square className="h-4 w-4" /> Stop
-            </Button>
-          )}
-          {spec.ops.update && (
-            <ResourceFormDialog
-              mode="edit"
-              title={`Edit ${spec.singular}`}
-              description="Изменяет ресурс."
-              apiPath={`${spec.apiPath}/${resourceId}`}
-              resourceId={spec.id}
-              template={data}
-              fields={spec.fields}
-              folderUid={folder?.uid}
-              sanitize={spec.sanitize}
-            />
-          )}
-          {spec.ops.delete && (
-            <DeleteButton
-              apiPath={`${spec.apiPath}/${resourceId}`}
-              resourceId={spec.id}
-              name={name}
-              resourceLabel={spec.singular}
-              folderUid={folder?.uid}
-              navigateTo={() => navigate(`/${spec.route}`)}
-            />
-          )}
-        </div>
-      </div>
+    <>
+      <DetailShell
+        resourceLabel={spec.singular}
+        resourceName={name || resourceId}
+        badges={statusValue ? <StatusBadge state={statusValue} /> : null}
+        tabs={tabs}
+        secondaryActions={secondaryActions ? secondaryActions(data) : undefined}
+      />
 
-      {actionErr && (
-        <div className="rounded-md bg-destructive/10 text-destructive p-2 text-xs">
-          {actionErr}
-        </div>
+      {spec.ops.delete && (
+        <DeleteDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          apiPath={editPath}
+          resourceId={spec.id}
+          resourceLabel={spec.singular}
+          name={name || resourceId}
+          folderUid={folder?.uid ?? null}
+          onSuccess={() => navigate(backHref)}
+        />
       )}
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="raw">Raw JSON</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          {spec.id === "subnets" && (
-            <SubnetCidrManager
-              subnetId={resourceId}
-              blocks={(getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[]}
-            />
-          )}
-          <div className="rounded-lg border border-border p-4 space-y-2">
-            <h3 className="font-semibold text-sm">Resource fields</h3>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-              <KV k="ID" v={resourceId} mono />
-              <KV k="Name" v={name} />
-              {statusValue ? <KV k="Status" v={statusValue} /> : null}
-              {getByPath<string>(data, "created_at") ? (
-                <KV
-                  k="Created"
-                  v={new Date(getByPath<string>(data, "created_at")!).toLocaleString()}
-                />
-              ) : null}
-              {getByPath<string>(data, "folder_id") ? (
-                <KV k="Folder" v={getByPath<string>(data, "folder_id")!} mono />
-              ) : null}
-              {getByPath<string>(data, "cloud_id") ? (
-                <KV k="Cloud" v={getByPath<string>(data, "cloud_id")!} mono />
-              ) : null}
-              {getByPath<string>(data, "organization_id") ? (
-                <KV k="Organization" v={getByPath<string>(data, "organization_id")!} mono />
-              ) : null}
-              {getByPath<string>(data, "zone_id") ? (
-                <KV k="Zone" v={getByPath<string>(data, "zone_id")!} />
-              ) : null}
-              {getByPath<string>(data, "display_name") ? (
-                <KV k="Display Name" v={getByPath<string>(data, "display_name")!} />
-              ) : null}
-              {getByPath<string>(data, "description") ? (
-                <KV k="Description" v={getByPath<string>(data, "description")!} />
-              ) : null}
-            </dl>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="raw">
-          <JsonView data={data} />
-        </TabsContent>
-      </Tabs>
+      {moveCapable && (
+        <MoveStubDialog
+          open={moveOpen}
+          onOpenChange={setMoveOpen}
+          resourceLabel={spec.singular}
+          name={name || resourceId}
+          apiPath={editPath}
+        />
+      )}
 
       <OperationDialog
         opId={actionOpId}
         title={actionTitle}
-        onSuccess={handleActionSuccess}
-        onClose={handleActionClose}
+        onSuccess={handleActionDone}
+        onClose={handleActionDone}
       />
-    </div>
-  );
-}
-
-function KV({ k, v, mono }: { k: string; v?: string; mono?: boolean }) {
-  return (
-    <>
-      <dt className="text-muted-foreground">{k}</dt>
-      <dd className={mono ? "font-mono text-xs" : ""}>{v || "—"}</dd>
     </>
   );
+
+  // Suppress unused
+  void navigate;
 }

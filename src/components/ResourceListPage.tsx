@@ -1,221 +1,207 @@
-// ResourceListPage — generic страница списка ресурсов.
-// Использует polling (3 сек) вместо Watch/WebSocket.
-// spec.apiPath содержит полный path: /resource-manager/v1/clouds и т.д.
+// ResourceListPage — generic страница списка ресурсов на antd.
+//
+// Polling 3 сек (через useResourceList).
 
-import { ReactNode } from "react";
-import { Link, useParams, useLocation } from "react-router-dom";
-import { ChevronRight, Eye, Loader2, RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Input, Select, Typography, Space } from "antd";
+import { ErrorResult } from "@/components/ErrorResult";
+import { PlusOutlined } from "@ant-design/icons";
+import { api } from "@/api/client";
+import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
-import { StatusBadge } from "@/components/StatusBadge";
-import { ResourceFormDialog } from "@/components/ResourceFormDialog";
-import { DeleteButton } from "@/components/DeleteButton";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
+import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
 
 interface Props {
   spec: ResourceSpec;
-  /** API field name для фильтрации списка (organization_id / cloud_id / folder_id). */
   parentField?: string;
-  /** URL-param name (orgId / cloudId / folderId) откуда брать значение filter. */
   parentParam?: string;
 }
 
 export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const params = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
+  const [query, setQuery] = useState("");
 
-  const { data, isLoading, isError, error, isFetching } = useResourceList(
+  const { data, isLoading, isError, error } = useResourceList(
     spec,
     parentField ?? null,
     filterValue,
   );
 
-  // Если ресурс требует parent (например, /folders/:folderId/networks без folderId)
+  const breadcrumb = useMemo(
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        {spec.serviceTitle && (
+          <>
+            <Typography.Text type="secondary">{spec.serviceTitle}</Typography.Text>
+            <Typography.Text type="secondary">/</Typography.Text>
+          </>
+        )}
+        <Typography.Text strong>{spec.plural}</Typography.Text>
+      </span>
+    ),
+    [spec.plural, spec.serviceTitle],
+  );
+  useBreadcrumb(breadcrumb);
+
+  const createBase = location.pathname.endsWith("/")
+    ? location.pathname.slice(0, -1)
+    : location.pathname;
+
+  const cta = useMemo(() => {
+    if (!spec.ops.create) return null;
+    return (
+      <Link to={`${createBase}/create`}>
+        <Button type="primary" size="small" icon={<PlusOutlined />}>
+          Создать {spec.singular.toLowerCase()}
+        </Button>
+      </Link>
+    );
+  }, [spec, createBase]);
+
+  useHeaderRight(cta);
+
   if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
 
-  // Текущий path-prefix — для построения link на detail (preserve nested path).
-  // Например, /folders/X/networks → detail на /folders/X/networks/{id}.
   const basePath = location.pathname.endsWith("/")
     ? location.pathname.slice(0, -1)
     : location.pathname;
 
   const items = (data?.[spec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
 
-  const columns: Column<Record<string, unknown>>[] = spec.columns.map((c) => ({
-    header: c.header,
-    className: c.className,
-    cell: (row) => formatCell(c, row),
-  }));
+  // Дополнительный фильтр "Зона доступности" — для ресурсов, у которых есть
+  // понятие zone. Subnet хранит zone напрямую, Address — внутри
+  // internal_ipv4_address.zone_id / external_ipv4_address.zone_id.
+  const hasZoneFilter = spec.id === "subnets" || spec.id === "addresses";
+  const [zone, setZone] = useState<string>("all");
+  const zoneSpec = REGISTRY["zones"];
+  const { data: zoneData } = useQuery({
+    queryKey: ["zones", "list-for-filter"],
+    queryFn: () =>
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
+        pageSize: "200",
+      }),
+    enabled: hasZoneFilter,
+    staleTime: 60_000,
+  });
+  const zoneOptions = useMemo(
+    () => [
+      { value: "all", label: "Все зоны доступности" },
+      ...((zoneData?.zones ?? []).map((z) => ({
+        value: z.id,
+        label: z.name || z.id,
+      })) as { value: string; label: string }[]),
+    ],
+    [zoneData],
+  );
 
-  // Колонка действий
+  function rowZone(row: Record<string, unknown>): string | undefined {
+    if (spec.id === "subnets") return getByPath<string>(row, "zone_id");
+    if (spec.id === "addresses") {
+      return (
+        getByPath<string>(row, "internal_ipv4_address.zone_id") ??
+        getByPath<string>(row, "external_ipv4_address.zone_id")
+      );
+    }
+    return undefined;
+  }
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((row) => {
+      // "Публичные IP" — это external addresses; internal IPs показываются
+      // только в subnet detail (IP-адреса tab). Фильтруем по наличию
+      // external_ipv4_address (либо external_ipv6_address в будущем).
+      if (spec.id === "addresses") {
+        const ext =
+          getByPath<unknown>(row, "external_ipv4_address") ??
+          getByPath<unknown>(row, "external_ipv6_address");
+        if (!ext) return false;
+      }
+      if (hasZoneFilter && zone !== "all" && rowZone(row) !== zone) return false;
+      if (!q) return true;
+      const name = (getByPath<string>(row, "name") ?? "").toLowerCase();
+      const id = (getByPath<string>(row, "id") ?? "").toLowerCase();
+      return name.includes(q) || id.includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, query, zone, hasZoneFilter, spec.id]);
+
+  const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec);
+
   columns.push({
     header: "",
     className: "text-right whitespace-nowrap",
-    cell: (row) => {
-      const id = getByPath<string>(row, "id") ?? "";
-      const name = getByPath<string>(row, "name") ?? id;
-      // Иерархический drill-down: для Org/Cloud/Folder ведёт в дочерний список.
-      // Leaf-ресурсы (VPC) идут в DetailPage.
-      const drill = spec.childRoute ? spec.childRoute.replace(":id", id) : null;
-      const target = drill ?? `${basePath}/${id}`;
-      return (
-        <div className="flex items-center justify-end gap-1">
-          <Button asChild variant="ghost" size="sm">
-            <Link to={target}>
-              {drill ? (
-                <>
-                  <ChevronRight className="h-4 w-4" /> Open
-                </>
-              ) : (
-                <>
-                  <Eye className="h-4 w-4" /> View
-                </>
-              )}
-            </Link>
-          </Button>
-          {spec.ops.update && (
-            <ResourceFormDialog
-              mode="edit"
-              title={`Edit ${spec.singular}`}
-              description="Изменяет ресурс; status пишется только сервером."
-              apiPath={`${spec.apiPath}/${id}`}
-              resourceId={spec.id}
-              template={row}
-              fields={spec.fields}
-              folderUid={filterValue ?? null}
-              sanitize={spec.sanitize}
-            />
-          )}
-          {spec.ops.delete && (
-            <DeleteButton
-              apiPath={`${spec.apiPath}/${id}`}
-              resourceId={spec.id}
-              name={name}
-              resourceLabel={spec.singular}
-              folderUid={filterValue ?? null}
-              triggerLabel=""
-            />
-          )}
-        </div>
-      );
-    },
+    cell: (row) => (
+      <RowActionsMenu
+        spec={spec}
+        row={row}
+        basePath={basePath}
+        folderUid={filterValue ?? null}
+      />
+    ),
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{spec.plural}</h1>
-            <PollingIndicator isFetching={isFetching} isError={isError} />
-          </div>
-          {spec.description && (
-            <p className="text-sm text-muted-foreground">{spec.description}</p>
-          )}
-          {parentField && filterValue && (
-            <p className="text-xs text-muted-foreground mt-1">
-              {parentField}: <code className="bg-muted px-1 py-0.5 rounded">{filterValue.slice(0, 8)}…</code>
-            </p>
-          )}
-        </div>
-        {spec.ops.create && (
-          <ResourceFormDialog
-            mode="create"
-            title={`Create ${spec.singular}`}
-            apiPath={spec.apiPath}
-            resourceId={spec.id}
-            template={spec.template({
-              folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
-              cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
-              organizationId:
-                parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
-            })}
-            fields={spec.fields}
-            folderUid={filterValue ?? null}
-            sanitize={spec.sanitize}
-          />
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <div>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          {spec.plural}
+        </Typography.Title>
+        {spec.description && (
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            {spec.description}
+          </Typography.Text>
         )}
       </div>
 
-      {isError && (
-        <div className="rounded-md bg-destructive/10 text-destructive p-3 text-sm">
-          Ошибка: {(error as Error).message}
-        </div>
-      )}
+      <Space size={12} wrap>
+        <Input.Search
+          placeholder="Фильтр по имени или идентификатору"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          style={{ width: 360 }}
+          allowClear
+        />
+        {hasZoneFilter && (
+          <Select
+            value={zone}
+            onChange={setZone}
+            options={zoneOptions}
+            style={{ width: 240 }}
+          />
+        )}
+      </Space>
 
+      {isError ? (
+        <ErrorResult error={error} />
+      ) : (
       <ResourceTable
-        rows={items}
+        rows={filteredItems}
         loading={isLoading && items.length === 0}
         rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
         columns={columns}
+        onRowClick={(row) => {
+          const id = getByPath<string>(row, "id");
+          if (!id) return;
+          // childRoute шаблон: /folders/:id, /clouds/:id/folders, ...
+          const target = spec.childRoute
+            ? spec.childRoute.replace(":id", id)
+            : `${basePath}/${id}`;
+          navigate(target);
+        }}
       />
-    </div>
+      )}
+    </Space>
   );
 }
 
-function PollingIndicator({
-  isFetching,
-  isError,
-}: {
-  isFetching: boolean;
-  isError: boolean;
-}) {
-  if (isError) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-rose-600">
-        <RefreshCw className="h-3 w-3" /> offline
-      </span>
-    );
-  }
-  if (isFetching) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" /> polling
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-emerald-600" title="Данные актуальны">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-      live
-    </span>
-  );
-}
-
-function formatCell(c: { path: string; format?: string }, row: Record<string, unknown>): ReactNode {
-  const v = getByPath(row, c.path);
-  switch (c.format) {
-    case "status":
-      return <StatusBadge state={typeof v === "string" ? v : undefined} />;
-    case "uid-short":
-      return typeof v === "string" && v ? (
-        <code className="text-xs text-muted-foreground">{v.slice(0, 8)}…</code>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      );
-    case "datetime":
-      return typeof v === "string" && v ? (
-        <span className="text-xs text-muted-foreground">{new Date(v).toLocaleString()}</span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      );
-    case "code":
-      return typeof v === "string" || typeof v === "number" ? (
-        <code className="text-xs">{String(v)}</code>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      );
-    case "list":
-      if (Array.isArray(v) && v.length > 0) {
-        return <span className="text-xs">{v.join(", ")}</span>;
-      }
-      return <span className="text-muted-foreground">—</span>;
-    case "text":
-    default:
-      if (v == null || v === "") return <span className="text-muted-foreground">—</span>;
-      return String(v);
-  }
-}

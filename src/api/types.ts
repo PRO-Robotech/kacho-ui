@@ -184,3 +184,130 @@ export interface SecurityGroupList {
   security_groups: SecurityGroup[];
   next_page_token?: string;
 }
+
+// ====== compute ======
+
+export interface Disk {
+  id: string;
+  folder_id?: string;
+  created_at?: string;
+  name: string;
+  description?: string;
+  labels?: Record<string, string>;
+  type_id?: string;
+  zone_id?: string;
+  size?: string | number;
+  block_size?: string | number;
+  status?: "STATUS_UNSPECIFIED" | "CREATING" | "READY" | "ERROR" | "DELETING" | string;
+  source_image_id?: string;
+  source_snapshot_id?: string;
+  instance_ids?: string[];
+}
+
+export interface DiskList {
+  disks: Disk[];
+  next_page_token?: string;
+}
+
+export interface Image {
+  id: string;
+  folder_id?: string;
+  created_at?: string;
+  name: string;
+  description?: string;
+  labels?: Record<string, string>;
+  family?: string;
+  storage_size?: string | number;
+  min_disk_size?: string | number;
+  product_ids?: string[];
+  status?: "STATUS_UNSPECIFIED" | "CREATING" | "READY" | "ERROR" | "DELETING" | string;
+  os?: { type?: string };
+  pooled?: boolean;
+}
+
+export interface ImageList {
+  images: Image[];
+  next_page_token?: string;
+}
+
+export interface Snapshot {
+  id: string;
+  folder_id?: string;
+  created_at?: string;
+  name: string;
+  description?: string;
+  labels?: Record<string, string>;
+  storage_size?: string | number;
+  disk_size?: string | number;
+  product_ids?: string[];
+  status?: "STATUS_UNSPECIFIED" | "CREATING" | "READY" | "ERROR" | "DELETING" | string;
+  source_disk_id?: string;
+}
+
+export interface SnapshotList {
+  snapshots: Snapshot[];
+  next_page_token?: string;
+}
+
+export interface InstanceNetworkInterface {
+  index?: string;
+  subnet_id?: string;
+  primary_v4_address?: { address?: string; one_to_one_nat?: { address?: string; ip_version?: string } };
+  security_group_ids?: string[];
+}
+
+export interface AttachedDisk {
+  mode?: string;
+  device_name?: string;
+  auto_delete?: boolean;
+  disk_id?: string;
+}
+
+export interface Instance {
+  id: string;
+  folder_id?: string;
+  created_at?: string;
+  name: string;
+  description?: string;
+  labels?: Record<string, string>;
+  zone_id?: string;
+  platform_id?: string;
+  resources?: { memory?: string | number; cores?: string | number; core_fraction?: string | number; gpus?: string | number };
+  status?:
+    | "STATUS_UNSPECIFIED" | "PROVISIONING" | "RUNNING" | "STOPPING" | "STOPPED"
+    | "STARTING" | "RESTARTING" | "UPDATING" | "ERROR" | "CRASHED" | "DELETING" | string;
+  metadata?: Record<string, string>;
+  boot_disk?: AttachedDisk;
+  secondary_disks?: AttachedDisk[];
+  network_interfaces?: InstanceNetworkInterface[];
+  fqdn?: string;
+  service_account_id?: string;
+}
+
+export interface InstanceList {
+  instances: Instance[];
+  next_page_token?: string;
+}
+
+export interface DiskType {
+  id: string;
+  description?: string;
+  zone_ids?: string[];
+}
+
+export interface DiskTypeList {
+  disk_types: DiskType[];
+  next_page_token?: string;
+}
+
+// compute.v1.Zone — read-only справочник зон, зеркало vpc zones.
+export interface ComputeZone {
+  id: string;
+  region_id?: string;
+  status?: string;
+}
+
+export interface ComputeZoneList {
+  zones: ComputeZone[];
+  next_page_token?: string;
+}

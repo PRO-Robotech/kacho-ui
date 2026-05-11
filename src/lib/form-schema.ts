@@ -9,7 +9,8 @@ export type FormField =
   | RefField
   | ArrayField
   | BoolField
-  | SgRulesField;
+  | SgRulesField
+  | LabelsField;
 
 interface BaseField {
   name: string; // dotted-path: "metadata.name", "spec.rules[0].direction"
@@ -23,6 +24,15 @@ interface BaseField {
   // applySubnetMask `v4_cidr_blocks is immutable after Subnet.Create`),
   // но UI ловит это раньше + сразу подсказывает пользователю.
   immutable?: boolean;
+  // Edit-only-hidden — поле есть в Create, но в Edit вообще не рендерится.
+  // Используется когда поле управляется отдельным action'ом на DetailPage
+  // (например, Subnet.v4_cidr_blocks → :add-cidr-blocks/:remove-cidr-blocks).
+  editHidden?: boolean;
+  // Условная видимость поля по значению другого поля формы (top-level path).
+  // Используется для proto oneof: discriminator-enum (`_address_kind`) скрывает
+  // неактивную ветку (external_* vs internal_*). Поле всё ещё может присутствовать
+  // в `obj`, sanitize стрижёт его перед отправкой.
+  visibleWhen?: { field: string; equals: string | string[] };
 }
 
 export interface StringField extends BaseField {
@@ -73,6 +83,12 @@ export interface ArrayField extends BaseField {
   minItems?: number;
   // Default для нового элемента
   newItem?: () => Record<string, unknown>;
+}
+
+// Editor для map<string,string> (Yandex Cloud labels). Хранится в obj как
+// объект {key: value}; UI рендерит через LabelsEditor с rows-style редактором.
+export interface LabelsField extends BaseField {
+  type: "labels";
 }
 
 // Специализированный editor для VPC SecurityGroup rules — слишком много conditional
