@@ -437,10 +437,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "IPv6 CIDR Blocks",
         type: "array",
         itemLabel: "CIDR",
-        description: "Опционально. IPv6 CIDR-блоки подсети. Задаётся только при создании.",
-        immutable: true,
-        // Как v4_cidr_blocks — в Edit не показывается (после Create immutable).
-        editHidden: true,
+        description: "Опционально. IPv6 CIDR-блоки подсети.",
+        // Показывается и в Create, и в Edit: kacho-proto принимает v6_cidr_blocks
+        // в UpdateSubnetRequest (soft-immutable на бэкенде — поле принимается, но
+        // изменение значения не применяется; см. applySubnetMask). В Edit-форме
+        // редактируемо так же, как остальные mutable-поля; реальное добавление
+        // CIDR после создания — через verbs :add-cidr-blocks / :remove-cidr-blocks
+        // на DetailPage (как для v4_cidr_blocks).
         newItem: () => ({ value: "" }),
         itemFields: [
           {
@@ -470,29 +473,28 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       name: "",
       network_id: "",
       zone_id: "",
-      v4_cidr_blocks: [{ value: "" }],
+      // v4_cidr_blocks больше не обязателен при создании (kacho-proto снял
+      // (required) с CreateSubnetRequest.v4_cidr_blocks; kacho-vpc допускает
+      // подсеть без IPv4 CIDR — добавляется позже через :add-cidr-blocks).
+      v4_cidr_blocks: [],
       v6_cidr_blocks: [],
       description: "",
     }),
-    // Конвертирует [{value: "10.0.0.0/24"}, ...] → ["10.0.0.0/24", ...] для wire format
-    // (для v4_cidr_blocks и v6_cidr_blocks). Пустой v6-список — выбрасываем.
+    // Конвертирует [{value: "10.0.0.0/24"}, ...] → ["10.0.0.0/24", ...] для wire
+    // format (для v4_cidr_blocks и v6_cidr_blocks). Пустой список передаётся как
+    // [] — оба поля опциональны и на create, и на update (soft-immutable).
     sanitize: (obj) => {
       const out: Record<string, unknown> = { ...obj };
       for (const key of ["v4_cidr_blocks", "v6_cidr_blocks"]) {
         const raw = out[key];
         if (Array.isArray(raw)) {
-          const list = raw
+          out[key] = raw
             .map((item) =>
               typeof item === "object" && item !== null && "value" in (item as object)
                 ? (item as Record<string, unknown>)["value"]
                 : item,
             )
             .filter((v) => typeof v === "string" && v);
-          if (key === "v6_cidr_blocks" && list.length === 0) {
-            delete out[key];
-          } else {
-            out[key] = list;
-          }
         }
       }
       return out;
@@ -1060,7 +1062,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Network", path: "network_id", format: "uid-short" },
+      {
+        header: "Network",
+        path: "network_id",
+        // network_id у SG теперь опционален (kacho-proto снял (required) с
+        // CreateSecurityGroupRequest.network_id; kacho-vpc допускает SG без сети).
+        render: (row) => {
+          const nid = row.network_id as string | undefined;
+          return nid ? <RefNameLink specId="networks" refId={nid} asTag /> : <span className="text-muted-foreground">—</span>;
+        },
+      },
       { header: "Status", path: "status", format: "status" },
       { header: "Default", path: "default_for_network", format: "text" },
       COL_CREATED,
@@ -1074,7 +1085,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "ref",
         refResource: "networks",
         refFolderScoped: true,
-        required: true,
+        // Опционально: SG можно создать без привязки к сети (kacho-vpc).
+        placeholder: "— без сети —",
+        description: "Опционально. Если не задано — группа безопасности не привязана к сети.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
@@ -1099,11 +1112,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     }),
     // Чистит UI-дискриминаторы (_protocol_mode/_ports_any/_target_kind) и
     // неактивные ветки oneof перед PATCH/POST. См. SgRulesEditor.
+    // Пустой network_id выбрасываем — SG может быть без привязки к сети.
     sanitize: (obj) => {
-      const raw = obj["rules"];
-      if (!Array.isArray(raw)) return obj;
-      const clean = raw.map((r) => sanitizeSgRule(r as Record<string, unknown>));
-      return { ...obj, rules: clean };
+      const out: Record<string, unknown> = { ...obj };
+      if (!out["network_id"]) delete out["network_id"];
+      const raw = out["rules"];
+      if (Array.isArray(raw)) {
+        out["rules"] = raw.map((r) => sanitizeSgRule(r as Record<string, unknown>));
+      }
+      return out;
     },
   },
 

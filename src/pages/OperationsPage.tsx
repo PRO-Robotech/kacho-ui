@@ -25,6 +25,7 @@ import { REGISTRY } from "@/lib/resource-registry";
 const VPC_RESOURCES = [
   { id: "networks", label: "Network" },
   { id: "subnets", label: "Subnet" },
+  { id: "network-interfaces", label: "Network Interface" },
   { id: "addresses", label: "Address" },
   { id: "route-tables", label: "Route Table" },
   { id: "security-groups", label: "Security Group" },
