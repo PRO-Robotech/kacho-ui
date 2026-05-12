@@ -577,6 +577,20 @@ export function ResourceDetailPage({
             render: () => <OperationsTab spec={spec} resourceId={resourceId} />,
           },
         ]),
+    ...(spec.internalGetPath
+      ? [
+          {
+            id: "jsonint",
+            label: "jsonint",
+            render: () => (
+              <JsonIntTab
+                path={spec.internalGetPath!.replace("{id}", resourceId)}
+                queryKey={[spec.id, "jsonint", resourceId]}
+              />
+            ),
+          },
+        ]
+      : []),
     ...(hideJsonTab
       ? []
       : [
@@ -632,6 +646,37 @@ export function ResourceDetailPage({
 
   // Suppress unused
   void navigate;
+}
+
+// JsonIntTab — generic "jsonint" tab: GET <internalGetPath с подставленным {id}>
+// и pretty-print JSON-ответа (read-only Monaco viewer, тот же, что у "JSON"-таба).
+// Показывается только для ресурсов с spec.internalGetPath (internal/infra-проекция
+// ресурса — Network → +vpn_id; NetworkInterface → +hv_id/sid/host_iface/...).
+// 404 / not-implemented → дружелюбное сообщение вместо raw-ошибки.
+function JsonIntTab({ path, queryKey }: { path: string; queryKey: unknown[] }) {
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey,
+    queryFn: () => api.get<unknown>(path),
+    refetchInterval: 5_000,
+    staleTime: 0,
+  });
+
+  if (isLoading && data === undefined) {
+    return <Spin tip="Загрузка…" />;
+  }
+  if (isError) {
+    const notFound =
+      error instanceof ApiError && (error.status === 404 || error.status === 501);
+    return (
+      <ErrorResult
+        error={notFound ? undefined : error}
+        status={notFound ? "404" : undefined}
+        title={notFound ? "404" : undefined}
+        subTitle={notFound ? "Internal-проекция для этого ресурса недоступна." : undefined}
+      />
+    );
+  }
+  return <JsonMonacoView data={data} />;
 }
 
 // UsedByBlock — generic "Used by" rendering for any resource whose API response

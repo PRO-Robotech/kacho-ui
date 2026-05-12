@@ -426,6 +426,7 @@ export default function App() {
               <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
               <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
               <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
+              <Route path="/system/hypervisors" element={<ResourceListPage spec={REGISTRY.hypervisors} />} />
             </Route>
             <Route path="/system/regions/create" element={<ResourceCreatePage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
@@ -436,6 +437,8 @@ export default function App() {
             <Route path="/system/address-pools/create" element={<ResourceCreatePage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
             <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
+            <Route path="/system/hypervisors/create" element={<ResourceCreatePage spec={REGISTRY.hypervisors} />} />
+            <Route path="/system/hypervisors/:uid" element={<ResourceDetailPage spec={REGISTRY.hypervisors} hideOperationsTab />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
 
             <Route path="*" element={<Navigate to="/" replace />} />
