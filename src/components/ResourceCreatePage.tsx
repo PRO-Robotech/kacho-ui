@@ -42,21 +42,29 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   // Контекст приходит либо из nested-URL params (`/networks/<n>/.../create`),
   // либо из query (`?network_id=...&subnet_id=...&kind=...`) для обратной
   // совместимости и для случая create-из-list-page с pre-selected parent.
-  const presetFields = useMemo(() => {
+  // `presetFields` — заблокированные (immutable) поля из контекста.
+  // `softPresetFields` — предзаполненные, но editable (начальное значение,
+  // не lock). Пример: `_address_kind` для адреса из контекста подсети — дефолт
+  // "internal", но пользователь может переключить на "internal_v6".
+  const { presetFields, softPresetFields } = useMemo(() => {
     const out: Record<string, unknown> = {};
+    const soft: Record<string, unknown> = {};
     const subnetId = (params.subnetId as string | undefined) ?? searchParams.get("subnet_id");
     const networkId = (params.networkId as string | undefined) ?? searchParams.get("network_id");
     const kind = searchParams.get("kind");
-    if (kind) out["_address_kind"] = kind;
-    if (subnetId) {
-      if (kind === "internal" || (!kind && spec.id === "addresses")) {
-        out["internal_ipv4_address_spec.subnet_id"] = subnetId;
-      } else {
-        out["subnet_id"] = subnetId;
-      }
+    if (spec.id === "addresses" && subnetId) {
+      // К какой бы версии (v4/v6) пользователь ни переключился — адрес
+      // привязан к этой подсети; sanitize выкинет неактивную ветку.
+      out["internal_ipv4_address_spec.subnet_id"] = subnetId;
+      out["internal_ipv6_address_spec.subnet_id"] = subnetId;
+      // `?kind=` задаёт лишь дефолт переключателя, не запирает его.
+      soft["_address_kind"] = kind === "internal_v6" ? "internal_v6" : "internal";
+    } else {
+      if (kind) out["_address_kind"] = kind;
+      if (subnetId) out["subnet_id"] = subnetId;
     }
     if (networkId) out["network_id"] = networkId;
-    return out;
+    return { presetFields: out, softPresetFields: soft };
   }, [params.subnetId, params.networkId, searchParams, spec.id]);
 
   const initialObj = useMemo(() => {
@@ -66,6 +74,9 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
         ? { ...(tpl as Record<string, unknown>) }
         : {};
     let merged: Record<string, unknown> = applyFieldDefaults(spec.fields, baseObj);
+    for (const [path, val] of Object.entries(softPresetFields)) {
+      merged = setByPath(merged, path, val);
+    }
     for (const [path, val] of Object.entries(presetFields)) {
       merged = setByPath(merged, path, val);
     }

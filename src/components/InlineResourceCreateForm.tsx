@@ -23,6 +23,15 @@ interface Props {
   /** Поля, которые должны быть pre-filled и locked (immutable в форме).
    *  Ключи — paths (например "network_id" или "internal_ipv4_address_spec.subnet_id"). */
   presetFields?: Record<string, unknown>;
+  /** Поля, которые должны быть pre-filled, но остаются editable (это начальное
+   *  значение, не lock). Пример: `_address_kind` при создании адреса из контекста
+   *  подсети — дефолт "internal", но пользователь может переключить на "internal_v6". */
+  editablePresetFields?: Record<string, unknown>;
+  /** Per-field ограничение набора опций enum-полей. Ключ — имя поля, значение —
+   *  список допустимых `value` (в нужном порядке). Опции, не вошедшие в список,
+   *  не показываются. Пример: `{ _address_kind: ["internal", "internal_v6"] }` —
+   *  в контексте подсети internal IPv4/IPv6, без `external`. */
+  fieldOptionsFilter?: Record<string, string[]>;
   /** folderUid для invalidate + OperationBanner. */
   folderUid: string | null;
   /** Title формы. По умолчанию — "Создать <singular>". */
@@ -36,6 +45,8 @@ export function InlineResourceCreateForm({
   spec,
   ctx,
   presetFields,
+  editablePresetFields,
+  fieldOptionsFilter,
   folderUid,
   title,
   onCancel,
@@ -43,6 +54,10 @@ export function InlineResourceCreateForm({
 }: Props) {
   const invalidate = useInvalidateResourceList();
   const presets = useMemo(() => presetFields ?? {}, [presetFields]);
+  const editablePresets = useMemo(
+    () => editablePresetFields ?? {},
+    [editablePresetFields],
+  );
 
   const initialObj = useMemo(() => {
     const tpl = spec.template(ctx);
@@ -51,6 +66,9 @@ export function InlineResourceCreateForm({
         ? { ...(tpl as Record<string, unknown>) }
         : {};
     let merged: Record<string, unknown> = applyFieldDefaults(spec.fields, baseObj);
+    for (const [path, val] of Object.entries(editablePresets)) {
+      merged = setByPath(merged, path, val);
+    }
     for (const [path, val] of Object.entries(presets)) {
       merged = setByPath(merged, path, val);
     }
@@ -141,15 +159,27 @@ export function InlineResourceCreateForm({
           // они уже подразумеваются местом, где открыта форма. Не загромождаем
           // UI и не дублируем выбор.
           .filter((f) => !lockedPathsRef.current.has(f.name))
-          .map((f) => (
-            <FormFieldRenderer
-              key={f.name}
-              field={f}
-              pathPrefix=""
-              value={obj}
-              onChange={setObj}
-            />
-          ))}
+          .map((f) => {
+            const allowed = fieldOptionsFilter?.[f.name];
+            const field =
+              allowed && f.type === "enum"
+                ? {
+                    ...f,
+                    options: allowed
+                      .map((v) => f.options.find((o) => o.value === v))
+                      .filter((o): o is { value: string; label: string } => !!o),
+                  }
+                : f;
+            return (
+              <FormFieldRenderer
+                key={f.name}
+                field={field}
+                pathPrefix=""
+                value={obj}
+                onChange={setObj}
+              />
+            );
+          })}
       </Space>
 
 
