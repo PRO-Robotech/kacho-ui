@@ -443,13 +443,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "IPv6 CIDR Blocks",
         type: "array",
         itemLabel: "CIDR",
-        description: "Опционально. IPv6 CIDR-блоки подсети.",
-        // Показывается и в Create, и в Edit: kacho-proto принимает v6_cidr_blocks
-        // в UpdateSubnetRequest (soft-immutable на бэкенде — поле принимается, но
-        // изменение значения не применяется; см. applySubnetMask). В Edit-форме
-        // редактируемо так же, как остальные mutable-поля; реальное добавление
-        // CIDR после создания — через verbs :add-cidr-blocks / :remove-cidr-blocks
-        // на DetailPage (как для v4_cidr_blocks).
+        description: "Опционально. IPv6 CIDR-блоки подсети (settable только при создании).",
+        // В Edit поле не показывается — UpdateSubnet.v6_cidr_blocks soft-immutable
+        // (поле принимается, но изменение значения не применяется; см.
+        // applySubnetMask), поэтому в Edit-форме оно вводило в заблуждение.
+        // После Create управляется через SubnetCidrManager на DetailPage
+        // (verbs :add-cidr-blocks / :remove-cidr-blocks), как и v4_cidr_blocks.
+        editHidden: true,
         newItem: () => ({ value: "" }),
         itemFields: [
           {
