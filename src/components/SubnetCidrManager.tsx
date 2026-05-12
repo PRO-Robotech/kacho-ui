@@ -1,9 +1,11 @@
-// SubnetCidrManager — отдельный UI-flow для управления v4_cidr_blocks подсети
-// через verbs `:add-cidr-blocks` / `:remove-cidr-blocks`.
+// SubnetCidrManager — отдельный UI-flow для управления v4_cidr_blocks /
+// v6_cidr_blocks подсети через verbs `:add-cidr-blocks` / `:remove-cidr-blocks`.
 //
-// Backend (kacho-vpc/internal/service/subnet.go) запрещает менять v4_cidr_blocks
-// через обычный PATCH (`v4_cidr_blocks is immutable after Subnet.Create`). YC
-// для этого выделяет отдельные RPC, которые UI вызывает через api.action().
+// Backend (kacho-vpc/internal/service/subnet.go) запрещает менять CIDR-блоки
+// через обычный PATCH (`v4_cidr_blocks is immutable after Subnet.Create`; то же
+// для v6 — UpdateSubnet.v6_cidr_blocks no-op). Для этого выделены отдельные RPC,
+// которые UI вызывает через api.action(). Оба verb'а принимают v4_cidr_blocks
+// и/или v6_cidr_blocks и возвращают Operation (поллим до done).
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,23 +17,48 @@ import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { extractOperationId } from "@/components/OperationDialog";
 import { toast } from "@/lib/toast";
 
+type CidrKind = "v4" | "v6";
+
 interface Props {
   subnetId: string;
-  // Текущие CIDR-блоки (из data.v4_cidr_blocks).
+  // Текущие IPv4 CIDR-блоки (из data.v4_cidr_blocks).
+  v4Blocks: string[];
+  // Текущие IPv6 CIDR-блоки (из data.v6_cidr_blocks).
+  v6Blocks?: string[];
+}
+
+const FIELD_BY_KIND: Record<CidrKind, "v4_cidr_blocks" | "v6_cidr_blocks"> = {
+  v4: "v4_cidr_blocks",
+  v6: "v6_cidr_blocks",
+};
+
+function validateCidr(kind: CidrKind, cidr: string): string | null {
+  if (!cidr) return "Введите CIDR.";
+  if (!cidr.includes("/")) return "CIDR должен содержать префикс (например /24).";
+  if (kind === "v6" && !cidr.includes(":")) return "Похоже не на IPv6-адрес.";
+  return null;
+}
+
+interface SectionProps {
+  subnetId: string;
+  kind: CidrKind;
   blocks: string[];
 }
 
-export function SubnetCidrManager({ subnetId, blocks }: Props) {
+function CidrSection({ subnetId, kind, blocks }: SectionProps) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState("");
   const [opId, setOpId] = useState<string | null>(null);
   const [opTitle, setOpTitle] = useState("");
   const [pendingCidr, setPendingCidr] = useState<string | null>(null);
 
+  const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
+  const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
+
   const mutate = useMutation({
     mutationFn: async (params: { verb: "add" | "remove"; cidr: string }) => {
       const path = `/vpc/v1/subnets/${subnetId}:${params.verb}-cidr-blocks`;
-      return api.action(path, { v4_cidr_blocks: [params.cidr] });
+      return api.action(path, { [FIELD_BY_KIND[kind]]: [params.cidr] });
     },
     onSuccess: (resp, vars) => {
       const id = extractOperationId(resp);
@@ -54,7 +81,11 @@ export function SubnetCidrManager({ subnetId, blocks }: Props) {
 
   const onAdd = () => {
     const cidr = draft.trim();
-    if (!cidr) return;
+    const v = validateCidr(kind, cidr);
+    if (v) {
+      toast.error(v);
+      return;
+    }
     setPendingCidr(cidr);
     mutate.mutate({ verb: "add", cidr });
     setDraft("");
@@ -72,7 +103,7 @@ export function SubnetCidrManager({ subnetId, blocks }: Props) {
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">IPv4 CIDR blocks</h3>
+        <h3 className="font-semibold text-sm">{label}</h3>
         <span className="text-xs text-muted-foreground">{blocks.length} блок(ов)</span>
       </div>
 
@@ -110,7 +141,7 @@ export function SubnetCidrManager({ subnetId, blocks }: Props) {
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="10.0.1.0/24"
+          placeholder={placeholder}
           className="font-mono text-xs h-8"
           disabled={mutate.isPending || opId !== null}
           onKeyDown={(e) => {
@@ -141,6 +172,15 @@ export function SubnetCidrManager({ subnetId, blocks }: Props) {
           qc.invalidateQueries({ queryKey: ["subnets", "list"] });
         }}
       />
+    </div>
+  );
+}
+
+export function SubnetCidrManager({ subnetId, v4Blocks, v6Blocks }: Props) {
+  return (
+    <div className="space-y-3">
+      <CidrSection subnetId={subnetId} kind="v4" blocks={v4Blocks} />
+      <CidrSection subnetId={subnetId} kind="v6" blocks={v6Blocks ?? []} />
     </div>
   );
 }

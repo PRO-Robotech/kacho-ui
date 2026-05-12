@@ -86,6 +86,7 @@ export function InlineSubnetEditForm({
   const networkId = (subnet?.network_id as string | undefined) ?? "";
   const zoneId = (subnet?.zone_id as string | undefined) ?? "";
   const v4Cidrs = (subnet?.v4_cidr_blocks as string[] | undefined) ?? [];
+  const v6Cidrs = (subnet?.v6_cidr_blocks as string[] | undefined) ?? [];
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -318,14 +319,14 @@ export function InlineSubnetEditForm({
         <Form.Item
           label={
             <Space size={4}>
-              IPv4 CIDR
-              <Tooltip title="Управляется через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
+              IPv4 и IPv6 CIDR
+              <Tooltip title="IPv4 and IPv6 CIDR blocks managed via :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
                 <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
         >
-          <SubnetCidrManager subnetId={subnetId} blocks={v4Cidrs} />
+          <SubnetCidrManager subnetId={subnetId} v4Blocks={v4Cidrs} v6Blocks={v6Cidrs} />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>
