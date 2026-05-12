@@ -777,6 +777,162 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     }),
   },
 
+  // proto: GET /vpc/v1/networkInterfaces — AWS-ENI-подобный ресурс (эпик KAC-2).
+  // Публичная проекция: tenant-facing намерение + результат (id/name/привязки/
+  // выделенные tenant-адреса/status). Инфра-поля (hv_id/sid/host_iface/...) —
+  // только во InternalNetworkInterfaceService, тут не показываются (см. workspace
+  // CLAUDE.md §«Инфра-чувствительные данные»). Мутации (Create/Update/Delete/
+  // Attach/Detach) async → Operation, как у остальных VPC-ресурсов.
+
+  "network-interfaces": {
+    id: "network-interfaces",
+    route: "network-interfaces",
+    apiPath: "/vpc/v1/networkInterfaces",
+    payloadKey: "network_interfaces",
+    singular: "Network Interface",
+    plural: "Сетевые интерфейсы",
+    serviceTitle: "Virtual Private Cloud",
+    scope: "folder",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Подсеть",
+        path: "subnet_id",
+        render: (row) => (
+          <RefNameLink specId="subnets" refId={row.subnet_id as string | undefined} />
+        ),
+      },
+      {
+        header: "Первичный IPv4",
+        path: "primary_v4_address",
+        render: (row) => {
+          const ip = row.primary_v4_address as string | undefined;
+          return ip ? <span className="font-mono text-xs">{ip}</span> : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "Статус",
+        path: "status",
+        format: "status",
+      },
+      {
+        header: "Виртуальная машина",
+        path: "instance_id",
+        render: (row) => (
+          <RefNameLink specId="compute-instances" refId={row.instance_id as string | undefined} asTag />
+        ),
+      },
+      {
+        header: "Дата создания",
+        path: "created_at",
+        format: "datetime",
+      },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => (
+          <LabelsCell labels={row.labels as Record<string, string> | undefined} />
+        ),
+      },
+    ],
+    fields: [
+      FIELD_NAME_VPC,
+      {
+        name: "subnet_id",
+        label: "Подсеть",
+        type: "ref",
+        refResource: "subnets",
+        refFolderScoped: true,
+        required: true,
+        immutable: true,
+        description: "Subnet, в которой создаётся интерфейс. Менять нельзя после создания.",
+      },
+      {
+        name: "primary_v4_address",
+        label: "Первичный IPv4-адрес",
+        type: "string",
+        required: true,
+        placeholder: "<ip-address>",
+        description: "В v1 адрес задаётся явно (автовыделение пока не поддержано). Должен входить в CIDR подсети.",
+      },
+      {
+        name: "secondary_v4_addresses",
+        label: "Дополнительные IPv4-адреса",
+        type: "array",
+        itemLabel: "Адрес",
+        description: "Опционально. Дополнительные IPv4-адреса из той же подсети.",
+        newItem: () => ({ value: "" }),
+        itemFields: [
+          { name: "value", label: "IPv4", type: "string", required: true, placeholder: "<ip-address>" },
+        ],
+      },
+      {
+        name: "v6_addresses",
+        label: "IPv6-адреса",
+        type: "array",
+        itemLabel: "Адрес",
+        description: "Опционально. IPv6-адреса интерфейса.",
+        newItem: () => ({ value: "" }),
+        itemFields: [
+          { name: "value", label: "IPv6", type: "string", required: true, placeholder: "<ipv6-address>" },
+        ],
+      },
+      {
+        name: "security_group_ids",
+        label: "Группы безопасности",
+        type: "array",
+        itemLabel: "SG",
+        description: "Опционально. Если не задано — действует SG по умолчанию для сети.",
+        newItem: () => ({ value: "" }),
+        itemFields: [
+          { name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true },
+        ],
+      },
+      FIELD_LABELS,
+      FIELD_DESCRIPTION,
+      FIELD_FOLDER_ID,
+    ],
+    template: ({ folderId }) => ({
+      folder_id: folderId ?? "",
+      name: "",
+      subnet_id: "",
+      primary_v4_address: "",
+      secondary_v4_addresses: [],
+      v6_addresses: [],
+      security_group_ids: [],
+      description: "",
+      labels: {},
+    }),
+    // Конвертирует [{value: "..."}, ...] → ["...", ...] для wire format
+    // (как subnets.v4_cidr_blocks / instance NIC security_group_ids).
+    sanitize: (obj) => {
+      const out: Record<string, unknown> = { ...obj };
+      for (const key of ["secondary_v4_addresses", "v6_addresses", "security_group_ids"]) {
+        const raw = out[key];
+        if (Array.isArray(raw)) {
+          out[key] = raw
+            .map((item) =>
+              typeof item === "object" && item !== null && "value" in (item as object)
+                ? (item as Record<string, unknown>)["value"]
+                : item,
+            )
+            .filter((v) => typeof v === "string" && v);
+        }
+      }
+      return out;
+    },
+  },
+
   // proto: GET /vpc/v1/securityGroups (YC использует camelCase в URL)
 
   "security-groups": {

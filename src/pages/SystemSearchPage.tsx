@@ -26,6 +26,7 @@ const DOMAINS = [
   { resource: "networks",      path: "/vpc/v1/networks",                       key: "networks",      linkBase: "/folders/:folder_id/networks/:id" },
   { resource: "subnets",       path: "/vpc/v1/subnets",                        key: "subnets",       linkBase: "/folders/:folder_id/subnets/:id" },
   { resource: "addresses",     path: "/vpc/v1/addresses",                      key: "addresses",     linkBase: "/folders/:folder_id/addresses/:id" },
+  { resource: "network-interfaces", path: "/vpc/v1/networkInterfaces",         key: "network_interfaces", linkBase: "/folders/:folder_id/network-interfaces/:id" },
   { resource: "address-pools", path: "/vpc/v1/addressPools",                   key: "pools",         linkBase: "/system/address-pools/:id" },
   { resource: "regions",       path: "/compute/v1/regions",                        key: "regions",       linkBase: "/system/regions/:id" },
   { resource: "zones",         path: "/compute/v1/zones",                          key: "zones",         linkBase: "/system/zones/:id" },
