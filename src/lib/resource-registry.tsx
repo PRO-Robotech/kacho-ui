@@ -943,6 +943,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             type: "ref",
             refResource: "addresses",
             required: true,
+            // `addresses` ресурс folder-scoped — ListAddressesRequest.folder_id
+            // (required). RefSelect авто-добавляет ?folder_id=<folder-context>;
+            // refQueryFromField докидывает &subnet_id=<form.subnet_id> сверху.
+            // Итог: GET /vpc/v1/addresses?folder_id=<folder>&subnet_id=<subnet>.
+            refFolderScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
             createResource: "addresses",
             createTitle: "Выделить IPv4-адрес из подсети",
@@ -967,6 +972,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             type: "ref",
             refResource: "addresses",
             required: true,
+            // см. комментарий у v4_address_ids — folder-scoped + subnet_id-фильтр.
+            refFolderScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
             createResource: "addresses",
             createTitle: "Выделить IPv6-адрес из подсети",
@@ -1544,13 +1551,36 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refFolderScoped: true, visibleWhen: { field: "_boot_source", equals: "disk" }, editHidden: true },
       { name: "boot_disk_spec.auto_delete", label: "Удалять загрузочный диск вместе с ВМ", type: "bool", default: true, editHidden: true },
       {
-        name: "network_interface_specs", label: "Сетевые интерфейсы", type: "array", itemLabel: "Интерфейс",
-        description: "Минимум один. Подсеть должна быть в той же зоне, что и ВМ.",
+        name: "network_interface_specs", label: "Сетевые интерфейсы", type: "array", itemLabel: "интерфейс",
+        description: "Минимум один сетевой интерфейс. Либо выберите существующий kacho-vpc NetworkInterface (nic_id) — тогда подсеть/SG/адрес берутся из него — либо опишите inline-spec (подсеть + SG + адрес), и интерфейс будет создан для ВМ. Подсеть должна быть в той же зоне, что и ВМ.",
         editHidden: true,
-        newItem: () => ({ subnet_id: "", _nat: false }),
+        newItem: () => ({ nic_id: "", subnet_id: "", _nat: false, primary_v4_address_spec: { address: "" } }),
         itemFields: [
-          { name: "subnet_id", label: "Подсеть", type: "ref", refResource: "subnets", refFolderScoped: true, required: true },
+          // KAC-5/KAC-9: attach существующий NetworkInterface-ресурс по id.
+          // RefSelect авто-добавляет ?folder_id=<folder-context>; «+ Создать
+          // интерфейс…» открывает InlineResourceCreateForm для network-interfaces
+          // (pre-fill: folder_id ВМ + subnet_id, если в spec уже выбрана подсеть).
+          {
+            name: "nic_id", label: "Существующий NetworkInterface (опционально)", type: "ref",
+            refResource: "network-interfaces", refFolderScoped: true,
+            placeholder: "— Создать новый интерфейс из spec ниже —",
+            description: "Если задано — подсеть/SG/адрес ниже игнорируются (берутся из выбранного NIC).",
+            createResource: "network-interfaces",
+            createTitle: "Создать сетевой интерфейс",
+            // Pre-fill: folder ВМ. subnet_id — per-NIC-spec, не доступен здесь
+            // (formValue в RefSelect = вся форма, не элемент массива) → пользователь
+            // выбирает подсеть в inline-create-форме. TODO(KAC-9).
+            createPresetFields: (form) => ({ folder_id: form["folder_id"] ?? "" }),
+          },
+          // Inline-spec (используется, если nic_id не задан).
+          // TODO(KAC-9): visibleWhen по sibling-полю внутри array-item не
+          // поддерживается (visibleWhen.field — top-level path), поэтому
+          // подсеть/SG/адрес показываются всегда; sanitize выкидывает их, если
+          // nic_id задан.
+          { name: "subnet_id", label: "Подсеть (для нового интерфейса)", type: "ref", refResource: "subnets", refFolderScoped: true },
           { name: "_nat", label: "Публичный IP (one-to-one NAT)", type: "bool", default: false },
+          { name: "primary_v4_address_spec.address", label: "Внутренний IPv4 (опционально)", type: "string",
+            placeholder: "(авто из CIDR подсети, если пусто)" },
           {
             name: "security_group_ids", label: "Группы безопасности", type: "array", itemLabel: "SG",
             newItem: () => ({ value: "" }),
@@ -1575,7 +1605,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       resources_spec: { cores: 2, memory_gib: 2, core_fraction: "100" },
       _boot_source: "image",
       boot_disk_spec: { auto_delete: true, disk_spec: { size_gib: 10, type_id: "" } },
-      network_interface_specs: [{ subnet_id: "", _nat: false }],
+      network_interface_specs: [{ nic_id: "", subnet_id: "", _nat: false, primary_v4_address_spec: { address: "" } }],
       description: "",
       labels: {},
     }),
@@ -1866,6 +1896,12 @@ export function sanitizeInstanceCreate(obj: Record<string, unknown>): Record<str
   const nics = Array.isArray(o["network_interface_specs"]) ? (o["network_interface_specs"] as Record<string, unknown>[]) : [];
   o["network_interface_specs"] = nics.map((nic) => {
     const out: Record<string, unknown> = {};
+    // Если выбран существующий NetworkInterface (nic_id) — отдаём только nic_id,
+    // подсеть/SG/адрес берутся из самого NIC (см. compute.v1.NetworkInterfaceSpec.nic_id, KAC-5).
+    if (nic["nic_id"]) {
+      out["nic_id"] = nic["nic_id"];
+      return out;
+    }
     if (nic["subnet_id"]) out["subnet_id"] = nic["subnet_id"];
     const sgs = Array.isArray(nic["security_group_ids"])
       ? (nic["security_group_ids"] as unknown[])
@@ -1873,7 +1909,14 @@ export function sanitizeInstanceCreate(obj: Record<string, unknown>): Record<str
           .filter((v) => typeof v === "string" && v)
       : [];
     if (sgs.length > 0) out["security_group_ids"] = sgs;
-    if (nic["_nat"] === true) out["primary_v4_address_spec"] = { one_to_one_nat_spec: { ip_version: "IPV4" } };
+    const primaryAddr =
+      typeof nic["primary_v4_address_spec"] === "object" && nic["primary_v4_address_spec"] !== null
+        ? ((nic["primary_v4_address_spec"] as Record<string, unknown>)["address"] as string | undefined)
+        : undefined;
+    const pv4: Record<string, unknown> = {};
+    if (primaryAddr) pv4["address"] = primaryAddr;
+    if (nic["_nat"] === true) pv4["one_to_one_nat_spec"] = { ip_version: "IPV4" };
+    if (Object.keys(pv4).length > 0) out["primary_v4_address_spec"] = pv4;
     return out;
   });
 
