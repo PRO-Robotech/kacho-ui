@@ -4,7 +4,7 @@
 // что и /folders/X/addresses.
 
 import { useCallback, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Button as AntButton, Input, Space, Typography } from "antd";
@@ -102,10 +102,19 @@ export function SubnetDetailPage() {
               <InlineResourceCreateForm
                 spec={addrSpec}
                 ctx={{ folderId }}
+                // subnet_id обеих oneof-веток предзаполнены и locked — к какой бы
+                // версии (v4/v6) ни переключился пользователь, адрес привязан к
+                // этой подсети; sanitize выкинет неактивную ветку из payload.
                 presetFields={{
-                  _address_kind: "internal",
                   "internal_ipv4_address_spec.subnet_id": subnetId,
+                  "internal_ipv6_address_spec.subnet_id": subnetId,
                 }}
+                // _address_kind остаётся editable: дефолт "internal" (IPv4),
+                // но пользователь может выбрать "internal_v6".
+                editablePresetFields={{ _address_kind: "internal" }}
+                // В контексте подсети `external` не имеет смысла (external-адрес
+                // не привязан к подсети) — оставляем только internal v4/v6.
+                fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
                 folderUid={folderId}
                 title="Резервирование IP-адреса"
                 onCancel={() => setCreatingAddress(false)}
@@ -114,7 +123,9 @@ export function SubnetDetailPage() {
               <AddressesSection
                 rows={subnetAddresses}
                 columns={addrColumns}
-                reserveLink={reserveLink}
+                onReserve={
+                  reserveLink ? () => setCreatingAddress(true) : null
+                }
                 onClick={(id) =>
                   addressesBasePath && navigate(`${addressesBasePath}/${id}`)
                 }
@@ -184,12 +195,12 @@ export function SubnetDetailPage() {
 function AddressesSection({
   rows,
   columns,
-  reserveLink,
+  onReserve,
   onClick,
 }: {
   rows: Array<Record<string, unknown>>;
   columns: Column<Record<string, unknown>>[];
-  reserveLink: string | null;
+  onReserve: (() => void) | null;
   onClick: (id: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -232,11 +243,9 @@ function AddressesSection({
               CIDR-блок этой подсети.
             </div>
           )}
-          {!query && reserveLink && (
-            <Button asChild>
-              <Link to={reserveLink}>
-                <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
-              </Link>
+          {!query && onReserve && (
+            <Button onClick={onReserve}>
+              <Plus className="h-4 w-4" /> Зарезервировать IP-адрес
             </Button>
           )}
         </div>
