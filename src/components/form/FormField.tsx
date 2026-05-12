@@ -190,11 +190,11 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
           {field.label}
         </Label>
         <Button type="button" variant="outline" size="sm" onClick={add} disabled={disabled}>
-          <Plus className="h-4 w-4" /> Add {field.itemLabel}
+          <Plus className="h-4 w-4" /> Добавить {field.itemLabel}
         </Button>
       </div>
       {items.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Пусто. Нажмите «Add {field.itemLabel}».</p>
+        <p className="text-xs text-muted-foreground italic">Пусто. Нажмите «Добавить {field.itemLabel}».</p>
       )}
       <div className="space-y-3">
         {items.map((_, idx) => (
