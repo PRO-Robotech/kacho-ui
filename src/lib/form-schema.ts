@@ -73,6 +73,20 @@ export interface RefField extends BaseField {
   // Если true — фильтруем по выбранному folder (selector field=folder_id op=EQ values=[currentFolder])
   refFolderScoped?: boolean;
   placeholder?: string;
+  // Динамический query-параметр для candidate-list, ключённый по значению
+  // другого поля той же формы. Пример: { param: "subnet_id", field: "subnet_id" }
+  // → GET <apiPath>?subnet_id=<form.subnet_id>. Если поле-источник пустое —
+  // список не загружается (enabled: false).
+  refQueryFromField?: { param: string; field: string };
+  // ID ресурса в registry, который можно создать прямо из дропдауна
+  // («+ Создать …» entry → открывает InlineResourceCreateForm в модалке,
+  // на success подставляет id созданного ресурса в это поле).
+  createResource?: string;
+  // Pre-fill для inline-create-формы, вычисляемый из текущего значения формы
+  // (paths → values; передаётся как presetFields в InlineResourceCreateForm).
+  createPresetFields?: (form: Record<string, unknown>) => Record<string, unknown>;
+  // Заголовок модалки создания (по умолчанию — "Создать <singular>").
+  createTitle?: string;
 }
 
 export interface ArrayField extends BaseField {

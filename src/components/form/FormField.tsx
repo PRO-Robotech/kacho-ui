@@ -152,6 +152,11 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: P
           onChange={(uid) => set(uid || undefined)}
           placeholder={field.placeholder}
           disabled={disabled}
+          refQueryFromField={field.refQueryFromField}
+          formValue={value}
+          createResource={field.createResource}
+          createPresetFields={field.createPresetFields}
+          createTitle={field.createTitle}
         />
       )}
     </div>

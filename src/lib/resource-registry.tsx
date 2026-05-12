@@ -433,6 +433,26 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
       },
       {
+        name: "v6_cidr_blocks",
+        label: "IPv6 CIDR Blocks",
+        type: "array",
+        itemLabel: "CIDR",
+        description: "Опционально. IPv6 CIDR-блоки подсети. Задаётся только при создании.",
+        immutable: true,
+        // Как v4_cidr_blocks — в Edit не показывается (после Create immutable).
+        editHidden: true,
+        newItem: () => ({ value: "" }),
+        itemFields: [
+          {
+            name: "value",
+            label: "CIDR",
+            type: "string",
+            required: true,
+            placeholder: "<ipv6>/<prefix>",
+          },
+        ],
+      },
+      {
         name: "route_table_id",
         label: "Route Table",
         type: "ref",
@@ -451,22 +471,31 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       network_id: "",
       zone_id: "",
       v4_cidr_blocks: [{ value: "" }],
+      v6_cidr_blocks: [],
       description: "",
     }),
-    // Конвертирует [{value: "10.0.0.0/24"}, ...] → ["10.0.0.0/24", ...] для wire format.
+    // Конвертирует [{value: "10.0.0.0/24"}, ...] → ["10.0.0.0/24", ...] для wire format
+    // (для v4_cidr_blocks и v6_cidr_blocks). Пустой v6-список — выбрасываем.
     sanitize: (obj) => {
-      const raw = obj["v4_cidr_blocks"];
-      if (Array.isArray(raw)) {
-        obj = {
-          ...obj,
-          v4_cidr_blocks: raw.map((item) =>
-            typeof item === "object" && item !== null && "value" in (item as object)
-              ? (item as Record<string, unknown>)["value"]
-              : item
-          ),
-        };
+      const out: Record<string, unknown> = { ...obj };
+      for (const key of ["v4_cidr_blocks", "v6_cidr_blocks"]) {
+        const raw = out[key];
+        if (Array.isArray(raw)) {
+          const list = raw
+            .map((item) =>
+              typeof item === "object" && item !== null && "value" in (item as object)
+                ? (item as Record<string, unknown>)["value"]
+                : item,
+            )
+            .filter((v) => typeof v === "string" && v);
+          if (key === "v6_cidr_blocks" && list.length === 0) {
+            delete out[key];
+          } else {
+            out[key] = list;
+          }
+        }
       }
-      return obj;
+      return out;
     },
   },
 
@@ -579,10 +608,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "enum",
         required: true,
         default: "external",
-        description: "External — публичный IP; Internal — внутри subnet.",
+        description: "External — публичный IPv4; Internal — IPv4/IPv6 из CIDR подсети.",
         options: [
           { value: "external", label: "External IPv4" },
           { value: "internal", label: "Internal IPv4" },
+          { value: "internal_v6", label: "Internal IPv6" },
         ],
         editHidden: true,
       },
@@ -624,6 +654,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         editHidden: true,
       },
       {
+        name: "internal_ipv6_address_spec.subnet_id",
+        label: "Subnet (Internal IPv6)",
+        type: "ref",
+        refResource: "subnets",
+        refFolderScoped: true,
+        description: "Subnet для Internal IPv6. Адрес выделяется из v6_cidr_blocks подсети.",
+        visibleWhen: { field: "_address_kind", equals: "internal_v6" },
+        editHidden: true,
+      },
+      {
         name: "deletion_protection",
         label: "Deletion Protection",
         type: "bool",
@@ -649,6 +689,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         if (k === "_address_kind") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
         if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
+        if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
         result[k] = v;
       }
       return result;
@@ -825,16 +866,36 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         },
       },
       {
+        header: "IPv6-адреса",
+        path: "v6_address_ids",
+        render: (row) => {
+          const ids = row.v6_address_ids as string[] | undefined;
+          const n = Array.isArray(ids) ? ids.length : 0;
+          return n > 0 ? <span className="font-mono text-xs">{n}</span> : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
         header: "Статус",
         path: "status",
         format: "status",
       },
       {
-        header: "Виртуальная машина",
-        path: "instance_id",
-        render: (row) => (
-          <RefNameLink specId="compute-instances" refId={row.instance_id as string | undefined} asTag />
-        ),
+        // `used_by` — output-only kacho.cloud.reference.Reference, заполняется
+        // когда compute-инстанс присоединяет NIC ({referrer:{type:"compute_instance",
+        // id:"<instance id>"}, type:"USED_BY"}). instance_id у NIC больше нет.
+        header: "Используется",
+        path: "used_by",
+        render: (row) => {
+          const ub = row.used_by as
+            | { referrer?: { type?: string; id?: string } }
+            | undefined;
+          const ref = ub?.referrer;
+          if (!ref?.id) return <span className="text-muted-foreground">—</span>;
+          if (ref.type === "compute_instance") {
+            return <RefNameLink specId="compute-instances" refId={ref.id} asTag />;
+          }
+          return <span className="font-mono text-xs">{ref.type ?? "?"}: {ref.id}</span>;
+        },
       },
       {
         header: "Дата создания",
@@ -861,28 +922,35 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         immutable: true,
         description: "Subnet, в которой создаётся интерфейс. Менять нельзя после создания.",
       },
-      // NIC ссылается на Address-ресурсы по id (модель KAC-2/KAC-14): NIC
+      // NIC ссылается на Address-ресурсы по id (модель KAC-2/KAC-7): NIC
       // больше не хранит IP-строки, а держит список id внутренних Address'ов
-      // из своей подсети. Здесь — ref-list на ресурс `addresses`.
-      //
-      // TODO(KAC-7): «Allocate» — кнопка рядом с полем, которая создаёт свежий
-      // внутренний Address в выбранной подсети (POST /vpc/v1/addresses
-      // {folderId, internalIpv4AddressSpec:{subnetId}} → Operation → poll →
-      // metadata.addressId) и добавляет его id в список. Generic ResourceForm
-      // пока не поддерживает custom-action рядом с полем — отложено.
-      //
-      // TODO(KAC-7): ref-list по-хорошему фильтровать по subnet_id формы
-      // (только Address'ы выбранной подсети), но RefField не умеет
-      // динамический selector от другого поля — пока folder-scoped.
+      // из своей подсети. Здесь — ref-list на ресурс `addresses`, отфильтрованный
+      // по subnet_id формы (GET /vpc/v1/addresses?subnet_id=<form.subnet_id>),
+      // с «+ Создать адрес» прямо в дропдауне (InlineResourceCreateForm
+      // с pre-filled internal_ipv4_address_spec.subnet_id — «создать» = «выделить
+      // IPv4 из CIDR этой подсети»). На success id появляется в списке.
       {
         name: "v4_address_ids",
         label: "IPv4-адреса (Address-ресурсы)",
         type: "array",
         itemLabel: "Address",
-        description: "Опционально. Список id внутренних Address-ресурсов из выбранной подсети. Создайте Address в подсети заранее.",
+        description: "Опционально. Address-ресурсы из выбранной подсети. Можно создать новый прямо в дропдауне.",
         newItem: () => ({ value: "" }),
         itemFields: [
-          { name: "value", label: "Address", type: "ref", refResource: "addresses", refFolderScoped: true, required: true },
+          {
+            name: "value",
+            label: "Address",
+            type: "ref",
+            refResource: "addresses",
+            required: true,
+            refQueryFromField: { param: "subnet_id", field: "subnet_id" },
+            createResource: "addresses",
+            createTitle: "Выделить IPv4-адрес из подсети",
+            createPresetFields: (form) => ({
+              _address_kind: "internal",
+              "internal_ipv4_address_spec.subnet_id": form["subnet_id"] ?? "",
+            }),
+          },
         ],
       },
       {
@@ -890,10 +958,23 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "IPv6-адреса (Address-ресурсы)",
         type: "array",
         itemLabel: "Address",
-        description: "Опционально. Список id IPv6 Address-ресурсов из выбранной подсети.",
+        description: "Опционально. IPv6 Address-ресурсы из выбранной подсети. Можно создать новый прямо в дропдауне.",
         newItem: () => ({ value: "" }),
         itemFields: [
-          { name: "value", label: "Address", type: "ref", refResource: "addresses", refFolderScoped: true, required: true },
+          {
+            name: "value",
+            label: "Address",
+            type: "ref",
+            refResource: "addresses",
+            required: true,
+            refQueryFromField: { param: "subnet_id", field: "subnet_id" },
+            createResource: "addresses",
+            createTitle: "Выделить IPv6-адрес из подсети",
+            createPresetFields: (form) => ({
+              _address_kind: "internal_v6",
+              "internal_ipv6_address_spec.subnet_id": form["subnet_id"] ?? "",
+            }),
+          },
         ],
       },
       // TODO(KAC-7): инициализировать default-значением из
@@ -901,18 +982,27 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // GET /vpc/v1/subnets/<id> → networkId → GET /vpc/v1/networks/<id> →
       // defaultSecurityGroupId). Generic-форма не поддерживает динамический
       // default от другого поля — отложено.
-      // TODO(KAC-7): «+ Create security group» рядом с полем (POST
-      // /vpc/v1/securityGroups в той же сети, добавить id) — нет паттерна
-      // create-related-resource в ResourceForm — отложено.
+      // TODO(KAC-7): SG-create pre-fill сетью, разрешённой subnet_id формы,
+      // требует dependent-lookup subnet_id → subnet.network_id — generic-форма
+      // его не умеет; пока в SG-create-форме сеть выбирает пользователь.
       {
         name: "security_group_ids",
         label: "Группы безопасности",
         type: "array",
         itemLabel: "SG",
-        description: "Опционально. Если не задано — действует SG по умолчанию для сети.",
+        description: "Опционально. Если не задано — действует SG по умолчанию для сети. Можно создать новую группу прямо в дропдауне.",
         newItem: () => ({ value: "" }),
         itemFields: [
-          { name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true },
+          {
+            name: "value",
+            label: "Security Group",
+            type: "ref",
+            refResource: "security-groups",
+            refFolderScoped: true,
+            required: true,
+            createResource: "security-groups",
+            createTitle: "Создать группу безопасности",
+          },
         ],
       },
       FIELD_LABELS,
