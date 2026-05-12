@@ -63,8 +63,9 @@ export function SubnetDetailPage() {
   const subnetAddresses = useMemo(() => {
     const all = addrList?.addresses ?? [];
     return all.filter((a) => {
-      const internal = a.internal_ipv4_address as { subnet_id?: string } | undefined;
-      return internal?.subnet_id === subnetId;
+      const v4 = a.internal_ipv4_address as { subnet_id?: string } | undefined;
+      const v6 = a.internal_ipv6_address as { subnet_id?: string } | undefined;
+      return v4?.subnet_id === subnetId || v6?.subnet_id === subnetId;
     });
   }, [addrList, subnetId]);
 
@@ -216,7 +217,12 @@ function AddressesSection({
       const int = (
         (row.internal_ipv4_address as { address?: string } | undefined)?.address ?? ""
       ).toLowerCase();
-      return name.includes(q) || id.includes(q) || ext.includes(q) || int.includes(q);
+      const int6 = (
+        (row.internal_ipv6_address as { address?: string } | undefined)?.address ?? ""
+      ).toLowerCase();
+      return (
+        name.includes(q) || id.includes(q) || ext.includes(q) || int.includes(q) || int6.includes(q)
+      );
     });
   }, [rows, query]);
 

@@ -124,6 +124,7 @@ export interface Address {
   labels?: Record<string, string>;
   external_ipv4_address?: { address: string; zone_id: string };
   internal_ipv4_address?: { address: string; subnet_id: string };
+  internal_ipv6_address?: { address: string; subnet_id: string };
   reserved?: boolean;
   used?: boolean;
   type?: string;

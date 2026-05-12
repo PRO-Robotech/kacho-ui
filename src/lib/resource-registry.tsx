@@ -535,7 +535,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         render: (row) => {
           const ext = (row.external_ipv4_address as { address?: string } | undefined)?.address;
           const int = (row.internal_ipv4_address as { address?: string } | undefined)?.address;
-          const ip = ext || int;
+          const int6 = (row.internal_ipv6_address as { address?: string } | undefined)?.address;
+          const ip = ext || int || int6;
           if (!ip) return <span className="text-muted-foreground">—</span>;
           return <span className="font-mono text-xs">{ip}</span>;
         },
