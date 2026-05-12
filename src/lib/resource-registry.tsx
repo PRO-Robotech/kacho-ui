@@ -913,8 +913,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     template: () => ({}),
   },
 
-  // compute-zones — read-only справочник зон compute-домена (зеркало vpc zones).
-  // Отдельная registry-запись от vpc `zones` — apiPath другой (/compute/v1/zones).
+  // compute-zones — read-only справочник зон. kacho-compute — owner Geography
+  // (Region/Zone перенесены из vpc, эпик KAC-15; см. workspace CLAUDE.md
+  // §«Кросс-доменные ссылки на ресурсы»). Admin-CRUD — registry-запись `zones`.
   "compute-zones": {
     id: "compute-zones",
     route: "compute-zones",
@@ -1327,7 +1328,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
   regions: {
     id: "regions",
     route: "regions",
-    apiPath: "/vpc/v1/regions",
+    apiPath: "/compute/v1/regions",
     payloadKey: "regions",
     singular: "Region",
     plural: "Регионы",
@@ -1358,7 +1359,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
   zones: {
     id: "zones",
     route: "zones",
-    apiPath: "/vpc/v1/zones",
+    apiPath: "/compute/v1/zones",
     payloadKey: "zones",
     singular: "Zone",
     plural: "Зоны",

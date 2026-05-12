@@ -38,7 +38,7 @@ export function SubnetRelocateDialog({
 
   const { data, isLoading } = useQuery({
     queryKey: ["zones-relocate"],
-    queryFn: () => api.list<{ zones: ZoneRow[] }>("/vpc/v1/zones"),
+    queryFn: () => api.list<{ zones: ZoneRow[] }>("/compute/v1/zones"),
     enabled: open,
     staleTime: 30_000,
   });
