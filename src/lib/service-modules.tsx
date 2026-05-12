@@ -149,7 +149,7 @@ export const COMMON_BOTTOM: NavLeaf[] = [
     icon: <SettingOutlined />,
     label: "Администрирование",
     to: () => "/system/regions",
-    matches: (p) => /^\/system\/(regions|zones|address-pools)/.test(p),
+    matches: (p) => /^\/system\/(regions|zones|address-pools|hypervisors)/.test(p),
   },
   {
     key: "profile",

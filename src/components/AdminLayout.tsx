@@ -12,6 +12,7 @@ const TABS = [
   { key: "/system/regions", label: "Регионы" },
   { key: "/system/zones", label: "Зоны" },
   { key: "/system/address-pools", label: "Пулы адресов" },
+  { key: "/system/hypervisors", label: "Гипервизоры" },
 ];
 
 export function AdminLayout() {

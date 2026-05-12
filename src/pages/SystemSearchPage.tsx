@@ -30,6 +30,7 @@ const DOMAINS = [
   { resource: "address-pools", path: "/vpc/v1/addressPools",                   key: "pools",         linkBase: "/system/address-pools/:id" },
   { resource: "regions",       path: "/compute/v1/regions",                        key: "regions",       linkBase: "/system/regions/:id" },
   { resource: "zones",         path: "/compute/v1/zones",                          key: "zones",         linkBase: "/system/zones/:id" },
+  { resource: "hypervisors",   path: "/compute/v1/hypervisors",                    key: "hypervisors",   linkBase: "/system/hypervisors/:id" },
 ];
 
 // ВАЖНО: VPC list endpoints (networks/subnets/addresses) обычно требуют folderId,
@@ -170,6 +171,11 @@ function extractExtras(resource: string, r: Record<string, unknown>): Record<str
       break;
     case "zones":
       if (r.region_id) e.region = String(r.region_id);
+      break;
+    case "hypervisors":
+      if (r.fqdn) e.fqdn = String(r.fqdn);
+      if (r.zone_id) e.zone = String(r.zone_id);
+      if (r.state) e.state = String(r.state);
       break;
   }
   return e;

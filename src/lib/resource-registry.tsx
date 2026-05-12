@@ -61,6 +61,11 @@ export interface ResourceSpec {
   // Используется для конвертации form-internal представления (wrapper-объекты, toggle-поля)
   // в wire format (plain arrays, oneof etc.).
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
+  /** Path-template для internal/infra-проекции ресурса (плейсхолдер `{id}`).
+   *  Если задан — на DetailPage появляется tab "jsonint", который делает
+   *  GET <internalGetPath с подставленным {id}> и pretty-print'ит JSON-ответ.
+   *  Пример: "/vpc/v1/networks/{id}/internal". Большинство ресурсов его не имеют. */
+  internalGetPath?: string;
 }
 
 // Pool kinds — UI упрощено до одного типа "External". Backend enum
@@ -263,6 +268,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "networks",
     apiPath: "/vpc/v1/networks",
     payloadKey: "networks",
+    internalGetPath: "/vpc/v1/networks/{id}/internal",
     singular: "Network",
     plural: "Облачные сети",
     serviceTitle: "Virtual Private Cloud",
@@ -832,6 +838,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "network-interfaces",
     apiPath: "/vpc/v1/networkInterfaces",
     payloadKey: "network_interfaces",
+    internalGetPath: "/vpc/v1/networkInterfaces/{id}/internal",
     singular: "Network Interface",
     plural: "Сетевые интерфейсы",
     serviceTitle: "Virtual Private Cloud",
@@ -1805,6 +1812,74 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         };
       }
       return obj;
+    },
+  },
+
+  // Hypervisor — internal/infra-ресурс kacho-compute (placement / capacity физики).
+  // Internal-only: не публикуется на external TLS endpoint, exposed через apiGW
+  // internal mux под /compute/v1/hypervisors (см. workspace CLAUDE.md §«Инфра-
+  // чувствительные данные»). Register (POST) возвращает Hypervisor синхронно
+  // (без Operation envelope) — как Region/Zone/AddressPool. Deregister — DELETE,
+  // возвращает {}. (Опциональный :updateState action в generic-фреймворке не
+  // выражается — пропущен.)
+  hypervisors: {
+    id: "hypervisors",
+    route: "hypervisors",
+    apiPath: "/compute/v1/hypervisors",
+    payloadKey: "hypervisors",
+    singular: "Hypervisor",
+    plural: "Гипервизоры",
+    serviceTitle: "Администрирование",
+    scope: "global",
+    ops: { create: true, update: false, delete: true },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Zone", path: "zone_id", format: "text" },
+      { header: "Node index", path: "node_index", format: "text" },
+      { header: "FQDN", path: "fqdn", format: "text" },
+      { header: "State", path: "state", format: "status" },
+      { header: "vCPUs", path: "capacity.vcpus", format: "text" },
+      {
+        header: "Memory",
+        path: "capacity.memory_bytes",
+        render: (row) => fmtBytesGiB(getByPath(row, "capacity.memory_bytes")),
+      },
+      { header: "Instances", path: "capacity.instances", format: "text" },
+      { header: "Updated", path: "updated_at", format: "datetime" },
+      COL_CREATED,
+    ],
+    fields: [
+      {
+        name: "zone_id",
+        label: "Zone",
+        type: "ref",
+        refResource: "zones",
+        description: "Зона размещения гипервизора.",
+      },
+      { name: "fqdn", label: "FQDN", type: "string", placeholder: "hv-01.zone-a.kacho.local" },
+      { name: "capacity.vcpus", label: "vCPUs", type: "int", min: 0, default: 0 },
+      { name: "capacity.memory_bytes", label: "Memory (bytes)", type: "int", min: 0, default: 0 },
+      { name: "capacity.instances", label: "Instances", type: "int", min: 0, default: 0 },
+      {
+        name: "id",
+        label: "Hypervisor ID",
+        type: "string",
+        hidden: true,
+        description: "Опционально. Пусто — id генерируется бекендом.",
+      },
+    ],
+    template: () => ({
+      zone_id: "",
+      fqdn: "",
+      capacity: { vcpus: 0, memory_bytes: 0, instances: 0 },
+      id: "",
+    }),
+    // Вырезаем пустой id (чтобы бекенд сгенерировал) и пустую zone_id.
+    sanitize: (obj) => {
+      const o = { ...obj };
+      if (o.id === "" || o.id === undefined) delete o.id;
+      if (o.zone_id === "" || o.zone_id === undefined) delete o.zone_id;
+      return o;
     },
   },
 };
