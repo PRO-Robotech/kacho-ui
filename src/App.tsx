@@ -32,7 +32,7 @@ const queryClient = new QueryClient({
 });
 
 // Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
-const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "gateways"]
+const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "network-interfaces", "gateways"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 

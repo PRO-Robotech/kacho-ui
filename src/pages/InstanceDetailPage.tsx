@@ -5,6 +5,12 @@
 // Старт/Стоп/Перезапуск рендерятся самим ResourceDetailPage (spec.ops.start/stop/restart
 // → POST <apiPath>/{id}:start|:stop|:restart). Здесь добавляем attach/detach над
 // tab content через secondaryActions.
+//
+// TODO(KAC-14/KAC-9): когда Instance.network_interfaces[] начнут нести `nic_id`
+// (ссылка на отдельный vpc NetworkInterface — отдельный тикет KAC-9), сделать
+// рендеринг NIC-блока с ссылкой на /folders/<fid>/vpc/network-interfaces/<nic_id>
+// (registry spec "network-interfaces"). Пока в proto/data этого поля нет — блок не
+// рендерим (generic ResourceDetailPage показывает network_interfaces как есть).
 
 import { useCallback, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
