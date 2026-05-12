@@ -813,11 +813,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ),
       },
       {
-        header: "Первичный IPv4",
-        path: "primary_v4_address",
+        // NIC теперь ссылается на Address-ресурсы по id (v4_address_ids).
+        // Здесь — компактно число привязанных IPv4-адресов; сами адреса
+        // (с IP-значением) видны на DetailPage / в ресурсе Address.
+        header: "IPv4-адреса",
+        path: "v4_address_ids",
         render: (row) => {
-          const ip = row.primary_v4_address as string | undefined;
-          return ip ? <span className="font-mono text-xs">{ip}</span> : <span className="text-muted-foreground">—</span>;
+          const ids = row.v4_address_ids as string[] | undefined;
+          const n = Array.isArray(ids) ? ids.length : 0;
+          return n > 0 ? <span className="font-mono text-xs">{n}</span> : <span className="text-muted-foreground">—</span>;
         },
       },
       {
@@ -857,36 +861,49 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         immutable: true,
         description: "Subnet, в которой создаётся интерфейс. Менять нельзя после создания.",
       },
+      // NIC ссылается на Address-ресурсы по id (модель KAC-2/KAC-14): NIC
+      // больше не хранит IP-строки, а держит список id внутренних Address'ов
+      // из своей подсети. Здесь — ref-list на ресурс `addresses`.
+      //
+      // TODO(KAC-7): «Allocate» — кнопка рядом с полем, которая создаёт свежий
+      // внутренний Address в выбранной подсети (POST /vpc/v1/addresses
+      // {folderId, internalIpv4AddressSpec:{subnetId}} → Operation → poll →
+      // metadata.addressId) и добавляет его id в список. Generic ResourceForm
+      // пока не поддерживает custom-action рядом с полем — отложено.
+      //
+      // TODO(KAC-7): ref-list по-хорошему фильтровать по subnet_id формы
+      // (только Address'ы выбранной подсети), но RefField не умеет
+      // динамический selector от другого поля — пока folder-scoped.
       {
-        name: "primary_v4_address",
-        label: "Первичный IPv4-адрес",
-        type: "string",
-        required: true,
-        placeholder: "<ip-address>",
-        description: "В v1 адрес задаётся явно (автовыделение пока не поддержано). Должен входить в CIDR подсети.",
-      },
-      {
-        name: "secondary_v4_addresses",
-        label: "Дополнительные IPv4-адреса",
+        name: "v4_address_ids",
+        label: "IPv4-адреса (Address-ресурсы)",
         type: "array",
-        itemLabel: "Адрес",
-        description: "Опционально. Дополнительные IPv4-адреса из той же подсети.",
+        itemLabel: "Address",
+        description: "Опционально. Список id внутренних Address-ресурсов из выбранной подсети. Создайте Address в подсети заранее.",
         newItem: () => ({ value: "" }),
         itemFields: [
-          { name: "value", label: "IPv4", type: "string", required: true, placeholder: "<ip-address>" },
+          { name: "value", label: "Address", type: "ref", refResource: "addresses", refFolderScoped: true, required: true },
         ],
       },
       {
-        name: "v6_addresses",
-        label: "IPv6-адреса",
+        name: "v6_address_ids",
+        label: "IPv6-адреса (Address-ресурсы)",
         type: "array",
-        itemLabel: "Адрес",
-        description: "Опционально. IPv6-адреса интерфейса.",
+        itemLabel: "Address",
+        description: "Опционально. Список id IPv6 Address-ресурсов из выбранной подсети.",
         newItem: () => ({ value: "" }),
         itemFields: [
-          { name: "value", label: "IPv6", type: "string", required: true, placeholder: "<ipv6-address>" },
+          { name: "value", label: "Address", type: "ref", refResource: "addresses", refFolderScoped: true, required: true },
         ],
       },
+      // TODO(KAC-7): инициализировать default-значением из
+      // subnet → network.default_security_group_id (при смене subnet_id:
+      // GET /vpc/v1/subnets/<id> → networkId → GET /vpc/v1/networks/<id> →
+      // defaultSecurityGroupId). Generic-форма не поддерживает динамический
+      // default от другого поля — отложено.
+      // TODO(KAC-7): «+ Create security group» рядом с полем (POST
+      // /vpc/v1/securityGroups в той же сети, добавить id) — нет паттерна
+      // create-related-resource в ResourceForm — отложено.
       {
         name: "security_group_ids",
         label: "Группы безопасности",
@@ -906,9 +923,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       folder_id: folderId ?? "",
       name: "",
       subnet_id: "",
-      primary_v4_address: "",
-      secondary_v4_addresses: [],
-      v6_addresses: [],
+      v4_address_ids: [],
+      v6_address_ids: [],
       security_group_ids: [],
       description: "",
       labels: {},
@@ -917,7 +933,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     // (как subnets.v4_cidr_blocks / instance NIC security_group_ids).
     sanitize: (obj) => {
       const out: Record<string, unknown> = { ...obj };
-      for (const key of ["secondary_v4_addresses", "v6_addresses", "security_group_ids"]) {
+      for (const key of ["v4_address_ids", "v6_address_ids", "security_group_ids"]) {
         const raw = out[key];
         if (Array.isArray(raw)) {
           out[key] = raw
