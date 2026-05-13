@@ -1,6 +1,8 @@
 // Схема формы — описывает поля для resource Create/Edit dialogue.
 // Используется ResourceForm для рендеринга нативных полей вместо JSON-textarea.
 
+import type { ReactNode } from "react";
+
 export type FormField =
   | StringField
   | TextField
@@ -10,7 +12,8 @@ export type FormField =
   | ArrayField
   | BoolField
   | SgRulesField
-  | LabelsField;
+  | LabelsField
+  | CustomField;
 
 interface BaseField {
   name: string; // dotted-path: "metadata.name", "spec.rules[0].direction"
@@ -115,4 +118,22 @@ export interface LabelsField extends BaseField {
 // Render через SgRulesEditor; sanitize вычищает `_*` дискриминаторы при submit.
 export interface SgRulesField extends BaseField {
   type: "sg-rules";
+}
+
+// Bespoke-поле: рендерится произвольным React-компонентом. Используется когда
+// логика поля слишком специфична для generic-механизма (multi-path write,
+// cross-resource lookup, inline-create + дерево опций) — например NIC-секция
+// формы создания Instance (Network→Address Cascader + Segmented external-IP).
+// render() получает весь объект формы + setter + pathPrefix контейнера
+// (для array-item — "network_interface_specs[0]"). sanitize ресурса должен
+// вычистить введённые этим полем `_*`-служебные ключи перед submit.
+export interface CustomField extends BaseField {
+  type: "custom";
+  render: (props: {
+    pathPrefix: string;
+    value: Record<string, unknown>;
+    onChange: (next: Record<string, unknown>) => void;
+    editMode?: boolean;
+    field: CustomField;
+  }) => ReactNode;
 }

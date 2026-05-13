@@ -9,6 +9,7 @@ import { CopyableId } from "@/components/CopyableId";
 import { CopyableName } from "@/components/CopyableName";
 import { RefNameLink } from "@/components/RefNameLink";
 import { LabelsCell } from "@/components/LabelsCell";
+import { NicSpecFields } from "@/components/form/NicSpecFields";
 
 export interface ResourceColumn {
   header: string;
@@ -1582,40 +1583,35 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       { name: "boot_disk_spec.auto_delete", label: "Удалять загрузочный диск вместе с ВМ", type: "bool", default: true, editHidden: true },
       {
         name: "network_interface_specs", label: "Сетевые интерфейсы", type: "array", itemLabel: "интерфейс",
-        description: "Минимум один сетевой интерфейс. Либо выберите существующий kacho-vpc NetworkInterface (nic_id) — тогда подсеть/SG/адрес берутся из него — либо опишите inline-spec (подсеть + SG + адрес), и интерфейс будет создан для ВМ. Подсеть должна быть в той же зоне, что и ВМ.",
+        description: "Минимум один сетевой интерфейс. Выберите сеть → подсеть → внутренний адрес (Cascader) и режим публичного IP (Segmented); либо переключитесь на «существующий NetworkInterface» (тогда подсеть/SG/адрес берутся из него). Подсеть должна быть в той же зоне, что и ВМ.",
         editHidden: true,
-        newItem: () => ({ nic_id: "", subnet_id: "", _nat: false, primary_v4_address_spec: { address: "" } }),
+        // Дефолт NIC-айтема: пустой spec, external-IP = «без адреса».
+        // `_*`-поля — служебные UI-state (cascader path / external mode), их
+        // вычищает sanitizeInstanceCreate перед submit.
+        newItem: () => ({
+          _addr_cascader: undefined, subnet_id: "", primary_v4_address_spec: { address: "" },
+          _ext_mode: "none", _use_existing_nic: false, nic_id: "", security_group_ids: [],
+        }),
         itemFields: [
-          // KAC-5/KAC-9: attach существующий NetworkInterface-ресурс по id.
-          // RefSelect авто-добавляет ?folder_id=<folder-context>; «+ Создать
-          // интерфейс…» открывает InlineResourceCreateForm для network-interfaces
-          // (pre-fill: folder_id ВМ + subnet_id, если в spec уже выбрана подсеть).
+          // Bespoke NIC-секция: Network→Subnet→Address Cascader + Segmented
+          // external-IP + (advanced) existing-NIC ref. См. NicSpecFields.tsx.
           {
-            name: "nic_id", label: "Существующий NetworkInterface (опционально)", type: "ref",
-            refResource: "network-interfaces", refFolderScoped: true,
-            placeholder: "— Создать новый интерфейс из spec ниже —",
-            description: "Если задано — подсеть/SG/адрес ниже игнорируются (берутся из выбранного NIC).",
-            createResource: "network-interfaces",
-            createTitle: "Создать сетевой интерфейс",
-            // Pre-fill: folder ВМ. subnet_id — per-NIC-spec, не доступен здесь
-            // (formValue в RefSelect = вся форма, не элемент массива) → пользователь
-            // выбирает подсеть в inline-create-форме. TODO(KAC-9).
-            createPresetFields: (form) => ({ folder_id: form["folder_id"] ?? "" }),
+            name: "_nic_config", label: "", type: "custom",
+            render: (p) => (
+              <NicSpecFields pathPrefix={p.pathPrefix} value={p.value} onChange={p.onChange} />
+            ),
           },
-          // Inline-spec (используется, если nic_id не задан).
-          // TODO(KAC-9): visibleWhen по sibling-полю внутри array-item не
-          // поддерживается (visibleWhen.field — top-level path), поэтому
-          // подсеть/SG/адрес показываются всегда; sanitize выкидывает их, если
-          // nic_id задан.
-          { name: "subnet_id", label: "Подсеть (для нового интерфейса)", type: "ref", refResource: "subnets", refFolderScoped: true },
-          { name: "_nat", label: "Публичный IP (one-to-one NAT)", type: "bool", default: false },
-          { name: "primary_v4_address_spec.address", label: "Внутренний IPv4 (опционально)", type: "string",
-            placeholder: "(авто из CIDR подсети, если пусто)" },
+          // Группы безопасности — generic ArrayField с inline-create «+ SG»
+          // (без изменений; на NIC-айтеме остаётся как было).
           {
             name: "security_group_ids", label: "Группы безопасности", type: "array", itemLabel: "SG",
+            description: "Опционально. Применяются к интерфейсу. Можно создать новую прямо в дропдауне.",
             newItem: () => ({ value: "" }),
             itemFields: [
-              { name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true },
+              {
+                name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true,
+                createResource: "security-groups", createTitle: "Создать группу безопасности",
+              },
             ],
           },
         ],
@@ -1635,7 +1631,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       resources_spec: { cores: 2, memory_gib: 2, core_fraction: "100" },
       _boot_source: "image",
       boot_disk_spec: { auto_delete: true, disk_spec: { size_gib: 10, type_id: "" } },
-      network_interface_specs: [{ nic_id: "", subnet_id: "", _nat: false, primary_v4_address_spec: { address: "" } }],
+      network_interface_specs: [{
+        _addr_cascader: undefined, subnet_id: "", primary_v4_address_spec: { address: "" },
+        _ext_mode: "none", _use_existing_nic: false, nic_id: "", security_group_ids: [],
+      }],
       description: "",
       labels: {},
     }),
@@ -1990,22 +1989,29 @@ export function sanitizeInstanceCreate(obj: Record<string, unknown>): Record<str
   o["boot_disk_spec"] = bds;
   delete o["_boot_source"];
 
-  // network_interface_specs
+  // network_interface_specs — собираем wire-shape из form-internal представления
+  // NIC-айтема (NicSpecFields.tsx). Возможные результаты на айтем:
+  //   {nic_id}                                            — выбран существующий NIC;
+  //   {subnet_id}                                         — подсеть, без адресов;
+  //   {subnet_id, primary_v4_address_spec.address}        — подсеть + внутренний IPv4;
+  //   + опц. primary_v4_address_spec.one_to_one_nat_spec  — external-IP режим;
+  //   + опц. security_group_ids: [...]
   const nics = Array.isArray(o["network_interface_specs"]) ? (o["network_interface_specs"] as Record<string, unknown>[]) : [];
   o["network_interface_specs"] = nics.map((nic) => {
     const out: Record<string, unknown> = {};
-    // Если выбран существующий NetworkInterface (nic_id) — отдаём только nic_id,
-    // подсеть/SG/адрес берутся из самого NIC (см. compute.v1.NetworkInterfaceSpec.nic_id, KAC-5).
-    if (nic["nic_id"]) {
-      out["nic_id"] = nic["nic_id"];
-      return out;
-    }
-    if (nic["subnet_id"]) out["subnet_id"] = nic["subnet_id"];
     const sgs = Array.isArray(nic["security_group_ids"])
       ? (nic["security_group_ids"] as unknown[])
           .map((it) => (typeof it === "object" && it !== null && "value" in (it as object) ? (it as Record<string, unknown>)["value"] : it))
           .filter((v) => typeof v === "string" && v)
       : [];
+    // Существующий NetworkInterface (nic_id) — отдаём только nic_id (+ SG, если заданы);
+    // подсеть/адрес берутся из самого NIC (см. compute.v1.NetworkInterfaceSpec.nic_id, KAC-5).
+    if (nic["_use_existing_nic"] === true && nic["nic_id"]) {
+      out["nic_id"] = nic["nic_id"];
+      if (sgs.length > 0) out["security_group_ids"] = sgs;
+      return out;
+    }
+    if (nic["subnet_id"]) out["subnet_id"] = nic["subnet_id"];
     if (sgs.length > 0) out["security_group_ids"] = sgs;
     const primaryAddr =
       typeof nic["primary_v4_address_spec"] === "object" && nic["primary_v4_address_spec"] !== null
@@ -2013,7 +2019,14 @@ export function sanitizeInstanceCreate(obj: Record<string, unknown>): Record<str
         : undefined;
     const pv4: Record<string, unknown> = {};
     if (primaryAddr) pv4["address"] = primaryAddr;
-    if (nic["_nat"] === true) pv4["one_to_one_nat_spec"] = { ip_version: "IPV4" };
+    const extMode = nic["_ext_mode"] as string | undefined;
+    if (extMode === "auto") {
+      pv4["one_to_one_nat_spec"] = { ip_version: "IPV4" };
+    } else if (extMode === "list") {
+      const ipVal = nic["_ext_addr_value"] as string | undefined;
+      // OneToOneNatSpec.address — это IP-строка (не Address-id), см. proto.
+      if (ipVal) pv4["one_to_one_nat_spec"] = { address: ipVal };
+    }
     if (Object.keys(pv4).length > 0) out["primary_v4_address_spec"] = pv4;
     return out;
   });
