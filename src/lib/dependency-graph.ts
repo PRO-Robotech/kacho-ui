@@ -2,17 +2,18 @@
 // удаления. Generic-механизм: per registry-id резолвер, который через REST собирает
 // зависимые ресурсы (рекурсивно), помечая, какие из них блокируют удаление родителя.
 //
-// Модель зависимостей (kacho-vpc, эпик KAC-31 — «NIC зависит от Address, не от Network
-// напрямую»):
+// Модель зависимостей (kacho-vpc):
+//   NIC → (blocks) → Subnet → (blocks) → Network
+//   NIC → (blocks) → Address
+//   NIC-attached-to-instance: instance → (blocks) → NIC
+// Раскрытие:
 //   networks  → subnets (RESTRICT, blocks) [рекурсивно → addresses · network-interfaces]
 //              · route-tables (RESTRICT, blocks)
 //              · security-groups (RESTRICT, blocks; кроме default-SG — авто-удаляется
 //                при Network.Delete → blocks=false)
 //   subnets   → addresses (RESTRICT, blocks)
-//              · network-interfaces — FK subnet_id теперь ON DELETE CASCADE: NIC БЕЗ
-//                привязки к инстансу удаляется каскадом (blocks=false, помечается
-//                «(каскадом)»); NIC привязанный к инстансу (used_by) — сервис-гард
-//                Subnet.Delete его не пустит → blocks=true.
+//              · network-interfaces (RESTRICT, blocks): NIC всегда блокирует удаление
+//                своей подсети — сначала удали NIC'и.
 //   addresses → network-interfaces, которые ссылаются на этот адрес в
 //                v4_address_ids/v6_address_ids (Address.Delete → FailedPrecondition
 //                «address is in use by network interface …» → blocks=true).
@@ -70,7 +71,7 @@ function nicAttachedInstanceId(ni: AnyRec): string {
   return ref?.id ? String(ref.id) : "";
 }
 
-/** Дети подсети: internal-Address'ы (RESTRICT) и NetworkInterface'ы (CASCADE / blocks при attach). */
+/** Дети подсети: internal-Address'ы (RESTRICT) и NetworkInterface'ы (RESTRICT). */
 async function subnetChildren(subnetId: string, folderId: string): Promise<DepNode[]> {
   if (!folderId) return [];
   const [addrs, nics] = await Promise.all([
@@ -84,15 +85,9 @@ async function subnetChildren(subnetId: string, folderId: string): Promise<DepNo
   }
   for (const ni of nics) {
     if (ni.subnet_id !== subnetId) continue;
-    const instId = nicAttachedInstanceId(ni);
-    const baseName = (ni.name as string) || String(ni.id);
-    out.push(
-      mkNode(
-        "network-interfaces",
-        { ...ni, name: instId ? baseName : `${baseName} (каскадом)` },
-        instId !== "",
-      ),
-    );
+    // FK network_interfaces.subnet_id = ON DELETE RESTRICT: NIC всегда блокирует
+    // удаление своей подсети (независимо от того, приаттачен ли он к инстансу).
+    out.push(mkNode("network-interfaces", ni, true));
   }
   return out;
 }
