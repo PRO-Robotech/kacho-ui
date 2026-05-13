@@ -35,6 +35,9 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
     if (!matched) return null;
   }
   const disabled = !!(field.immutable && editMode);
+  if (field.type === "custom") {
+    return <>{field.render({ pathPrefix, value, onChange, editMode, field })}</>;
+  }
   if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} />;
   if (field.type === "sg-rules") {
     const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;

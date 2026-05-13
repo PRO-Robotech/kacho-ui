@@ -138,3 +138,120 @@ describe("sanitizeSgRule", () => {
     expect(out.labels).toEqual({ tier: "edge" });
   });
 });
+
+import { sanitizeInstanceCreate } from "./resource-registry";
+
+describe("sanitizeInstanceCreate — network_interface_specs", () => {
+  const base = {
+    folder_id: "f1",
+    name: "vm-1",
+    zone_id: "ru-1-a",
+    platform_id: "standard-v3",
+    resources_spec: { cores: 2, memory_gib: 2, core_fraction: "100" },
+    _boot_source: "image" as const,
+    boot_disk_spec: { auto_delete: true, disk_spec: { image_id: "img-1", size_gib: 10, type_id: "" } },
+  };
+
+  it("with-address: emits {subnet_id, primary_v4_address_spec.address}", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        _addr_cascader: ["net-1", "sub-1", "addr-1"],
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "10.0.0.5" },
+        _ext_mode: "none",
+        _use_existing_nic: false,
+        nic_id: "",
+        security_group_ids: [{ value: "sg-1" }],
+      }],
+    });
+    expect(out.network_interface_specs).toEqual([
+      { subnet_id: "sub-1", security_group_ids: ["sg-1"], primary_v4_address_spec: { address: "10.0.0.5" } },
+    ]);
+  });
+
+  it("no-address: emits just {subnet_id}", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        _addr_cascader: ["net-1", "sub-1", "__noaddr__:sub-1"],
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "" },
+        _ext_mode: "none",
+        _use_existing_nic: false,
+        nic_id: "",
+        security_group_ids: [],
+      }],
+    });
+    expect(out.network_interface_specs).toEqual([{ subnet_id: "sub-1" }]);
+  });
+
+  it("external auto: adds one_to_one_nat_spec {ip_version:'IPV4'}", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "10.0.0.5" },
+        _ext_mode: "auto",
+        _use_existing_nic: false,
+        nic_id: "",
+        security_group_ids: [],
+      }],
+    });
+    expect(out.network_interface_specs).toEqual([
+      { subnet_id: "sub-1", primary_v4_address_spec: { address: "10.0.0.5", one_to_one_nat_spec: { ip_version: "IPV4" } } },
+    ]);
+  });
+
+  it("external list: passes the external IP value into one_to_one_nat_spec.address", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "" },
+        _ext_mode: "list",
+        _ext_addr_id: "addr-ext-1",
+        _ext_addr_value: "203.0.113.10",
+        _use_existing_nic: false,
+        nic_id: "",
+        security_group_ids: [],
+      }],
+    });
+    expect(out.network_interface_specs).toEqual([
+      { subnet_id: "sub-1", primary_v4_address_spec: { one_to_one_nat_spec: { address: "203.0.113.10" } } },
+    ]);
+  });
+
+  it("existing nic_id: emits only {nic_id} (+ sg if any), ignores subnet/address", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        _addr_cascader: ["net-1", "sub-1", "addr-1"],
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "10.0.0.5" },
+        _ext_mode: "auto",
+        _use_existing_nic: true,
+        nic_id: "nic-1",
+        security_group_ids: [{ value: "sg-1" }],
+      }],
+    });
+    expect(out.network_interface_specs).toEqual([{ nic_id: "nic-1", security_group_ids: ["sg-1"] }]);
+  });
+
+  it("strips all _-prefixed UI keys from the emitted spec", () => {
+    const out = sanitizeInstanceCreate({
+      ...base,
+      network_interface_specs: [{
+        _addr_cascader: ["net-1", "sub-1", "addr-1"],
+        subnet_id: "sub-1",
+        primary_v4_address_spec: { address: "10.0.0.5" },
+        _ext_mode: "auto",
+        _use_existing_nic: false,
+        nic_id: "",
+        security_group_ids: [],
+      }],
+    });
+    const spec = (out.network_interface_specs as Record<string, unknown>[])[0];
+    for (const k of Object.keys(spec)) expect(k.startsWith("_")).toBe(false);
+  });
+});
