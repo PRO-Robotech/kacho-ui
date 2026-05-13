@@ -1,13 +1,23 @@
 // dependency-graph — построение дерева «что подвязано к ресурсу» для confirm-модалки
 // удаления. Generic-механизм: per registry-id резолвер, который через REST собирает
-// дочерние ресурсы (рекурсивно), помечая, какие из них блокируют удаление родителя
-// (FK RESTRICT на бэкенде → "Network/Subnet ... is not empty").
+// зависимые ресурсы (рекурсивно), помечая, какие из них блокируют удаление родителя.
 //
-// Сейчас резолверы есть для:
-//   networks  → subnets (рекурсивно: addresses, network-interfaces) · route-tables · security-groups
-//   subnets   → addresses · network-interfaces
-// (см. kacho-vpc/CLAUDE.md §2 «FK contract»: default-SG авто-удаляется при Network.Delete,
-//  поэтому defaultForNetwork-SG помечается blocks=false.)
+// Модель зависимостей (kacho-vpc, эпик KAC-31 — «NIC зависит от Address, не от Network
+// напрямую»):
+//   networks  → subnets (RESTRICT, blocks) [рекурсивно → addresses · network-interfaces]
+//              · route-tables (RESTRICT, blocks)
+//              · security-groups (RESTRICT, blocks; кроме default-SG — авто-удаляется
+//                при Network.Delete → blocks=false)
+//   subnets   → addresses (RESTRICT, blocks)
+//              · network-interfaces — FK subnet_id теперь ON DELETE CASCADE: NIC БЕЗ
+//                привязки к инстансу удаляется каскадом (blocks=false, помечается
+//                «(каскадом)»); NIC привязанный к инстансу (used_by) — сервис-гард
+//                Subnet.Delete его не пустит → blocks=true.
+//   addresses → network-interfaces, которые ссылаются на этот адрес в
+//                v4_address_ids/v6_address_ids (Address.Delete → FailedPrecondition
+//                «address is in use by network interface …» → blocks=true).
+//   network-interfaces → инстанс, к которому NIC приаттачен (used_by) — NIC.Delete его
+//                не пустит → blocks=true.
 
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
@@ -23,7 +33,7 @@ export interface DepNode {
   folderId: string;
   /** URL-сегмент под /folders/:fid/ (например "vpc/subnets"). */
   routeSegment: string;
-  /** Блокирует удаление родителя (FK RESTRICT)? */
+  /** Блокирует удаление родителя? */
   blocks: boolean;
   children: DepNode[];
 }
@@ -54,7 +64,13 @@ function mkNode(resourceId: string, r: AnyRec, blocks: boolean, children: DepNod
   };
 }
 
-/** Дети подсети: internal-Address'ы и NetworkInterface'ы на ней (фильтр по folder-спискам). */
+/** id инстанса, к которому приаттачен NIC (used_by referrer), либо "". */
+function nicAttachedInstanceId(ni: AnyRec): string {
+  const ref = ni?.used_by?.referrer;
+  return ref?.id ? String(ref.id) : "";
+}
+
+/** Дети подсети: internal-Address'ы (RESTRICT) и NetworkInterface'ы (CASCADE / blocks при attach). */
 async function subnetChildren(subnetId: string, folderId: string): Promise<DepNode[]> {
   if (!folderId) return [];
   const [addrs, nics] = await Promise.all([
@@ -67,14 +83,41 @@ async function subnetChildren(subnetId: string, folderId: string): Promise<DepNo
     if (sid === subnetId) out.push(mkNode("addresses", a, true));
   }
   for (const ni of nics) {
-    if (ni.subnet_id === subnetId) out.push(mkNode("network-interfaces", ni, true));
+    if (ni.subnet_id !== subnetId) continue;
+    const instId = nicAttachedInstanceId(ni);
+    const baseName = (ni.name as string) || String(ni.id);
+    out.push(
+      mkNode(
+        "network-interfaces",
+        { ...ni, name: instId ? baseName : `${baseName} (каскадом)` },
+        instId !== "",
+      ),
+    );
+  }
+  return out;
+}
+
+/** NIC'и, ссылающиеся на адрес в v4_address_ids / v6_address_ids. */
+async function addressDependents(addressId: string, folderId: string): Promise<DepNode[]> {
+  if (!folderId) return [];
+  const nics = await listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: folderId });
+  const out: DepNode[] = [];
+  for (const ni of nics) {
+    const v4: string[] = ni.v4_address_ids ?? [];
+    const v6: string[] = ni.v6_address_ids ?? [];
+    if (v4.includes(addressId) || v6.includes(addressId)) out.push(mkNode("network-interfaces", ni, true));
   }
   return out;
 }
 
 /** Есть ли резолвер зависимостей для этого registry-id. */
 export function hasDependencyResolver(resourceId: string): boolean {
-  return resourceId === "networks" || resourceId === "subnets";
+  return (
+    resourceId === "networks" ||
+    resourceId === "subnets" ||
+    resourceId === "addresses" ||
+    resourceId === "network-interfaces"
+  );
 }
 
 /** Собрать дерево зависимостей ресурса. `resource` — минимум {id, folder_id}. */
@@ -105,6 +148,30 @@ export async function loadDependents(
 
   if (resourceId === "subnets") {
     return subnetChildren(resource.id, folderId);
+  }
+
+  if (resourceId === "addresses") {
+    return addressDependents(resource.id, folderId);
+  }
+
+  if (resourceId === "network-interfaces") {
+    // NIC, приаттаченный к инстансу, нельзя удалить (NIC.Delete → FailedPrecondition).
+    // Загружаем сам NIC, чтобы узнать used_by.
+    let ni: AnyRec | null = null;
+    try {
+      ni = await api.get<AnyRec>(`/vpc/v1/networkInterfaces/${resource.id}`);
+    } catch {
+      ni = null;
+    }
+    const instId = ni ? nicAttachedInstanceId(ni) : "";
+    if (!instId) return [];
+    return [
+      mkNode(
+        "compute-instances",
+        { id: instId, name: instId, folder_id: (ni?.folder_id as string) || folderId },
+        true,
+      ),
+    ];
   }
 
   return [];
