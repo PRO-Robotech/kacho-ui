@@ -510,6 +510,29 @@ export function ResourceDetailPage({
           })(),
         }
       : null,
+    // Subnet-specific: IPv6 CIDR (multi-line). v6_cidr_blocks помечен editHidden
+    // в registry (управляется через SubnetCidrManager), но в read-only обзоре
+    // показывается рядом с IPv4 CIDR.
+    spec.id === "subnets"
+      ? {
+          label: "IPv6 CIDR",
+          value: (() => {
+            const cidrs =
+              (getByPath<string[]>(data, "v6_cidr_blocks") ?? []) as string[];
+            if (cidrs.length === 0)
+              return <Typography.Text type="secondary">—</Typography.Text>;
+            return (
+              <Space direction="vertical" size={2} style={{ width: "100%" }}>
+                {cidrs.map((c, i) => (
+                  <Typography.Text key={i} code style={{ fontFamily: "monospace" }}>
+                    {c}
+                  </Typography.Text>
+                ))}
+              </Space>
+            );
+          })(),
+        }
+      : null,
     spec.id === "subnets" && getByPath<string>(data, "route_table_id")
       ? {
           label: "Таблица маршрутизации",

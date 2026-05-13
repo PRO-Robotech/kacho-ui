@@ -153,6 +153,7 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: P
           placeholder={field.placeholder}
           disabled={disabled}
           refQueryFromField={field.refQueryFromField}
+          refFilter={field.refFilter}
           formValue={value}
           createResource={field.createResource}
           createPresetFields={field.createPresetFields}

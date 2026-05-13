@@ -958,6 +958,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             // Итог: GET /vpc/v1/addresses?folder_id=<folder>&subnet_id=<subnet>.
             refFolderScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
+            // Только внутренние IPv4-адреса (у которых выставлен
+            // internal_ipv4_address) — отсекаем external / IPv6-only.
+            refFilter: (row) => !!row.internal_ipv4_address,
             createResource: "addresses",
             createTitle: "Выделить IPv4-адрес из подсети",
             createPresetFields: (form) => ({
@@ -984,6 +987,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             // см. комментарий у v4_address_ids — folder-scoped + subnet_id-фильтр.
             refFolderScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
+            // Только внутренние IPv6-адреса (у которых выставлен
+            // internal_ipv6_address).
+            refFilter: (row) => !!row.internal_ipv6_address,
             createResource: "addresses",
             createTitle: "Выделить IPv6-адрес из подсети",
             createPresetFields: (form) => ({

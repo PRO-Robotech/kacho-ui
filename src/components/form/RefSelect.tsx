@@ -31,6 +31,8 @@ interface Props {
   disabled?: boolean;
   // Динамический query-параметр от другого поля формы.
   refQueryFromField?: { param: string; field: string };
+  // Клиентский фильтр-предикат поверх загруженного candidate-list.
+  refFilter?: (row: Record<string, unknown>) => boolean;
   // Текущее значение всей формы (для refQueryFromField / createPresetFields).
   formValue?: Record<string, unknown>;
   // Inline-create related-resource.
@@ -48,6 +50,7 @@ export function RefSelect({
   id,
   disabled,
   refQueryFromField,
+  refFilter,
   formValue,
   createResource,
   createPresetFields,
@@ -84,7 +87,7 @@ export function RefSelect({
       const q: Record<string, string> = {};
       if (refFolderScoped && folder) q["folder_id"] = folder.uid;
       if (refQueryFromField && dynParamValue) q[refQueryFromField.param] = dynParamValue;
-      return api.list<Record<string, Array<{ id: string; name: string }>>>(
+      return api.list<Record<string, Array<{ id: string; name: string } & Record<string, unknown>>>>(
         spec!.apiPath,
         q,
       );
@@ -95,7 +98,10 @@ export function RefSelect({
 
   if (!spec) return <div className="text-xs text-rose-600">Unknown ref: {refResource}</div>;
 
-  const options = (data?.[spec.payloadKey] ?? []).map((it) => ({
+  const candidates = (data?.[spec.payloadKey] ?? []).filter((it) =>
+    refFilter ? refFilter(it as Record<string, unknown>) : true,
+  );
+  const options = candidates.map((it) => ({
     uid: it.id,
     name: it.name,
   }));

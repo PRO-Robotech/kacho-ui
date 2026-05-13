@@ -78,6 +78,11 @@ export interface RefField extends BaseField {
   // → GET <apiPath>?subnet_id=<form.subnet_id>. Если поле-источник пустое —
   // список не загружается (enabled: false).
   refQueryFromField?: { param: string; field: string };
+  // Клиентский фильтр-предикат поверх загруженного candidate-list: остаются
+  // только строки, для которых вернул true. Применяется ПОСЛЕ серверного
+  // запроса (refFolderScoped / refQueryFromField). Пример (NIC-форма):
+  // v4_address_ids → row => !!row.internal_ipv4_address (только внутренние IPv4).
+  refFilter?: (row: Record<string, unknown>) => boolean;
   // ID ресурса в registry, который можно создать прямо из дропдауна
   // («+ Создать …» entry → открывает InlineResourceCreateForm в модалке,
   // на success подставляет id созданного ресурса в это поле).
