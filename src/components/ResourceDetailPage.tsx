@@ -118,28 +118,41 @@ export function ResourceDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
 
-  // Inline-edit: edit-mode определяется наличием /edit-суффикса в pathname.
-  // "Редактировать" в overviewActions переключает URL на /edit без полной
-  // перезагрузки страницы (replace=false → можно вернуться через "Назад"),
-  // Сохранить/Отменить возвращают URL без /edit (replace=true).
+  // KAC-70: edit-flow перенесён в модалку (ResourceFormModal). Старый /edit
+  // URL — back-compat: редиректим на detail + ?modal=<spec>-edit&id=<uid>.
+  // editing-state больше не используется здесь — модалка сама управляет.
   const isEditUrl = location.pathname.endsWith("/edit");
   const detailPath = isEditUrl
     ? location.pathname.slice(0, -"/edit".length)
     : location.pathname;
-  const [editing, setEditing] = useState(isEditUrl);
   useEffect(() => {
-    setEditing(isEditUrl);
-  }, [isEditUrl]);
+    if (isEditUrl && uid) {
+      const params = new URLSearchParams(searchParams);
+      params.set("modal", `${spec.id}-edit`);
+      params.set("id", uid);
+      navigate(`${detailPath}?${params.toString()}`, { replace: true });
+    }
+  }, [isEditUrl, uid, detailPath, navigate, searchParams, spec.id]);
 
   const enterEdit = useCallback(() => {
-    setEditing(true);
-    if (!isEditUrl) navigate(`${detailPath}/edit`, { replace: false });
-  }, [isEditUrl, detailPath, navigate]);
+    if (!uid) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("modal", `${spec.id}-edit`);
+    params.set("id", uid);
+    navigate(`${detailPath}?${params.toString()}`, { replace: false });
+  }, [detailPath, navigate, searchParams, spec.id, uid]);
 
   const exitEdit = useCallback(() => {
-    setEditing(false);
-    if (isEditUrl) navigate(detailPath, { replace: true });
-  }, [isEditUrl, detailPath, navigate]);
+    const params = new URLSearchParams(searchParams);
+    params.delete("modal");
+    params.delete("id");
+    const qs = params.toString();
+    navigate(qs ? `${detailPath}?${qs}` : detailPath, { replace: true });
+  }, [detailPath, navigate, searchParams]);
+
+  // editing — legacy для renderInlineEdit. С KAC-70 edit-flow в модалке,
+  // inline-edit не используется → всегда false.
+  const editing = false;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],

@@ -7,6 +7,7 @@
 import { useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
@@ -140,12 +141,15 @@ export function SecurityGroupDetailPage() {
   );
 
   return (
-    <ResourceDetailPage
-      spec={spec}
-      extraTabs={extraTabs}
-      backHrefOverride={backHrefOverride}
-      breadcrumbSegments={breadcrumbSegments}
-      renderInlineEdit={renderInlineEdit}
-    />
+    <>
+      <ResourceDetailPage
+        spec={spec}
+        extraTabs={extraTabs}
+        backHrefOverride={backHrefOverride}
+        breadcrumbSegments={breadcrumbSegments}
+        renderInlineEdit={renderInlineEdit}
+      />
+      {folderId && <ResourceFormModal folderId={folderId} />}
+    </>
   );
 }

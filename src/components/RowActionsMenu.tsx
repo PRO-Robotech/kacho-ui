@@ -92,7 +92,11 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "edit",
           icon: <EditOutlined />,
           label: "Редактировать",
-          onClick: stop(() => navigate(`${basePath}/${id}/edit`)),
+          // KAC-70: Edit открывается в модалке (ResourceFormModal) поверх
+          // текущей страницы — URL остаётся list, query-флаг открывает форму.
+          onClick: stop(() =>
+            navigate(`${basePath}?modal=${spec.id}-edit&id=${id}`),
+          ),
         }
       : null,
     moveCapable

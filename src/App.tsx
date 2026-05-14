@@ -17,7 +17,7 @@ import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
 import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
 import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
-import { SubnetsListPage } from "@/pages/SubnetsListPage";
+import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -183,14 +183,14 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}`}
                   element={
-                    // Subnet — список + mount SubnetFormModal (для ?modal=subnet-create).
-                    spec.id === "subnets"
-                      ? <SubnetsListPage />
-                      : <ResourceListPage
-                          spec={spec}
-                          parentField="folder_id"
-                          parentParam="folderId"
-                        />
+                    // VpcListShell = ResourceListPage + ResourceFormModal mount
+                    // (модалка открывается по ?modal=<spec>-create или
+                    // ?modal=<spec>-edit&id=<uid>).
+                    <VpcListShell
+                      spec={spec}
+                      parentField="folder_id"
+                      parentParam="folderId"
+                    />
                   }
                 />
                 <Route
@@ -222,7 +222,7 @@ export default function App() {
                           ? <SecurityGroupDetailPage />
                           : spec.id === "network-interfaces"
                             ? <NetworkInterfaceDetailPage />
-                            : <ResourceDetailPage spec={spec} />
+                            : <VpcDetailShell spec={spec} />
                   }
                 />
                 {/* /edit URL ведёт на ту же detail-страницу — она авто-
@@ -239,7 +239,7 @@ export default function App() {
                           ? <SecurityGroupDetailPage />
                           : spec.id === "network-interfaces"
                             ? <NetworkInterfaceDetailPage />
-                            : <ResourceDetailPage spec={spec} />
+                            : <VpcDetailShell spec={spec} />
                   }
                 />
                 {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`

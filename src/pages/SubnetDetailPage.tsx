@@ -14,6 +14,7 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
+import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
@@ -181,14 +182,17 @@ export function SubnetDetailPage() {
   );
 
   return (
-    <ResourceDetailPage
-      spec={spec}
-      extraTabs={extraTabs}
-      headerActionsByTab={headerActionsByTab}
-      backHrefOverride={backHrefOverride}
-      breadcrumbSegments={breadcrumbSegments}
-      renderInlineEdit={renderInlineEdit}
-    />
+    <>
+      <ResourceDetailPage
+        spec={spec}
+        extraTabs={extraTabs}
+        headerActionsByTab={headerActionsByTab}
+        backHrefOverride={backHrefOverride}
+        breadcrumbSegments={breadcrumbSegments}
+        renderInlineEdit={renderInlineEdit}
+      />
+      {folderId && <ResourceFormModal folderId={folderId} />}
+    </>
   );
 }
 

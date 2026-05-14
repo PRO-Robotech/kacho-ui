@@ -53,20 +53,20 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   );
   useBreadcrumb(breadcrumb);
 
-  const createBase = location.pathname.endsWith("/")
-    ? location.pathname.slice(0, -1)
-    : location.pathname;
-
+  // KAC-70: Create открывается в модалке (ResourceFormModal) поверх list.
+  // URL: добавляем ?modal=<spec>-create — модалка показывается на текущей
+  // странице, не уходим на /create standalone route.
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
+    const target = `${location.pathname}?modal=${spec.id}-create`;
     return (
-      <Link to={`${createBase}/create`}>
+      <Link to={target}>
         <Button type="primary" size="small" icon={<PlusOutlined />}>
           Создать {spec.singular.toLowerCase()}
         </Button>
       </Link>
     );
-  }, [spec, createBase]);
+  }, [spec, location.pathname]);
 
   useHeaderRight(cta);
 

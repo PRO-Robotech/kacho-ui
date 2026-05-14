@@ -16,6 +16,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Tag, Typography } from "antd";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
@@ -192,5 +193,10 @@ export function NetworkInterfaceDetailPage() {
     return <ResourceDetailPage spec={spec} />;
   }
 
-  return <ResourceDetailPage spec={spec} overviewExtras={overviewExtras} />;
+  return (
+    <>
+      <ResourceDetailPage spec={spec} overviewExtras={overviewExtras} />
+      <ResourceFormModal folderId={folderId} />
+    </>
+  );
 }
