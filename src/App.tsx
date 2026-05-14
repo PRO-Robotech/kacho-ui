@@ -15,6 +15,7 @@ import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
+import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -310,13 +311,7 @@ export default function App() {
             />
             <Route
               path="/folders/:folderId/vpc/networks/:networkId/subnets/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.subnets}
-                  parentField="folder_id"
-                  parentParam="folderId"
-                />
-              }
+              element={<SubnetCreateRedirect />}
             />
             <Route
               path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
