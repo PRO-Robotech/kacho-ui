@@ -17,6 +17,7 @@ import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
 import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
 import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
+import { SubnetsListPage } from "@/pages/SubnetsListPage";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -182,11 +183,14 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}`}
                   element={
-                    <ResourceListPage
-                      spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
-                    />
+                    // Subnet — список + mount SubnetFormModal (для ?modal=subnet-create).
+                    spec.id === "subnets"
+                      ? <SubnetsListPage />
+                      : <ResourceListPage
+                          spec={spec}
+                          parentField="folder_id"
+                          parentParam="folderId"
+                        />
                   }
                 />
                 <Route
