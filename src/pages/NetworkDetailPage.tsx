@@ -30,27 +30,39 @@ export function NetworkDetailPage() {
 
   const subnetSpec = REGISTRY["subnets"];
 
-  // Inline-create state: при true в правой панели Обзора (или соответствующем
-  // tab'е) вместо списка/Descriptions разворачивается форма создания
-  // дочерней сущности с pre-filled network_id (locked). Cancel/Success
-  // возвращают обычный вид. URL не меняется — context network сохраняется.
-  const [creatingSubnet, setCreatingSubnet] = useState(false);
-  const [creatingRouteTable, setCreatingRouteTable] = useState(false);
-  const [creatingSecurityGroup, setCreatingSecurityGroup] = useState(false);
-
-  // Auto-open inline form по query-флагу `?createSubnet=1`. Используется
-  // редиректом со старого URL `/folders/.../networks/<n>/subnets/create`
-  // (см. SubnetCreateRedirect): любой entry-point «Создать подсеть»
-  // (RowActionsMenu, прямые ссылки, header) приводит к новой inline-форме,
-  // а не к generic ResourceCreatePage.
+  // Inline-create state — это **deep-link-якорь** в query-параметре `action`:
+  //   ?action=create-subnet      — InlineSubnetCreateForm раскрыт в Обзоре
+  //   ?action=create-route-table — InlineResourceCreateForm RT раскрыт
+  //   ?action=create-security-group — InlineResourceCreateForm SG раскрыт
+  //
+  // Любая ссылка / редирект / закладка / breadcrumb приводят пользователя
+  // в правильное состояние без отдельного pre-mount-effect. State чисто
+  // derived из URL → нет рассинхронизации при back/forward, refresh,
+  // прямом вводе URL. Cancel/Success снимают action (см. setAction(null)).
   const [searchParams, setSearchParams] = useSearchParams();
+  const action = searchParams.get("action");
+  const creatingSubnet = action === "create-subnet";
+  const creatingRouteTable = action === "create-route-table";
+  const creatingSecurityGroup = action === "create-security-group";
+
+  const setAction = useCallback(
+    (next: string | null) => {
+      const params = new URLSearchParams(searchParams);
+      if (next) params.set("action", next);
+      else params.delete("action");
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  // Back-compat для прежнего флага `?createSubnet=1` (использовался коротко
+  // между KAC-67 v1 и v2): один раз транслируем в action=create-subnet.
   useEffect(() => {
     if (searchParams.get("createSubnet") === "1") {
-      setCreatingSubnet(true);
-      // Снимаем флаг, чтобы при cancel не зацикливалось.
-      const next = new URLSearchParams(searchParams);
-      next.delete("createSubnet");
-      setSearchParams(next, { replace: true });
+      const params = new URLSearchParams(searchParams);
+      params.delete("createSubnet");
+      params.set("action", "create-subnet");
+      setSearchParams(params, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
@@ -140,7 +152,7 @@ export function NetworkDetailPage() {
                 presetFields={{ network_id: networkId }}
                 folderUid={folderId}
                 title="Создание таблицы маршрутизации"
-                onCancel={() => setCreatingRouteTable(false)}
+                onCancel={() => setAction(null)}
               />
             ) : (
               <ChildSection
@@ -170,7 +182,7 @@ export function NetworkDetailPage() {
                 presetFields={{ network_id: networkId }}
                 folderUid={folderId}
                 title="Создание группы безопасности"
-                onCancel={() => setCreatingSecurityGroup(false)}
+                onCancel={() => setAction(null)}
               />
             ) : (
               <ChildSection
@@ -225,7 +237,7 @@ export function NetworkDetailPage() {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => setCreatingRouteTable(true)}
+            onClick={() => setAction("create-route-table")}
           >
             Создать таблицу маршрутизации
           </Button>
@@ -237,7 +249,7 @@ export function NetworkDetailPage() {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => setCreatingSecurityGroup(true)}
+            onClick={() => setAction("create-security-group")}
           >
             Создать группу безопасности
           </Button>
@@ -255,7 +267,7 @@ export function NetworkDetailPage() {
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () => setCreatingSubnet(true),
+            onClick: () => setAction("create-subnet"),
           }
         : undefined,
     [folderId, networkId],
@@ -267,7 +279,7 @@ export function NetworkDetailPage() {
       <InlineSubnetCreateForm
         folderId={folderId}
         networkId={networkId}
-        onCancel={() => setCreatingSubnet(false)}
+        onCancel={() => setAction(null)}
       />
     );
   }, [creatingSubnet, folderId, networkId]);

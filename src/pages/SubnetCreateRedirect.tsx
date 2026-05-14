@@ -17,7 +17,7 @@ export function SubnetCreateRedirect() {
   }
   return (
     <Navigate
-      to={`/folders/${folderId}/vpc/networks/${networkId}?createSubnet=1`}
+      to={`/folders/${folderId}/vpc/networks/${networkId}?action=create-subnet`}
       replace
     />
   );
