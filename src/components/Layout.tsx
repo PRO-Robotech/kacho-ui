@@ -9,6 +9,7 @@ import {
   HeaderBreadcrumbSlot,
   PageHeaderSlotProvider,
 } from "@/components/PageHeaderSlot";
+import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
 
 const { Header, Sider, Content } = AntLayout;
 
@@ -138,6 +139,10 @@ function LayoutInner() {
           <div style={{ minWidth: "max-content", padding: "20px 24px" }}>
             <Outlet />
           </div>
+          {/* Глобальный mount модалок Create/Edit — для всех ресурсов
+              (vpc/compute/resource-manager). Модалка сама читает URL и
+              решает, открываться по `?modal=<spec.id>-create|edit`. */}
+          <GlobalResourceFormModal />
         </Content>
       </AntLayout>
     </AntLayout>
