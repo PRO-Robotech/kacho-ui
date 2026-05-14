@@ -30,6 +30,7 @@ import {
 } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
+import { SubnetCidrChips } from "@/components/SubnetCidrChips";
 import { DopplerButton } from "@/components/DopplerButton";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
@@ -47,22 +48,10 @@ interface Props {
   onSuccess?: () => void;
 }
 
-interface CidrEntry {
-  address: string;
-  prefix: number;
+interface LabelEntry {
+  key: string;
+  value: string;
 }
-
-const PREFIX_OPTIONS = Array.from({ length: 25 }, (_, i) => ({
-  value: i + 8, // /8 .. /32
-  label: `${i + 8}`,
-}));
-
-// IPv6: типичные subnet-маски /48..../128 (RFC 6177 — /48 site, /56 home,
-// /64 default subnet). Шаг 1 даёт полное покрытие; default /64.
-const PREFIX_OPTIONS_V6 = Array.from({ length: 81 }, (_, i) => ({
-  value: i + 48, // /48 .. /128
-  label: `${i + 48}`,
-}));
 
 function autoName(): string {
   return `subnetwork-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -84,9 +73,10 @@ export function InlineSubnetCreateForm({
   const [labels, setLabels] = useState<LabelEntry[]>([]);
   const [zoneId, setZoneId] = useState<string | undefined>(undefined);
   const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
-  const [cidrs, setCidrs] = useState<CidrEntry[]>([{ address: "", prefix: 24 }]);
-  // v6 — пусто по умолчанию; оба массива независимы (v4-only / v6-only / dual-stack).
-  const [cidrsV6, setCidrsV6] = useState<CidrEntry[]>([]);
+  // CIDR-блоки храним как массив готовых строк "10.0.0.0/24" (как в edit-вью);
+  // визуально — chip-list через SubnetCidrChips (visual parity с SubnetCidrManager).
+  const [v4Blocks, setV4Blocks] = useState<string[]>([]);
+  const [v6Blocks, setV6Blocks] = useState<string[]>([]);
   const [dhcpDomainName, setDhcpDomainName] = useState("");
   const [dhcpDns, setDhcpDns] = useState<string[]>([]);
   const [dhcpNtp, setDhcpNtp] = useState<string[]>([]);
@@ -177,17 +167,10 @@ export function InlineSubnetCreateForm({
     if (!zoneId) {
       return;
     }
-    const cidrStrings = cidrs
-      .map((c) => c.address.trim())
-      .filter((s) => s.length > 0)
-      .map((s, i) => `${s}/${cidrs[i].prefix}`);
-    const v6Strings = cidrsV6
-      .map((c) => c.address.trim())
-      .filter((s) => s.length > 0)
-      .map((s, i) => `${s}/${cidrsV6[i].prefix}`);
-    // Хотя бы одно семейство должно быть задано (kacho-vpc допускает v4-only,
-    // v6-only и dual-stack; полностью пустая подсеть отвергается backend'ом).
-    if (cidrStrings.length === 0 && v6Strings.length === 0) {
+    // CIDR-строки уже валидированы и добавлены через SubnetCidrChips —
+    // используем как есть. Хотя бы одно семейство (v4 / v6 / оба) обязательно.
+    if (v4Blocks.length === 0 && v6Blocks.length === 0) {
+      toast.error("Добавьте хотя бы один CIDR (IPv4 или IPv6).");
       return;
     }
     const labelMap = labelsFromEntries(labels);
@@ -207,8 +190,8 @@ export function InlineSubnetCreateForm({
       name,
       description: description || undefined,
       labels: Object.keys(labelMap).length > 0 ? labelMap : undefined,
-      v4_cidr_blocks: cidrStrings.length > 0 ? cidrStrings : undefined,
-      v6_cidr_blocks: v6Strings.length > 0 ? v6Strings : undefined,
+      v4_cidr_blocks: v4Blocks.length > 0 ? v4Blocks : undefined,
+      v6_cidr_blocks: v6Blocks.length > 0 ? v6Blocks : undefined,
       route_table_id: routeTableId || undefined,
       dhcp_options: dhcp,
     };
@@ -273,107 +256,22 @@ export function InlineSubnetCreateForm({
           label={
             <Space size={4}>
               IPv4 и IPv6 CIDR
-              <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Маски: v4 /8–/32, v6 /48–/128 (default /64).">
+              <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Введите CIDR с префиксом, например 10.0.0.0/24 или 2001:db8::/64, и нажмите Add.">
                 <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
           required
         >
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            {cidrs.map((c, idx) => (
-              <Space.Compact key={idx} style={{ width: "100%" }}>
-                <Input
-                  placeholder="IPv4 CIDR (например, 10.0.0.0)"
-                  value={c.address}
-                  onChange={(e) => {
-                    const next = [...cidrs];
-                    next[idx] = { ...next[idx], address: e.target.value };
-                    setCidrs(next);
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  defaultValue="/"
-                  disabled
-                  style={{
-                    width: 30,
-                    textAlign: "center",
-                    pointerEvents: "none",
-                    background: "transparent",
-                  }}
-                />
-                <Select
-                  value={c.prefix}
-                  onChange={(v) => {
-                    const next = [...cidrs];
-                    next[idx] = { ...next[idx], prefix: v };
-                    setCidrs(next);
-                  }}
-                  options={PREFIX_OPTIONS}
-                  style={{ width: 80 }}
-                />
-                <Button
-                  icon={<DeleteOutlined />}
-                  onClick={() => setCidrs(cidrs.filter((_, i) => i !== idx))}
-                />
-              </Space.Compact>
-            ))}
-            <Button
-              onClick={() => setCidrs([...cidrs, { address: "", prefix: 24 }])}
-              icon={<PlusOutlined />}
-            >
-              Добавить IPv4 CIDR
-            </Button>
-
-            {/* IPv6 — продолжение того же блока (как SubnetCidrManager в Edit
-                объединяет v4+v6 под одним label). Разделитель — отступ. */}
-            {cidrsV6.map((c, idx) => (
-              <Space.Compact key={`v6-${idx}`} style={{ width: "100%" }}>
-                <Input
-                  placeholder="IPv6 CIDR (например, 2001:db8::)"
-                  value={c.address}
-                  onChange={(e) => {
-                    const next = [...cidrsV6];
-                    next[idx] = { ...next[idx], address: e.target.value };
-                    setCidrsV6(next);
-                  }}
-                  style={{ flex: 1 }}
-                />
-                <Input
-                  defaultValue="/"
-                  disabled
-                  style={{
-                    width: 30,
-                    textAlign: "center",
-                    pointerEvents: "none",
-                    background: "transparent",
-                  }}
-                />
-                <Select
-                  value={c.prefix}
-                  onChange={(v) => {
-                    const next = [...cidrsV6];
-                    next[idx] = { ...next[idx], prefix: v };
-                    setCidrsV6(next);
-                  }}
-                  options={PREFIX_OPTIONS_V6}
-                  style={{ width: 90 }}
-                  showSearch
-                />
-                <Button
-                  icon={<DeleteOutlined />}
-                  onClick={() => setCidrsV6(cidrsV6.filter((_, i) => i !== idx))}
-                />
-              </Space.Compact>
-            ))}
-            <Button
-              onClick={() => setCidrsV6([...cidrsV6, { address: "", prefix: 64 }])}
-              icon={<PlusOutlined />}
-            >
-              Добавить IPv6 CIDR
-            </Button>
-          </Space>
+          {/* Тот же chip-list-виджет, что у Edit (SubnetCidrManager), но в
+              controlled-mode — мутирует локальный state, отправка вместе с
+              формой. Визуальная parity с edit-страницей. */}
+          <SubnetCidrChips
+            v4Blocks={v4Blocks}
+            onV4Change={setV4Blocks}
+            v6Blocks={v6Blocks}
+            onV6Change={setV6Blocks}
+          />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>
