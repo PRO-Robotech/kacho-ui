@@ -21,6 +21,7 @@ import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
 import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
 import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
+import { InlineAddressPoolCreateForm } from "@/components/InlineAddressPoolCreateForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
@@ -109,6 +110,16 @@ export function ResourceFormModal({ folderId }: Props) {
           folderId={folderId}
           sgId={id}
           onCancel={close}
+        />
+      );
+    }
+    if (specId === "address-pools" && action === "create") {
+      // KAC-71: AddressPool с тем же CIDR-chip layout, что у Subnet
+      // (поддержка v4/v6, KAC-60 sparse IPAM).
+      return (
+        <InlineAddressPoolCreateForm
+          onCancel={close}
+          onSuccess={close}
         />
       );
     }
