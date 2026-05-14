@@ -22,6 +22,7 @@ import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
 import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
 import { InlineAddressPoolCreateForm } from "@/components/InlineAddressPoolCreateForm";
+import { InlineAddressPoolEditForm } from "@/components/InlineAddressPoolEditForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
@@ -118,6 +119,15 @@ export function ResourceFormModal({ folderId }: Props) {
       // (поддержка v4/v6, KAC-60 sparse IPAM).
       return (
         <InlineAddressPoolCreateForm
+          onCancel={close}
+          onSuccess={close}
+        />
+      );
+    }
+    if (specId === "address-pools" && action === "edit" && id) {
+      return (
+        <InlineAddressPoolEditForm
+          poolId={id}
           onCancel={close}
           onSuccess={close}
         />
