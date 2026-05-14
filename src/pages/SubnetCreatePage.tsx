@@ -14,7 +14,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Form, Select, Space, Typography } from "antd";
+import { Button, Form, Select, Space, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { api } from "@/api/client";
@@ -106,22 +106,25 @@ export function SubnetCreatePage() {
 
   if (!folderId) return null;
 
+  // Visual parity с SubnetDetailPage в edit-mode: тот же padding и плоская
+  // обёртка (без Card), как у tab "Обзор" DetailPage. Inline-форма рендерится
+  // напрямую — она сама ставит заголовок «Создание подсети», 2-column
+  // horizontal layout, CIDR-виджеты и DHCP-collapse.
   return (
-    <div style={{ padding: 24, maxWidth: 900 }}>
+    <div style={{ padding: 24, maxWidth: 760 }}>
       <Button
         type="text"
         size="small"
         icon={<ArrowLeftOutlined />}
         onClick={onCancel}
-        style={{ marginBottom: 12 }}
+        style={{ marginBottom: 16, padding: 0 }}
       >
         Назад
       </Button>
 
       {!networkId ? (
-        // Шаг 1: выбор сети, если networkId не задан query-параметром.
-        <Card>
-          <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
             Создание подсети
           </Typography.Title>
           <Form
@@ -143,21 +146,17 @@ export function SubnetCreatePage() {
               />
             </Form.Item>
           </Form>
-          <Space style={{ marginTop: 8 }}>
-            <Typography.Text type="secondary">
-              Подсеть всегда принадлежит сети — выберите её, чтобы продолжить.
-            </Typography.Text>
-          </Space>
-        </Card>
+          <Typography.Text type="secondary">
+            Подсеть всегда принадлежит сети — выберите её, чтобы продолжить.
+          </Typography.Text>
+        </Space>
       ) : (
-        <Card>
-          <InlineSubnetCreateForm
-            folderId={folderId}
-            networkId={networkId}
-            onCancel={onCancel}
-            onSuccess={onSuccess}
-          />
-        </Card>
+        <InlineSubnetCreateForm
+          folderId={folderId}
+          networkId={networkId}
+          onCancel={onCancel}
+          onSuccess={onSuccess}
+        />
       )}
     </div>
   );
