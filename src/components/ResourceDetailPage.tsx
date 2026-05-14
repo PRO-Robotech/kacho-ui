@@ -539,6 +539,14 @@ export function ResourceDetailPage({
           value: <CopyableId id={getByPath<string>(data, "route_table_id")!} />,
         }
       : null,
+    // NetworkInterface: MAC address (output-only, KAC-48). Префикс 0e: + 40 бит
+    // crypto/rand, стабилен на жизни NIC, уникален в пределах cloud.
+    spec.id === "network-interfaces" && getByPath<string>(data, "mac_address")
+      ? {
+          label: "MAC",
+          value: <CopyableId id={getByPath<string>(data, "mac_address")!} />,
+        }
+      : null,
   ].filter(Boolean) as { label: string; value: React.ReactNode }[];
 
   const tabs: DetailTab[] = [

@@ -864,6 +864,19 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ),
       },
       {
+        // mac_address — output-only, аллоцируется kacho-vpc при Create
+        // (префикс 0e: + 40 бит crypto/rand), стабилен на жизни NIC,
+        // уникален в пределах cloud (KAC-48). Клиент не может задать.
+        header: "MAC",
+        path: "mac_address",
+        render: (row) => {
+          const mac = row.mac_address as string | undefined;
+          return mac
+            ? <CopyableId id={mac} />
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
         // NIC теперь ссылается на Address-ресурсы по id (v4_address_ids).
         // Здесь — компактно число привязанных IPv4-адресов; сами адреса
         // (с IP-значением) видны на DetailPage / в ресурсе Address.
