@@ -535,9 +535,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         path: "external_ipv4_address.address",
         render: (row) => {
           const ext = (row.external_ipv4_address as { address?: string } | undefined)?.address;
+          const ext6 = (row.external_ipv6_address as { address?: string } | undefined)?.address;
           const int = (row.internal_ipv4_address as { address?: string } | undefined)?.address;
           const int6 = (row.internal_ipv6_address as { address?: string } | undefined)?.address;
-          const ip = ext || int || int6;
+          // KAC-58: показываем external_ipv6_address наравне с external_ipv4
+          // (обе ветки oneof; форма теперь предлагает только external).
+          // internal_* оставлены в render для backward compat — Address-ресурсы,
+          // созданные через compute Instance.Create flow до KAC-58 / напрямую
+          // через API, останутся видимыми.
+          const ip = ext || ext6 || int || int6;
           if (!ip) return <span className="text-muted-foreground">—</span>;
           return <span className="font-mono text-xs">{ip}</span>;
         },
@@ -617,59 +623,54 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "enum",
         required: true,
         default: "external",
-        description: "External — публичный IPv4; Internal — IPv4/IPv6 из CIDR подсети.",
+        description: "External IPv4 / External IPv6. Internal IP создаются автоматически compute-сервисом при Instance.Create через nic-spec и здесь не предлагаются.",
+        // KAC-58 (epic) / KAC-61: оставили только External. Internal IPv4/IPv6
+        // создаются через compute Instance.Create flow с
+        // network_interface_specs[*].subnet_id — Address.Create internal через
+        // UI явно убран как часть упрощения product surface.
         options: [
           { value: "external", label: "External IPv4" },
-          { value: "internal", label: "Internal IPv4" },
-          { value: "internal_v6", label: "Internal IPv6" },
+          { value: "external_v6", label: "External IPv6" },
         ],
         editHidden: true,
       },
       {
         name: "external_ipv4_address_spec.zone_id",
-        label: "Zone (External)",
+        label: "Zone (External IPv4)",
         type: "ref",
         refResource: "zones",
-        description: "Зона для External IP. Оставьте address пустым для auto-allocation.",
+        description: "Зона для External IPv4. Оставьте address пустым для auto-allocation.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
       {
         name: "external_ipv4_address_spec.address",
-        label: "Address (External, необязательно)",
+        label: "Address (External IPv4, необязательно)",
         type: "string",
         placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется автоматически.",
+        description: "Если пусто — адрес выделяется автоматически из default IPv4 pool зоны.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
       {
-        name: "internal_ipv4_address_spec.subnet_id",
-        label: "Subnet (Internal)",
+        // KAC-58: External IPv6 — sparse counter-based allocator (миграция 0021).
+        // CIDR-pool с v6 prefix создаётся через InternalAddressPoolService;
+        // cascade resolve фильтрует pool по family запроса.
+        name: "external_ipv6_address_spec.zone_id",
+        label: "Zone (External IPv6)",
         type: "ref",
-        refResource: "subnets",
-        refFolderScoped: true,
-        description: "Subnet для Internal IP. Адрес выделяется автоматически.",
-        visibleWhen: { field: "_address_kind", equals: "internal" },
+        refResource: "zones",
+        description: "Зона для External IPv6. Оставьте address пустым для auto-allocation из v6 pool.",
+        visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
-        name: "internal_ipv4_address_spec.address",
-        label: "Address (Internal, необязательно)",
+        name: "external_ipv6_address_spec.address",
+        label: "Address (External IPv6, необязательно)",
         type: "string",
         placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется из subnet автоматически.",
-        visibleWhen: { field: "_address_kind", equals: "internal" },
-        editHidden: true,
-      },
-      {
-        name: "internal_ipv6_address_spec.subnet_id",
-        label: "Subnet (Internal IPv6)",
-        type: "ref",
-        refResource: "subnets",
-        refFolderScoped: true,
-        description: "Subnet для Internal IPv6. Адрес выделяется из v6_cidr_blocks подсети.",
-        visibleWhen: { field: "_address_kind", equals: "internal_v6" },
+        description: "Если пусто — адрес выделяется автоматически из v6 pool зоны.",
+        visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
@@ -691,14 +692,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       deletion_protection: false,
     }),
     // Убирает поле-переключатель _address_kind и неактивный oneof из payload.
+    // KAC-58: form предлагает только external IPv4 / external IPv6; internal_*
+    // ключи в форме отсутствуют, но защита от их «протекания» оставлена на
+    // случай legacy template'ов.
     sanitize: (obj) => {
       const kind = obj["_address_kind"];
       const result: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
         if (k === "_address_kind") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
-        if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
-        if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
+        if (k === "external_ipv6_address_spec" && kind !== "external_v6") continue;
+        if (k === "internal_ipv4_address_spec") continue
+        if (k === "internal_ipv6_address_spec") continue
         result[k] = v;
       }
       return result;
