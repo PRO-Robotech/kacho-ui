@@ -5,7 +5,11 @@
 //
 // Wire-format submission ровно как у public AddressService.Create:
 //   { folder_id, network_id, zone_id, name, description?, labels?,
-//     v4_cidr_blocks: [string], route_table_id?, dhcp_options? }
+//     v4_cidr_blocks: [string], v6_cidr_blocks: [string], route_table_id?, dhcp_options? }
+//
+// v6_cidr_blocks (KAC-68): аналогично v4, но prefix-варианты /48..../128;
+// в большинстве случаев /64 (RFC-default для subnet). Оба поля optional —
+// допустима v4-only / v6-only / dual-stack подсеть.
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -53,6 +57,13 @@ const PREFIX_OPTIONS = Array.from({ length: 25 }, (_, i) => ({
   label: `${i + 8}`,
 }));
 
+// IPv6: типичные subnet-маски /48..../128 (RFC 6177 — /48 site, /56 home,
+// /64 default subnet). Шаг 1 даёт полное покрытие; default /64.
+const PREFIX_OPTIONS_V6 = Array.from({ length: 81 }, (_, i) => ({
+  value: i + 48, // /48 .. /128
+  label: `${i + 48}`,
+}));
+
 function autoName(): string {
   return `subnetwork-${Math.floor(100000 + Math.random() * 900000)}`;
 }
@@ -74,6 +85,8 @@ export function InlineSubnetCreateForm({
   const [zoneId, setZoneId] = useState<string | undefined>(undefined);
   const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
   const [cidrs, setCidrs] = useState<CidrEntry[]>([{ address: "", prefix: 24 }]);
+  // v6 — пусто по умолчанию; оба массива независимы (v4-only / v6-only / dual-stack).
+  const [cidrsV6, setCidrsV6] = useState<CidrEntry[]>([]);
   const [dhcpDomainName, setDhcpDomainName] = useState("");
   const [dhcpDns, setDhcpDns] = useState<string[]>([]);
   const [dhcpNtp, setDhcpNtp] = useState<string[]>([]);
@@ -168,7 +181,13 @@ export function InlineSubnetCreateForm({
       .map((c) => c.address.trim())
       .filter((s) => s.length > 0)
       .map((s, i) => `${s}/${cidrs[i].prefix}`);
-    if (cidrStrings.length === 0) {
+    const v6Strings = cidrsV6
+      .map((c) => c.address.trim())
+      .filter((s) => s.length > 0)
+      .map((s, i) => `${s}/${cidrsV6[i].prefix}`);
+    // Хотя бы одно семейство должно быть задано (kacho-vpc допускает v4-only,
+    // v6-only и dual-stack; полностью пустая подсеть отвергается backend'ом).
+    if (cidrStrings.length === 0 && v6Strings.length === 0) {
       return;
     }
     const labelMap: Record<string, string> = {};
@@ -191,7 +210,8 @@ export function InlineSubnetCreateForm({
       name,
       description: description || undefined,
       labels: Object.keys(labelMap).length > 0 ? labelMap : undefined,
-      v4_cidr_blocks: cidrStrings,
+      v4_cidr_blocks: cidrStrings.length > 0 ? cidrStrings : undefined,
+      v6_cidr_blocks: v6Strings.length > 0 ? v6Strings : undefined,
       route_table_id: routeTableId || undefined,
       dhcp_options: dhcp,
     };
@@ -290,11 +310,10 @@ export function InlineSubnetCreateForm({
         </Form.Item>
 
         <Form.Item
-          required
           label={
             <Space size={4}>
-              CIDR
-              <Tooltip title="IPv4 CIDR-блоки подсети, RFC 1918. Маска /16–/30.">
+              IPv4 CIDR
+              <Tooltip title="IPv4 CIDR-блоки подсети, RFC 1918. Маска /16–/30. Поле опционально — допустима v6-only подсеть.">
                 <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
@@ -304,7 +323,7 @@ export function InlineSubnetCreateForm({
             {cidrs.map((c, idx) => (
               <Space.Compact key={idx} style={{ width: "100%" }}>
                 <Input
-                  placeholder="IPv4 CIDR"
+                  placeholder="IPv4 CIDR (например, 10.0.0.0)"
                   value={c.address}
                   onChange={(e) => {
                     const next = [...cidrs];
@@ -333,19 +352,76 @@ export function InlineSubnetCreateForm({
                   options={PREFIX_OPTIONS}
                   style={{ width: 80 }}
                 />
-                {cidrs.length > 1 && (
-                  <Button
-                    icon={<DeleteOutlined />}
-                    onClick={() => setCidrs(cidrs.filter((_, i) => i !== idx))}
-                  />
-                )}
+                <Button
+                  icon={<DeleteOutlined />}
+                  onClick={() => setCidrs(cidrs.filter((_, i) => i !== idx))}
+                />
               </Space.Compact>
             ))}
             <Button
               onClick={() => setCidrs([...cidrs, { address: "", prefix: 24 }])}
               icon={<PlusOutlined />}
             >
-              Добавить CIDR
+              Добавить IPv4 CIDR
+            </Button>
+          </Space>
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              IPv6 CIDR
+              <Tooltip title="IPv6 CIDR-блоки подсети. Маска /48–/128 (default /64 — RFC 6177). Поле опционально — допустима v4-only подсеть. Dual-stack: задайте оба.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            {cidrsV6.map((c, idx) => (
+              <Space.Compact key={idx} style={{ width: "100%" }}>
+                <Input
+                  placeholder="IPv6 CIDR (например, 2001:db8::)"
+                  value={c.address}
+                  onChange={(e) => {
+                    const next = [...cidrsV6];
+                    next[idx] = { ...next[idx], address: e.target.value };
+                    setCidrsV6(next);
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <Input
+                  defaultValue="/"
+                  disabled
+                  style={{
+                    width: 30,
+                    textAlign: "center",
+                    pointerEvents: "none",
+                    background: "transparent",
+                  }}
+                />
+                <Select
+                  value={c.prefix}
+                  onChange={(v) => {
+                    const next = [...cidrsV6];
+                    next[idx] = { ...next[idx], prefix: v };
+                    setCidrsV6(next);
+                  }}
+                  options={PREFIX_OPTIONS_V6}
+                  style={{ width: 90 }}
+                  showSearch
+                />
+                <Button
+                  icon={<DeleteOutlined />}
+                  onClick={() => setCidrsV6(cidrsV6.filter((_, i) => i !== idx))}
+                />
+              </Space.Compact>
+            ))}
+            <Button
+              onClick={() => setCidrsV6([...cidrsV6, { address: "", prefix: 64 }])}
+              icon={<PlusOutlined />}
+            >
+              Добавить IPv6 CIDR
             </Button>
           </Space>
         </Form.Item>
