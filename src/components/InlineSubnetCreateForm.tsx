@@ -272,12 +272,13 @@ export function InlineSubnetCreateForm({
         <Form.Item
           label={
             <Space size={4}>
-              IPv4 CIDR
-              <Tooltip title="IPv4 CIDR-блоки подсети, RFC 1918. Маска /16–/30. Поле опционально — допустима v6-only подсеть.">
+              IPv4 и IPv6 CIDR
+              <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Маски: v4 /8–/32, v6 /48–/128 (default /64).">
                 <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
+          required
         >
           <Space direction="vertical" size={8} style={{ width: "100%" }}>
             {cidrs.map((c, idx) => (
@@ -324,22 +325,11 @@ export function InlineSubnetCreateForm({
             >
               Добавить IPv4 CIDR
             </Button>
-          </Space>
-        </Form.Item>
 
-        <Form.Item
-          label={
-            <Space size={4}>
-              IPv6 CIDR
-              <Tooltip title="IPv6 CIDR-блоки подсети. Маска /48–/128 (default /64 — RFC 6177). Поле опционально — допустима v4-only подсеть. Dual-stack: задайте оба.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
-              </Tooltip>
-            </Space>
-          }
-        >
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            {/* IPv6 — продолжение того же блока (как SubnetCidrManager в Edit
+                объединяет v4+v6 под одним label). Разделитель — отступ. */}
             {cidrsV6.map((c, idx) => (
-              <Space.Compact key={idx} style={{ width: "100%" }}>
+              <Space.Compact key={`v6-${idx}`} style={{ width: "100%" }}>
                 <Input
                   placeholder="IPv6 CIDR (например, 2001:db8::)"
                   value={c.address}
