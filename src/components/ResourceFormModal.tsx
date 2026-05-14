@@ -155,6 +155,31 @@ export function ResourceFormModal({ folderId }: Props) {
         />
       );
     }
+    // addresses + create в контексте subnet (subnetId в query) — preset обе
+    // ветки internal_ipv4/v6_address_spec.subnet_id, editable _address_kind
+    // только internal v4/v6 (external не имеет смысла под subnet).
+    if (specId === "addresses" && action === "create") {
+      const subnetId =
+        searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined;
+      if (subnetId) {
+        return (
+          <InlineResourceCreateForm
+            spec={spec}
+            ctx={{ folderId }}
+            presetFields={{
+              "internal_ipv4_address_spec.subnet_id": subnetId,
+              "internal_ipv6_address_spec.subnet_id": subnetId,
+            }}
+            editablePresetFields={{ _address_kind: "internal" }}
+            fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
+            folderUid={folderId}
+            title="Резервирование IP-адреса"
+            onCancel={close}
+            onSuccess={close}
+          />
+        );
+      }
+    }
     if (action === "create") {
       return (
         <InlineResourceCreateForm

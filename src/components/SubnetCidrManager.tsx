@@ -1,5 +1,6 @@
-// SubnetCidrManager — отдельный UI-flow для управления v4_cidr_blocks /
-// v6_cidr_blocks подсети через verbs `:add-cidr-blocks` / `:remove-cidr-blocks`.
+// SubnetCidrManager — управление v4_cidr_blocks / v6_cidr_blocks подсети через
+// verbs `:add-cidr-blocks` / `:remove-cidr-blocks`. Визуально — AntD Card+Tag
+// (parity с controlled-вариантом SubnetCidrChips в Create-форме).
 //
 // Backend (kacho-vpc/internal/service/subnet.go) запрещает менять CIDR-блоки
 // через обычный PATCH (`v4_cidr_blocks is immutable after Subnet.Create`; то же
@@ -9,9 +10,16 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Button,
+  Card,
+  Input,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from "antd";
+import { CloseOutlined, LoadingOutlined, PlusOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -21,9 +29,7 @@ type CidrKind = "v4" | "v6";
 
 interface Props {
   subnetId: string;
-  // Текущие IPv4 CIDR-блоки (из data.v4_cidr_blocks).
   v4Blocks: string[];
-  // Текущие IPv6 CIDR-блоки (из data.v6_cidr_blocks).
   v6Blocks?: string[];
 }
 
@@ -54,6 +60,7 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
 
   const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
   const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
+  const tagColor = kind === "v4" ? "blue" : "geekblue";
 
   const mutate = useMutation({
     mutationFn: async (params: { verb: "add" | "remove"; cidr: string }) => {
@@ -67,13 +74,13 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
         setOpId(id);
         setPendingCidr(vars.cidr);
       } else {
-        // Sync-ответ (на всякий случай) — сразу инвалидируем detail.
         qc.invalidateQueries({ queryKey: ["subnets", "detail", subnetId] });
         setPendingCidr(null);
       }
     },
     onError: (err, vars) => {
-      const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      const m =
+        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
       toast.error(`CIDR ${vars.verb}: ${m}`);
       setPendingCidr(null);
     },
@@ -84,6 +91,10 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
     const v = validateCidr(kind, cidr);
     if (v) {
       toast.error(v);
+      return;
+    }
+    if (blocks.includes(cidr)) {
+      toast.error("Этот CIDR уже добавлен.");
       return;
     }
     setPendingCidr(cidr);
@@ -100,67 +111,82 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
     mutate.mutate({ verb: "remove", cidr });
   };
 
+  const inputDisabled = mutate.isPending || opId !== null;
+
   return (
-    <div className="rounded-lg border border-border p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-sm">{label}</h3>
-        <span className="text-xs text-muted-foreground">{blocks.length} блок(ов)</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {blocks.length === 0 && (
-          <span className="text-xs text-muted-foreground italic">— пусто —</span>
-        )}
-        {blocks.map((cidr) => {
-          const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
-          return (
-            <span
-              key={cidr}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1 text-xs font-mono"
-            >
-              {cidr}
-              <button
-                type="button"
-                onClick={() => onRemove(cidr)}
-                disabled={busy || mutate.isPending}
-                className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Remove this CIDR"
-              >
-                {busy ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3 w-3" />
-                )}
-              </button>
-            </span>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={placeholder}
-          className="font-mono text-xs h-8"
-          disabled={mutate.isPending || opId !== null}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onAdd();
-            }
-          }}
-        />
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={onAdd}
-          disabled={!draft.trim() || mutate.isPending || opId !== null}
-        >
-          <Plus className="h-4 w-4" /> Add
-        </Button>
-      </div>
+    <Card
+      size="small"
+      title={
+        <Space size={8}>
+          <Typography.Text strong>{label}</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {blocks.length} блок(ов)
+          </Typography.Text>
+        </Space>
+      }
+    >
+      <Space direction="vertical" size={8} style={{ width: "100%" }}>
+        <div style={{ minHeight: 24 }}>
+          {blocks.length === 0 ? (
+            <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
+              — пусто —
+            </Typography.Text>
+          ) : (
+            <Space size={[6, 6]} wrap>
+              {blocks.map((cidr) => {
+                const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
+                return (
+                  <Tag
+                    key={cidr}
+                    color={tagColor}
+                    closable={!busy}
+                    closeIcon={
+                      busy ? (
+                        <Spin
+                          indicator={<LoadingOutlined style={{ fontSize: 10 }} spin />}
+                        />
+                      ) : (
+                        <CloseOutlined style={{ fontSize: 10 }} />
+                      )
+                    }
+                    onClose={(e) => {
+                      e.preventDefault();
+                      if (!busy) onRemove(cidr);
+                    }}
+                    style={{ fontFamily: "monospace", fontSize: 12, margin: 0 }}
+                  >
+                    {cidr}
+                  </Tag>
+                );
+              })}
+            </Space>
+          )}
+        </div>
+        <Space.Compact style={{ width: "100%" }}>
+          <Input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={placeholder}
+            disabled={inputDisabled}
+            style={{ fontFamily: "monospace", fontSize: 12 }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onAdd();
+              }
+            }}
+          />
+          <Button
+            type="primary"
+            ghost
+            onClick={onAdd}
+            disabled={!draft.trim() || inputDisabled}
+            icon={<PlusOutlined />}
+          >
+            Add
+          </Button>
+        </Space.Compact>
+      </Space>
 
       <OperationToastWatcher
         opId={opId}
@@ -172,7 +198,7 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
           qc.invalidateQueries({ queryKey: ["subnets", "list"] });
         }}
       />
-    </div>
+    </Card>
   );
 }
 

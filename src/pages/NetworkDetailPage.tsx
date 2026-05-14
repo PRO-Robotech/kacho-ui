@@ -14,7 +14,6 @@ import { PlusOutlined } from "@ant-design/icons";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
-import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
@@ -30,41 +29,45 @@ export function NetworkDetailPage() {
 
   const subnetSpec = REGISTRY["subnets"];
 
-  // Inline-create state — это **deep-link-якорь** в query-параметре `action`:
-  //   ?action=create-subnet      — InlineSubnetCreateForm раскрыт в Обзоре
-  //   ?action=create-route-table — InlineResourceCreateForm RT раскрыт
-  //   ?action=create-security-group — InlineResourceCreateForm SG раскрыт
-  //
-  // Любая ссылка / редирект / закладка / breadcrumb приводят пользователя
-  // в правильное состояние без отдельного pre-mount-effect. State чисто
-  // derived из URL → нет рассинхронизации при back/forward, refresh,
-  // прямом вводе URL. Cancel/Success снимают action (см. setAction(null)).
+  // Create flow для всех child-ресурсов (Subnet/RT/SG) — через модалку
+  // ResourceFormModal, открываемую по query `?modal=<spec.id>-create&networkId=<n>`.
+  // URL остаётся на parent-странице → при close модалки user остаётся на
+  // Network detail. presetFields подхватываются ResourceFormModal автоматически
+  // (см. ResourceFormModal.tsx — networkId → network_id snake_case преобр.).
   const [searchParams, setSearchParams] = useSearchParams();
-  const action = searchParams.get("action");
-  const creatingSubnet = action === "create-subnet";
-  const creatingRouteTable = action === "create-route-table";
-  const creatingSecurityGroup = action === "create-security-group";
 
-  const setAction = useCallback(
-    (next: string | null) => {
+  const openCreateModal = useCallback(
+    (specId: string) => {
+      if (!networkId) return;
       const params = new URLSearchParams(searchParams);
-      if (next) params.set("action", next);
-      else params.delete("action");
-      setSearchParams(params, { replace: true });
+      params.set("modal", `${specId}-create`);
+      params.set("networkId", networkId);
+      // Старый ?action=…-* флаг убираем — модалка теперь единый entry-point.
+      params.delete("action");
+      params.delete("createSubnet");
+      setSearchParams(params, { replace: false });
     },
-    [searchParams, setSearchParams],
+    [networkId, searchParams, setSearchParams],
   );
 
-  // Back-compat для прежнего флага `?createSubnet=1` (использовался коротко
-  // между KAC-67 v1 и v2): один раз транслируем в action=create-subnet.
+  // Back-compat для старых ссылок (KAC-67 v2..v5 — `?action=create-…` / `?createSubnet=1`):
+  // конвертируем в `?modal=…-create`, чтобы старые закладки/линки работали.
   useEffect(() => {
-    if (searchParams.get("createSubnet") === "1") {
-      const params = new URLSearchParams(searchParams);
-      params.delete("createSubnet");
-      params.set("action", "create-subnet");
-      setSearchParams(params, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
+    const action = searchParams.get("action");
+    const createSubnetLegacy = searchParams.get("createSubnet") === "1";
+    if (!networkId) return;
+    let target: string | null = null;
+    if (createSubnetLegacy || action === "create-subnet") target = "subnets";
+    else if (action === "create-route-table") target = "route-tables";
+    else if (action === "create-security-group") target = "security-groups";
+    if (!target) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete("action");
+    params.delete("createSubnet");
+    params.set("modal", `${target}-create`);
+    params.set("networkId", networkId);
+    setSearchParams(params, { replace: true });
+  }, [networkId, searchParams, setSearchParams]);
 
   const { data: subnetData } = useQuery({
     queryKey: ["subnets", "list", folderId],
@@ -144,61 +147,41 @@ export function NetworkDetailPage() {
           id: "route-tables",
           label: "Таблицы маршрутизации",
           count: networkRouteTables.length,
-          render: () =>
-            creatingRouteTable && folderId && networkId ? (
-              <InlineResourceCreateForm
-                spec={rtSpec}
-                ctx={{ folderId }}
-                presetFields={{ network_id: networkId }}
-                folderUid={folderId}
-                title="Создание таблицы маршрутизации"
-                onCancel={() => setAction(null)}
-              />
-            ) : (
-              <ChildSection
-                title="Таблицы маршрутизации"
-                rows={networkRouteTables}
-                columns={rtColumns}
-                emptyText="К сети не привязано ни одной таблицы маршрутизации."
-                onClick={(id) =>
-                  folderId &&
-                  networkId &&
-                  navigate(
-                    `/folders/${folderId}/vpc/networks/${networkId}/route-tables/${id}`,
-                  )
-                }
-              />
-            ),
+          render: () => (
+            <ChildSection
+              title="Таблицы маршрутизации"
+              rows={networkRouteTables}
+              columns={rtColumns}
+              emptyText="К сети не привязано ни одной таблицы маршрутизации."
+              onClick={(id) =>
+                folderId &&
+                networkId &&
+                navigate(
+                  `/folders/${folderId}/vpc/networks/${networkId}/route-tables/${id}`,
+                )
+              }
+            />
+          ),
         },
         {
           id: "security-groups",
           label: "Группы безопасности",
           count: networkSGs.length,
-          render: () =>
-            creatingSecurityGroup && folderId && networkId ? (
-              <InlineResourceCreateForm
-                spec={sgSpec}
-                ctx={{ folderId }}
-                presetFields={{ network_id: networkId }}
-                folderUid={folderId}
-                title="Создание группы безопасности"
-                onCancel={() => setAction(null)}
-              />
-            ) : (
-              <ChildSection
-                title="Группы безопасности"
-                rows={networkSGs}
-                columns={sgColumns}
-                emptyText="В сети нет групп безопасности."
-                onClick={(id) =>
-                  folderId &&
-                  networkId &&
-                  navigate(
-                    `/folders/${folderId}/vpc/networks/${networkId}/security-groups/${id}`,
-                  )
-                }
-              />
-            ),
+          render: () => (
+            <ChildSection
+              title="Группы безопасности"
+              rows={networkSGs}
+              columns={sgColumns}
+              emptyText="В сети нет групп безопасности."
+              onClick={(id) =>
+                folderId &&
+                networkId &&
+                navigate(
+                  `/folders/${folderId}/vpc/networks/${networkId}/security-groups/${id}`,
+                )
+              }
+            />
+          ),
         },
         {
           id: "dns-zones",
@@ -221,35 +204,31 @@ export function NetworkDetailPage() {
       folderId,
       networkId,
       navigate,
-      creatingRouteTable,
-      creatingSecurityGroup,
-      rtSpec,
-      sgSpec,
     ],
   );
 
   const headerActionsByTab = useCallback(
     (tabId: string) => {
-      if (!folderId) return null;
-      if (tabId === "route-tables" && !creatingRouteTable) {
+      if (!folderId || !networkId) return null;
+      if (tabId === "route-tables") {
         return (
           <Button
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => setAction("create-route-table")}
+            onClick={() => openCreateModal("route-tables")}
           >
             Создать таблицу маршрутизации
           </Button>
         );
       }
-      if (tabId === "security-groups" && !creatingSecurityGroup) {
+      if (tabId === "security-groups") {
         return (
           <Button
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => setAction("create-security-group")}
+            onClick={() => openCreateModal("security-groups")}
           >
             Создать группу безопасности
           </Button>
@@ -257,40 +236,20 @@ export function NetworkDetailPage() {
       }
       return null;
     },
-    [folderId, creatingRouteTable, creatingSecurityGroup],
+    [folderId, networkId, openCreateModal],
   );
 
-  // "Создать подсеть" — открывает модалку поверх текущей страницы (KAC-69).
-  // Query-флаг `?modal=subnets-create&networkId=<n>` подхватывается
-  // <SubnetFormModal/> ниже. URL остаётся parent-страницы → при close
-  // модалки user остаётся на Network detail.
+  // "Создать подсеть" — открывает ту же модалку с specId=subnets.
   const overviewCreateOverride = useMemo(
     () =>
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () => {
-              const params = new URLSearchParams(searchParams);
-              params.set("modal", "subnets-create");
-              params.set("networkId", networkId);
-              setSearchParams(params, { replace: false });
-            },
+            onClick: () => openCreateModal("subnets"),
           }
         : undefined,
-    [folderId, networkId, searchParams, setSearchParams],
+    [folderId, networkId, openCreateModal],
   );
-
-  // Back-compat: старая ссылка `?action=create-subnet` → конвертируем в
-  // `?modal=subnets-create` (единый entry-point теперь — модалка).
-  useEffect(() => {
-    if (creatingSubnet && folderId && networkId) {
-      const params = new URLSearchParams(searchParams);
-      params.delete("action");
-      params.set("modal", "subnets-create");
-      params.set("networkId", networkId);
-      setSearchParams(params, { replace: true });
-    }
-  }, [creatingSubnet, folderId, networkId, searchParams, setSearchParams]);
 
   return (
     <>
