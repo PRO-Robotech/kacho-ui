@@ -157,7 +157,8 @@ export function ResourceFormModal({ folderId }: Props) {
       footer={null}
       width={width}
       destroyOnClose
-      maskClosable={false}
+      // Клик по маске вне модалки → закрытие (user UX-запрос).
+      maskClosable={true}
       title={null}
       // У всех inline-форм свой <Title level={4}> — не дублируем Modal-title.
       // Компактный padding (user: «слишком большое расстояние по бокам»).
