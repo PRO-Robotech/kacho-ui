@@ -5,8 +5,8 @@
 // Per-tab header CTA через ResourceDetailPage.headerActionsByTab.
 // Каждый child-tab имеет Title + filter (имя или id substring) над таблицей.
 
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Input, Space, Typography } from "antd";
 import { ErrorResult } from "@/components/ErrorResult";
@@ -37,6 +37,22 @@ export function NetworkDetailPage() {
   const [creatingSubnet, setCreatingSubnet] = useState(false);
   const [creatingRouteTable, setCreatingRouteTable] = useState(false);
   const [creatingSecurityGroup, setCreatingSecurityGroup] = useState(false);
+
+  // Auto-open inline form по query-флагу `?createSubnet=1`. Используется
+  // редиректом со старого URL `/folders/.../networks/<n>/subnets/create`
+  // (см. SubnetCreateRedirect): любой entry-point «Создать подсеть»
+  // (RowActionsMenu, прямые ссылки, header) приводит к новой inline-форме,
+  // а не к generic ResourceCreatePage.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("createSubnet") === "1") {
+      setCreatingSubnet(true);
+      // Снимаем флаг, чтобы при cancel не зацикливалось.
+      const next = new URLSearchParams(searchParams);
+      next.delete("createSubnet");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data: subnetData } = useQuery({
     queryKey: ["subnets", "list", folderId],
