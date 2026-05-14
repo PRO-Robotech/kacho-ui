@@ -47,12 +47,18 @@ export function InlineResourceEditForm({
 
   useEffect(() => {
     if (hydrated || !fields) return;
-    const baseObj: Record<string, unknown> = { ...data };
+    // wire → form: если spec определил hydrate (см. resource-registry для
+    // NIC v4/v6_address_ids/security_group_ids и Subnet v4/v6_cidr_blocks),
+    // оборачиваем array-of-string поля в {value:"..."}-объекты, чтобы
+    // RefSelect/array-form их корректно отображал в edit-режиме. Иначе
+    // RefSelect получает массив строк и не показывает имена.
+    const wireData: Record<string, unknown> = { ...data };
+    const baseObj = spec.hydrate ? spec.hydrate(wireData) : wireData;
     const merged = applyFieldDefaults(fields, baseObj);
     originalRef.current = baseObj;
     setObj(merged);
     setHydrated(true);
-  }, [data, fields, hydrated]);
+  }, [data, fields, hydrated, spec]);
 
   const [pendingOpId, setPendingOpId] = useState<string | null>(null);
   const { data: op } = useOperation(pendingOpId);

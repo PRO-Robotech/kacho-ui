@@ -62,6 +62,14 @@ export interface ResourceSpec {
   // Используется для конвертации form-internal представления (wrapper-объекты, toggle-поля)
   // в wire format (plain arrays, oneof etc.).
   sanitize?: (obj: Record<string, unknown>) => Record<string, unknown>;
+  /** Обратная sanitize: wire → form. Вызывается InlineResourceEditForm перед
+   *  установкой initial form-state. Используется когда у формы есть array-of-ref
+   *  или array-of-string поля, для которых wire-format = массив строк, а
+   *  form-format = массив объектов `{value: "..."}` (см. NIC v4/v6_address_ids
+   *  / security_group_ids; Subnet v4/v6_cidr_blocks). Без hydrate-адаптера
+   *  RefSelect получает массив строк вместо объектов и не отображает
+   *  выбранные значения в edit-режиме. */
+  hydrate?: (obj: Record<string, unknown>) => Record<string, unknown>;
   /** Path-template для internal/infra-проекции ресурса (плейсхолдер `{id}`).
    *  Если задан — на DetailPage появляется tab "jsonint", который делает
    *  GET <internalGetPath с подставленным {id}> и pretty-print'ит JSON-ответ.
@@ -501,6 +509,19 @@ export const REGISTRY: Record<string, ResourceSpec> = {
                 : item,
             )
             .filter((v) => typeof v === "string" && v);
+        }
+      }
+      return out;
+    },
+    // Inverse sanitize: wire-strings → form-objects {value:"..."} для array-полей.
+    hydrate: (obj) => {
+      const out: Record<string, unknown> = { ...obj };
+      for (const key of ["v4_cidr_blocks", "v6_cidr_blocks"]) {
+        const raw = out[key];
+        if (Array.isArray(raw)) {
+          out[key] = raw.map((item) =>
+            typeof item === "string" ? { value: item } : item,
+          );
         }
       }
       return out;
@@ -1081,6 +1102,21 @@ export const REGISTRY: Record<string, ResourceSpec> = {
                 : item,
             )
             .filter((v) => typeof v === "string" && v);
+        }
+      }
+      return out;
+    },
+    // Inverse sanitize: wire → form. Backend возвращает массивы id-строк, форма
+    // ждёт массивы объектов {value: "..."} (для RefSelect). Без этого в
+    // edit-режиме RefSelect получает массив строк и не показывает имена.
+    hydrate: (obj) => {
+      const out: Record<string, unknown> = { ...obj };
+      for (const key of ["v4_address_ids", "v6_address_ids", "security_group_ids"]) {
+        const raw = out[key];
+        if (Array.isArray(raw)) {
+          out[key] = raw.map((item) =>
+            typeof item === "string" ? { value: item } : item,
+          );
         }
       }
       return out;
