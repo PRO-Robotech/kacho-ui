@@ -14,7 +14,6 @@ import { PlusOutlined } from "@ant-design/icons";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
-import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
@@ -260,29 +259,33 @@ export function NetworkDetailPage() {
     [folderId, creatingRouteTable, creatingSecurityGroup],
   );
 
-  // На Network detail "Создать подсеть" разворачивает форму inline в правой
-  // панели вместо навигации на отдельную /subnets/create страницу.
+  // "Создать подсеть" — единый flow через standalone SubnetCreatePage
+  // (`/vpc/subnets/create?networkId=<n>`). YC-style layout как у subnet edit.
+  // Back-compat: ?action=create-subnet редиректит на standalone (см. useEffect ниже).
   const overviewCreateOverride = useMemo(
     () =>
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () => setAction("create-subnet"),
+            onClick: () =>
+              navigate(
+                `/folders/${folderId}/vpc/subnets/create?networkId=${networkId}`,
+              ),
           }
         : undefined,
-    [folderId, networkId],
+    [folderId, networkId, navigate],
   );
 
-  const overviewReplace = useMemo(() => {
-    if (!creatingSubnet || !folderId || !networkId) return undefined;
-    return () => (
-      <InlineSubnetCreateForm
-        folderId={folderId}
-        networkId={networkId}
-        onCancel={() => setAction(null)}
-      />
-    );
-  }, [creatingSubnet, folderId, networkId]);
+  // Если кто-то пришёл по старой ссылке `?action=create-subnet` — редирект
+  // на standalone-форму (единый entry-point).
+  useEffect(() => {
+    if (creatingSubnet && folderId && networkId) {
+      navigate(
+        `/folders/${folderId}/vpc/subnets/create?networkId=${networkId}`,
+        { replace: true },
+      );
+    }
+  }, [creatingSubnet, folderId, networkId, navigate]);
 
   return (
     <ResourceDetailPage
@@ -291,8 +294,6 @@ export function NetworkDetailPage() {
       headerActionsByTab={headerActionsByTab}
       overviewCreateOverride={overviewCreateOverride}
       overviewExtras={overviewExtras}
-      overviewReplace={overviewReplace}
-      hideOverviewCreate={creatingSubnet}
     />
   );
 }

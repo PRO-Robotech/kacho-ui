@@ -77,14 +77,13 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "create-subnet",
           icon: <PlusOutlined />,
           label: "Создать подсеть",
-          // Deep-link якорь: NetworkDetailPage читает ?action=create-subnet
-          // и сразу разворачивает InlineSubnetCreateForm (YC-style) в
-          // правой панели. Любая ссылка / закладка / breadcrumb приводят
-          // в то же состояние. Старый /subnets/create редиректит сюда же
-          // (см. SubnetCreateRedirect).
+          // Standalone-страница SubnetCreatePage — единый URL для всех
+          // entry-point'ов «Создать подсеть» (header CTA / RowActionsMenu /
+          // /networks/<n>/subnets/create / /subnets/create). Тот же
+          // визуальный layout что у SubnetDetailPage в edit-mode.
           onClick: stop(() =>
             navigate(
-              `/folders/${currentFolderId}/vpc/networks/${id}?action=create-subnet`,
+              `/folders/${currentFolderId}/vpc/subnets/create?networkId=${id}`,
             ),
           ),
         }
