@@ -1788,12 +1788,54 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Zone", path: "zone_id", format: "text" },
-      { header: "CIDRs", path: "cidr_blocks", format: "list" },
+      // Те же колонки и стиль, что у subnets list (CopyableName/Id, отдельные
+      // v4/v6 блоки, LabelsCell): visual parity по запросу user'а.
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => (
+          <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />
+        ),
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      { header: "Тип", path: "kind", format: "text" },
+      { header: "Зона", path: "zone_id", format: "text" },
+      {
+        header: "IPv4 CIDR",
+        path: "cidr_blocks",
+        // Фильтр массива по семейству — рендер через formatList-like.
+        render: (row) => {
+          const all = (row.cidr_blocks as string[] | undefined) ?? [];
+          const v4 = all.filter((c) => c.includes(".") && !c.includes(":"));
+          return v4.length > 0
+            ? <span className="font-mono text-xs">{v4.join(", ")}</span>
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "IPv6 CIDR",
+        path: "cidr_blocks",
+        render: (row) => {
+          const all = (row.cidr_blocks as string[] | undefined) ?? [];
+          const v6 = all.filter((c) => c.includes(":"));
+          return v6.length > 0
+            ? <span className="font-mono text-xs">{v6.join(", ")}</span>
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
       { header: "Default", path: "is_default", format: "text" },
-      { header: "Selector", path: "selector_labels", format: "code" },
-      COL_ID,
+      {
+        header: "Метки селектора",
+        path: "selector_labels",
+        render: (row) => (
+          <LabelsCell labels={row.selector_labels as Record<string, string> | undefined} />
+        ),
+      },
+      { header: "Selector priority", path: "selector_priority", format: "text" },
     ],
     fields: [
       {
