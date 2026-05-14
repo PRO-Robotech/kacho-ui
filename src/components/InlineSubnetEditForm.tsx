@@ -312,7 +312,7 @@ export function InlineSubnetEditForm({
             onChange={(v) => setRouteTableId(v)}
             options={rtOptions}
             allowClear
-            placeholder=""
+            placeholder="Выберите таблицу маршрутизации (опц.)"
           />
         </Form.Item>
 

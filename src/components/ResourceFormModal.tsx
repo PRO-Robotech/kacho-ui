@@ -149,14 +149,13 @@ export function ResourceFormModal({ folderId }: Props) {
       maskClosable={false}
       title={null}
       // У всех inline-форм свой <Title level={4}> — не дублируем Modal-title.
-      // Единый padding для всех модалок (visual unity между custom/generic
-      // формами): top 24 (под Title), bottom 16 (под submit-кнопки), left/right 24.
+      // Компактный padding (user: «слишком большое расстояние по бокам»).
       styles={{
         body: {
-          paddingTop: 24,
-          paddingBottom: 16,
-          paddingLeft: 24,
-          paddingRight: 24,
+          paddingTop: 16,
+          paddingBottom: 12,
+          paddingLeft: 12,
+          paddingRight: 12,
         },
       }}
       // Anim — стандартная Antd (zoom from center). Без transform-origin

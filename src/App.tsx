@@ -106,6 +106,31 @@ export default function App() {
             headerBg: "#26272d",
             rowHoverBg: "#2a2b32",
           },
+          // KAC-69: единый цвет модалок + селекторов внутри форм (по
+          // указанию user'а: фон модалки rgb(52,54,61) = #34363d;
+          // внутренний цвет селектора rgb(28,29,33) = #1c1d22).
+          Modal: {
+            contentBg: "#34363d",
+            headerBg: "#34363d",
+            footerBg: "#34363d",
+          },
+          Select: {
+            // Закрытое поле + dropdown — затемнённый фон (как у Layout body).
+            colorBgContainer: "#1c1d22",
+            colorBgElevated: "#1c1d22",
+            optionSelectedBg: "#2a2b32",
+            optionActiveBg: "#26272d",
+          },
+          Input: {
+            // Чтобы Input в модалке имел тот же фон что Select — visual unity.
+            colorBgContainer: "#1c1d22",
+          },
+          InputNumber: {
+            colorBgContainer: "#1c1d22",
+          },
+          DatePicker: {
+            colorBgContainer: "#1c1d22",
+          },
         },
       }}
     >
