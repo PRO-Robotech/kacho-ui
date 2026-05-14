@@ -67,6 +67,20 @@ export default function App() {
   return (
     <ConfigProvider
       locale={ruRU}
+      form={{
+        // Звёздочка required справа от label (по умолчанию AntD ставит слева).
+        // По указанию user'а: все звёздочки должны быть справа.
+        requiredMark: (label, info) => (
+          <>
+            {label}
+            {info.required && (
+              <span style={{ color: "#ff4d4f", marginLeft: 4 }} aria-hidden>
+                *
+              </span>
+            )}
+          </>
+        ),
+      }}
       theme={{
         algorithm: antdTheme.darkAlgorithm,
         token: {
