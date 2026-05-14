@@ -713,9 +713,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       deletion_protection: false,
     }),
     // Убирает поле-переключатель _address_kind и неактивный oneof из payload.
-    // KAC-58: form предлагает только external IPv4 / external IPv6; internal_*
-    // ключи в форме отсутствуют, но защита от их «протекания» оставлена на
-    // случай legacy template'ов.
+    // Все 4 spec-варианта поддерживаются: external/external_v6 (top-level
+    // Address.Create form) + internal/internal_v6 (inline-create из NIC form,
+    // RefSelect createPresetFields → _address_kind="internal[_v6]" +
+    // internal_*_address_spec.subnet_id pre-filled). Sanitize оставляет
+    // активный oneof по _address_kind и выкидывает остальные.
     sanitize: (obj) => {
       const kind = obj["_address_kind"];
       const result: Record<string, unknown> = {};
@@ -723,8 +725,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         if (k === "_address_kind") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
         if (k === "external_ipv6_address_spec" && kind !== "external_v6") continue;
-        if (k === "internal_ipv4_address_spec") continue
-        if (k === "internal_ipv6_address_spec") continue
+        if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
+        if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
         result[k] = v;
       }
       return result;
