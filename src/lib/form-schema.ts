@@ -103,6 +103,11 @@ export interface ArrayField extends BaseField {
   itemLabel: string; // как назвать «одну единицу»: "Rule", "Listener"
   // Минимум элементов (если 0 — массив можно опустить)
   minItems?: number;
+  // Максимум элементов. Когда items.length >= maxItems — кнопка «Добавить»
+  // дизейблится. Используется для NIC `v4_address_ids`/`v6_address_ids`
+  // (cardinality ≤ 1 — KAC-55: один v4 + один v6 на NIC; multi-IP per VM
+  // делается через несколько NIC).
+  maxItems?: number;
   // Default для нового элемента
   newItem?: () => Record<string, unknown>;
 }
