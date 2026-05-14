@@ -23,6 +23,7 @@ import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
 import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
 import { InlineAddressPoolCreateForm } from "@/components/InlineAddressPoolCreateForm";
 import { InlineAddressPoolEditForm } from "@/components/InlineAddressPoolEditForm";
+import { InlineNetworkInterfaceEditForm } from "@/components/InlineNetworkInterfaceEditForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
@@ -128,6 +129,16 @@ export function ResourceFormModal({ folderId }: Props) {
       return (
         <InlineAddressPoolEditForm
           poolId={id}
+          onCancel={close}
+          onSuccess={close}
+        />
+      );
+    }
+    if (specId === "network-interfaces" && action === "edit" && id) {
+      return (
+        <InlineNetworkInterfaceEditForm
+          folderId={folderId}
+          nicId={id}
           onCancel={close}
           onSuccess={close}
         />
