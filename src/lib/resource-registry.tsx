@@ -954,10 +954,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // IPv4 из CIDR этой подсети»). На success id появляется в списке.
       {
         name: "v4_address_ids",
-        label: "IPv4-адреса (Address-ресурсы)",
+        label: "IPv4-адрес (Address-ресурс)",
         type: "array",
         itemLabel: "Address",
-        description: "Опционально. Address-ресурсы из выбранной подсети. Можно создать новый прямо в дропдауне.",
+        // KAC-55: на одной NIC максимум один IPv4 (и максимум один IPv6).
+        // Multi-IP per VM — через несколько NIC, не secondary addresses в одном
+        // NIC. Backend отбивает > 1 sync InvalidArgument + DB CHECK
+        // network_interfaces_v4_addr_max1 (миграция 0018) как backstop.
+        maxItems: 1,
+        description: "Опционально. IPv4 Address-ресурс из выбранной подсети. Можно создать новый прямо в дропдауне.",
         newItem: () => ({ value: "" }),
         itemFields: [
           {
@@ -986,10 +991,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         name: "v6_address_ids",
-        label: "IPv6-адреса (Address-ресурсы)",
+        label: "IPv6-адрес (Address-ресурс)",
         type: "array",
         itemLabel: "Address",
-        description: "Опционально. IPv6 Address-ресурсы из выбранной подсети. Можно создать новый прямо в дропдауне.",
+        // KAC-55: на одной NIC максимум один IPv6 (и максимум один IPv4).
+        maxItems: 1,
+        description: "Опционально. IPv6 Address-ресурс из выбранной подсети. Можно создать новый прямо в дропдауне.",
         newItem: () => ({ value: "" }),
         itemFields: [
           {

@@ -171,7 +171,13 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
   const path = fullPath(pathPrefix, field.name);
   const items = (getByPath(value, path) as Record<string, unknown>[] | undefined) ?? [];
 
+  // KAC-55: если задан maxItems и достигли лимита — кнопка «Добавить» дизейблится,
+  // подсказывается в description. Backend всё равно отбьёт sync InvalidArgument
+  // / DB CHECK, но UI-уровень даёт мгновенный feedback.
+  const atCap = field.maxItems !== undefined && items.length >= field.maxItems;
+
   const add = () => {
+    if (atCap) return;
     const next = [...items, field.newItem ? field.newItem() : {}];
     onChange(setByPath(value, path, next));
   };
@@ -187,13 +193,15 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
           description={
             disabled
               ? `${field.description ? field.description + " " : ""}(immutable после Create — управляется отдельным action)`
+              : field.maxItems !== undefined
+              ? `${field.description ? field.description + " " : ""}Максимум ${field.maxItems}.`
               : field.description
           }
           required={field.required}
         >
           {field.label}
         </Label>
-        <Button type="button" variant="outline" size="sm" onClick={add} disabled={disabled}>
+        <Button type="button" variant="outline" size="sm" onClick={add} disabled={disabled || atCap}>
           <Plus className="h-4 w-4" /> Добавить {field.itemLabel}
         </Button>
       </div>
