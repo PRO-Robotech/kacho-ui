@@ -15,6 +15,7 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
+import { SubnetFormModal } from "@/components/SubnetFormModal";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
@@ -259,42 +260,49 @@ export function NetworkDetailPage() {
     [folderId, creatingRouteTable, creatingSecurityGroup],
   );
 
-  // "Создать подсеть" — единый flow через standalone SubnetCreatePage
-  // (`/vpc/subnets/create?networkId=<n>`). YC-style layout как у subnet edit.
-  // Back-compat: ?action=create-subnet редиректит на standalone (см. useEffect ниже).
+  // "Создать подсеть" — открывает модалку поверх текущей страницы (KAC-69).
+  // Query-флаг `?modal=subnet-create&networkId=<n>` подхватывается
+  // <SubnetFormModal/> ниже. URL остаётся parent-страницы → при close
+  // модалки user остаётся на Network detail.
   const overviewCreateOverride = useMemo(
     () =>
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () =>
-              navigate(
-                `/folders/${folderId}/vpc/subnets/create?networkId=${networkId}`,
-              ),
+            onClick: () => {
+              const params = new URLSearchParams(searchParams);
+              params.set("modal", "subnet-create");
+              params.set("networkId", networkId);
+              setSearchParams(params, { replace: false });
+            },
           }
         : undefined,
-    [folderId, networkId, navigate],
+    [folderId, networkId, searchParams, setSearchParams],
   );
 
-  // Если кто-то пришёл по старой ссылке `?action=create-subnet` — редирект
-  // на standalone-форму (единый entry-point).
+  // Back-compat: старая ссылка `?action=create-subnet` → конвертируем в
+  // `?modal=subnet-create` (единый entry-point теперь — модалка).
   useEffect(() => {
     if (creatingSubnet && folderId && networkId) {
-      navigate(
-        `/folders/${folderId}/vpc/subnets/create?networkId=${networkId}`,
-        { replace: true },
-      );
+      const params = new URLSearchParams(searchParams);
+      params.delete("action");
+      params.set("modal", "subnet-create");
+      params.set("networkId", networkId);
+      setSearchParams(params, { replace: true });
     }
-  }, [creatingSubnet, folderId, networkId, navigate]);
+  }, [creatingSubnet, folderId, networkId, searchParams, setSearchParams]);
 
   return (
-    <ResourceDetailPage
-      spec={networkSpec}
-      extraTabs={extraTabs}
-      headerActionsByTab={headerActionsByTab}
-      overviewCreateOverride={overviewCreateOverride}
-      overviewExtras={overviewExtras}
-    />
+    <>
+      <ResourceDetailPage
+        spec={networkSpec}
+        extraTabs={extraTabs}
+        headerActionsByTab={headerActionsByTab}
+        overviewCreateOverride={overviewCreateOverride}
+        overviewExtras={overviewExtras}
+      />
+      {folderId && <SubnetFormModal folderId={folderId} />}
+    </>
   );
 }
 

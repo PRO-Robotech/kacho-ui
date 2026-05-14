@@ -77,13 +77,12 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "create-subnet",
           icon: <PlusOutlined />,
           label: "Создать подсеть",
-          // Standalone-страница SubnetCreatePage — единый URL для всех
-          // entry-point'ов «Создать подсеть» (header CTA / RowActionsMenu /
-          // /networks/<n>/subnets/create / /subnets/create). Тот же
-          // визуальный layout что у SubnetDetailPage в edit-mode.
+          // Открывает модалку SubnetFormModal поверх Network detail.
+          // Query-флаг `?modal=subnet-create&networkId=<n>` подхватывается
+          // SubnetFormModal — модалка появляется над Network detail-страницей.
           onClick: stop(() =>
             navigate(
-              `/folders/${currentFolderId}/vpc/subnets/create?networkId=${id}`,
+              `/folders/${currentFolderId}/vpc/networks/${id}?modal=subnet-create&networkId=${id}`,
             ),
           ),
         }

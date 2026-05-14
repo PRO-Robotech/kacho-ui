@@ -15,9 +15,10 @@ export function SubnetCreateRedirect() {
     // Защита от мисматча route — fallback на список сетей.
     return <Navigate to="/" replace />;
   }
+  // Открываем модалку SubnetFormModal на Network detail.
   return (
     <Navigate
-      to={`/folders/${folderId}/vpc/subnets/create?networkId=${networkId}`}
+      to={`/folders/${folderId}/vpc/networks/${networkId}?modal=subnet-create&networkId=${networkId}`}
       replace
     />
   );

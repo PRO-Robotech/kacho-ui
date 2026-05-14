@@ -38,7 +38,10 @@ import { toast } from "@/lib/toast";
 
 interface Props {
   folderId: string;
-  networkId: string;
+  // networkId — preset (locked если задан). Если undefined — форма
+  // отображает RefSelect "Сеть" как первое поле, user выбирает в форме
+  // (отказались от двухшагового flow).
+  networkId?: string;
   onCancel: () => void;
   onSuccess?: () => void;
 }
@@ -54,7 +57,7 @@ function autoName(): string {
 
 export function InlineSubnetCreateForm({
   folderId,
-  networkId,
+  networkId: presetNetworkId,
   onCancel,
   onSuccess,
 }: Props) {
@@ -62,6 +65,32 @@ export function InlineSubnetCreateForm({
   const subnetSpec = REGISTRY["subnets"];
   const zoneSpec = REGISTRY["zones"];
   const rtSpec = REGISTRY["route-tables"];
+  const networkSpec = REGISTRY["networks"];
+
+  // Если networkId preset (передан из контекста — например, "Создать подсеть"
+  // из NetworkDetailPage), сеть locked. Иначе — selectable в форме.
+  const [networkId, setNetworkId] = useState<string | undefined>(presetNetworkId);
+  const networkLocked = !!presetNetworkId;
+
+  // Список Networks для RefSelect (когда preset не задан).
+  const { data: netData } = useQuery({
+    queryKey: ["networks", "list", folderId],
+    queryFn: () =>
+      api.list<{ networks: Array<{ id: string; name?: string }> }>(networkSpec.apiPath, {
+        folder_id: folderId,
+        pageSize: "500",
+      }),
+    enabled: !networkLocked,
+    staleTime: 30_000,
+  });
+  const networkOptions = useMemo(
+    () =>
+      (netData?.networks ?? []).map((n) => ({
+        value: n.id,
+        label: n.name || n.id,
+      })),
+    [netData],
+  );
 
   const [name, setName] = useState(() => autoName());
   const [description, setDescription] = useState("");
@@ -147,19 +176,28 @@ export function InlineSubnetCreateForm({
   useEffect(() => {
     if (!pendingOpId || !op?.done) return;
     if (op.error) {
+      // На ошибку — НЕ вызываем onCancel/onSuccess: остаёмся на форме,
+      // user видит toast с причиной (например CIDR overlap) и может
+      // поправить ввод. Раньше любой результат закрывал форму — баг.
       toast.error(`Создать подсеть: ${op.error.message ?? "ошибка"}`);
-    } else {
-      invalidate(subnetSpec.id, folderId);
-      toast.success(`Подсеть ${name} создана`);
-      onSuccess?.();
+      setPendingOpId(null);
+      return;
     }
+    invalidate(subnetSpec.id, folderId);
+    toast.success(`Подсеть ${name} создана`);
     setPendingOpId(null);
+    onSuccess?.();
     onCancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [op?.done, op?.error?.code]);
 
   const submit = () => {
+    if (!networkId) {
+      toast.error("Выберите сеть для подсети.");
+      return;
+    }
     if (!zoneId) {
+      toast.error("Выберите зону доступности.");
       return;
     }
     // CIDR-строки уже валидированы и добавлены через SubnetCidrChips —
@@ -211,6 +249,18 @@ export function InlineSubnetCreateForm({
         colon={false}
         size="middle"
       >
+        <Form.Item label="Сеть" required>
+          <Select
+            showSearch
+            value={networkId}
+            onChange={(v) => setNetworkId(v)}
+            options={networkOptions}
+            placeholder="Выберите сеть"
+            optionFilterProp="label"
+            disabled={networkLocked}
+          />
+        </Form.Item>
+
         <Form.Item label="Имя" required>
           <Input
             value={name}
