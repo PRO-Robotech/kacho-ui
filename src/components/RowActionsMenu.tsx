@@ -78,11 +78,11 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           icon: <PlusOutlined />,
           label: "Создать подсеть",
           // Открывает модалку SubnetFormModal поверх Network detail.
-          // Query-флаг `?modal=subnet-create&networkId=<n>` подхватывается
+          // Query-флаг `?modal=subnets-create&networkId=<n>` подхватывается
           // SubnetFormModal — модалка появляется над Network detail-страницей.
           onClick: stop(() =>
             navigate(
-              `/folders/${currentFolderId}/vpc/networks/${id}?modal=subnet-create&networkId=${id}`,
+              `/folders/${currentFolderId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
             ),
           ),
         }

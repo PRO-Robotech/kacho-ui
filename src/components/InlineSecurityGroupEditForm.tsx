@@ -184,7 +184,7 @@ export function InlineSecurityGroupEditForm({ folderId, sgId, onCancel }: Props)
   const pending = updateMain.isPending || updateRules.isPending;
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
         Редактирование группы безопасности
       </Typography.Title>
