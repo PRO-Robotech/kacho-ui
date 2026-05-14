@@ -6,7 +6,7 @@
 // kind / zone_id — immutable (disabled в форме). cidr_blocks — editable
 // (backend Update принимает полный список с update_mask=cidr_blocks).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Button,
