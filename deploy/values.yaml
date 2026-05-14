@@ -6,3 +6,19 @@ port: 8080
 ingress:
   enabled: true
   host: console.kacho.local
+
+# UI is a static SPA over nginx — small footprint; HPA + resources
+# present for uniform policy. maxReplicas=3 is plenty.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
