@@ -18,7 +18,7 @@ export function SubnetCreateRedirect() {
   // Открываем модалку SubnetFormModal на Network detail.
   return (
     <Navigate
-      to={`/folders/${folderId}/vpc/networks/${networkId}?modal=subnet-create&networkId=${networkId}`}
+      to={`/folders/${folderId}/vpc/networks/${networkId}?modal=subnets-create&networkId=${networkId}`}
       replace
     />
   );

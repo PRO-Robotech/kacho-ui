@@ -236,7 +236,7 @@ export function InlineSubnetCreateForm({
   };
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
         Создание подсети
       </Typography.Title>

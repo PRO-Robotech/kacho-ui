@@ -68,12 +68,8 @@ export function ResourceFormModal({ folderId }: Props) {
     return fields;
   }, [action, searchParams]);
 
-  // Размер модалки: для subnet/security-group — широкий (custom-формы с
-  // CIDR/правилами); для остального — стандарт 720.
-  const width = useMemo(() => {
-    if (specId === "subnets" || specId === "security-groups") return 860;
-    return 720;
-  }, [specId]);
+  // Единая ширина для ВСЕХ модалок ресурсов — visual unity.
+  const width = 860;
 
   if (!spec || !action) return null;
   if (action === "edit" && (!id || !editData)) {
@@ -153,12 +149,22 @@ export function ResourceFormModal({ folderId }: Props) {
       maskClosable={false}
       title={null}
       // У всех inline-форм свой <Title level={4}> — не дублируем Modal-title.
-      // padding-top на body чтобы заголовок не лип к крестику закрытия.
-      styles={{ body: { paddingTop: 16 } }}
+      // Единый padding для всех модалок (visual unity между custom/generic
+      // формами): top 24 (под Title), bottom 16 (под submit-кнопки), left/right 24.
+      styles={{
+        body: {
+          paddingTop: 24,
+          paddingBottom: 16,
+          paddingLeft: 24,
+          paddingRight: 24,
+        },
+      }}
       // Anim — стандартная Antd (zoom from center). Без transform-origin
       // override модалка появляется из центра, не от точки клика.
     >
-      {formNode}
+      {/* Унифицирующая обёртка: maxWidth → forms not slip past modal width;
+          Inline-форма сама рендерит Title level=4 + content. */}
+      <div style={{ width: "100%" }}>{formNode}</div>
       <span style={{ position: "absolute", left: -10000 }} aria-hidden>
         {title}
       </span>

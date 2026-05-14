@@ -12,7 +12,7 @@ export function SubnetCreatePage() {
   if (!folderId) return <Navigate to="/" replace />;
 
   const params = new URLSearchParams();
-  params.set("modal", "subnet-create");
+  params.set("modal", "subnets-create");
   if (networkId) params.set("networkId", networkId);
 
   // Если networkId известен — открываем модалку на Network detail (контекст

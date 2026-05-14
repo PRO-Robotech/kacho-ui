@@ -261,7 +261,7 @@ export function NetworkDetailPage() {
   );
 
   // "Создать подсеть" — открывает модалку поверх текущей страницы (KAC-69).
-  // Query-флаг `?modal=subnet-create&networkId=<n>` подхватывается
+  // Query-флаг `?modal=subnets-create&networkId=<n>` подхватывается
   // <SubnetFormModal/> ниже. URL остаётся parent-страницы → при close
   // модалки user остаётся на Network detail.
   const overviewCreateOverride = useMemo(
@@ -271,7 +271,7 @@ export function NetworkDetailPage() {
             label: "Создать подсеть",
             onClick: () => {
               const params = new URLSearchParams(searchParams);
-              params.set("modal", "subnet-create");
+              params.set("modal", "subnets-create");
               params.set("networkId", networkId);
               setSearchParams(params, { replace: false });
             },
@@ -281,12 +281,12 @@ export function NetworkDetailPage() {
   );
 
   // Back-compat: старая ссылка `?action=create-subnet` → конвертируем в
-  // `?modal=subnet-create` (единый entry-point теперь — модалка).
+  // `?modal=subnets-create` (единый entry-point теперь — модалка).
   useEffect(() => {
     if (creatingSubnet && folderId && networkId) {
       const params = new URLSearchParams(searchParams);
       params.delete("action");
-      params.set("modal", "subnet-create");
+      params.set("modal", "subnets-create");
       params.set("networkId", networkId);
       setSearchParams(params, { replace: true });
     }
