@@ -16,6 +16,7 @@ import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
 import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
+import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -191,11 +192,19 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}/create`}
                   element={
-                    <ResourceCreatePage
-                      spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
-                    />
+                    // Subnet — отдельная standalone-страница SubnetCreatePage
+                    // (YC-style layout как у SubnetDetailPage в edit-mode).
+                    // Использует ?networkId=<n> для пред-фиксации сети;
+                    // без параметра — показывает RefSelect "Сеть" вверху.
+                    // Generic ResourceCreatePage оставлен для остальных VPC-
+                    // ресурсов (Network, Address, RT, SG, Gateway, PE).
+                    spec.id === "subnets"
+                      ? <SubnetCreatePage />
+                      : <ResourceCreatePage
+                          spec={spec}
+                          parentField="folder_id"
+                          parentParam="folderId"
+                        />
                   }
                 />
                 <Route
