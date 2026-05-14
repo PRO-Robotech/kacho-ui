@@ -30,6 +30,11 @@ import { DopplerButton } from "@/components/DopplerButton";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
+import {
+  LabelsEditor,
+  labelsFromEntries,
+  type LabelEntry,
+} from "@/components/LabelsEditor";
 
 interface Props {
   folderId: string;
@@ -41,11 +46,6 @@ interface Props {
 interface CidrEntry {
   address: string;
   prefix: number;
-}
-
-interface LabelEntry {
-  key: string;
-  value: string;
 }
 
 const PREFIX_OPTIONS = Array.from({ length: 25 }, (_, i) => ({
@@ -171,10 +171,7 @@ export function InlineSubnetCreateForm({
     if (cidrStrings.length === 0) {
       return;
     }
-    const labelMap: Record<string, string> = {};
-    for (const l of labels) {
-      if (l.key.trim()) labelMap[l.key.trim()] = l.value;
-    }
+    const labelMap = labelsFromEntries(labels);
     const dhcp =
       dhcpDomainName || dhcpDns.length > 0 || dhcpNtp.length > 0
         ? {
@@ -230,44 +227,7 @@ export function InlineSubnetCreateForm({
         </Form.Item>
 
         <Form.Item label="Метки">
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            {labels.map((l, idx) => (
-              <Space key={idx} size={4} style={{ width: "100%" }}>
-                <Input
-                  placeholder="ключ"
-                  value={l.key}
-                  onChange={(e) => {
-                    const next = [...labels];
-                    next[idx] = { ...next[idx], key: e.target.value };
-                    setLabels(next);
-                  }}
-                  style={{ width: 200 }}
-                />
-                <span>=</span>
-                <Input
-                  placeholder="значение"
-                  value={l.value}
-                  onChange={(e) => {
-                    const next = [...labels];
-                    next[idx] = { ...next[idx], value: e.target.value };
-                    setLabels(next);
-                  }}
-                  style={{ width: 240 }}
-                />
-                <Button
-                  type="text"
-                  icon={<DeleteOutlined />}
-                  onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
-                />
-              </Space>
-            ))}
-            <Button
-              onClick={() => setLabels([...labels, { key: "", value: "" }])}
-              icon={<PlusOutlined />}
-            >
-              Добавить метку
-            </Button>
-          </Space>
+          <LabelsEditor value={labels} onChange={setLabels} />
         </Form.Item>
 
         <Form.Item label="Зона доступности" required>

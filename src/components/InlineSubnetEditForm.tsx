@@ -20,9 +20,7 @@ import {
 } from "antd";
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
 import {
-  PlusOutlined,
   QuestionCircleOutlined,
-  DeleteOutlined,
   LockOutlined,
 } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
@@ -31,17 +29,18 @@ import { DopplerButton } from "@/components/DopplerButton";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
+import {
+  LabelsEditor,
+  labelsToEntries,
+  labelsFromEntries,
+  type LabelEntry,
+} from "@/components/LabelsEditor";
 
 interface Props {
   folderId: string;
   subnetId: string;
   onCancel: () => void;
   onSuccess?: () => void;
-}
-
-interface LabelEntry {
-  key: string;
-  value: string;
 }
 
 const MUTABLE_FIELDS = [
@@ -51,19 +50,6 @@ const MUTABLE_FIELDS = [
   "route_table_id",
   "dhcp_options",
 ] as const;
-
-function labelsToEntries(labels?: Record<string, string>): LabelEntry[] {
-  if (!labels) return [];
-  return Object.entries(labels).map(([key, value]) => ({ key, value }));
-}
-
-function entriesToLabels(entries: LabelEntry[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const e of entries) {
-    if (e.key.trim()) out[e.key.trim()] = e.value;
-  }
-  return out;
-}
 
 export function InlineSubnetEditForm({
   folderId,
@@ -102,7 +88,9 @@ export function InlineSubnetEditForm({
     if (!subnet || hydrated) return;
     setName((subnet.name as string) ?? "");
     setDescription((subnet.description as string) ?? "");
-    setLabels(labelsToEntries(subnet.labels as Record<string, string> | undefined));
+    setLabels(
+      labelsToEntries(subnet.labels as Record<string, string> | undefined),
+    );
     setRouteTableId((subnet.route_table_id as string | undefined) || undefined);
     const dhcp = subnet.dhcp_options as
       | {
@@ -176,7 +164,7 @@ export function InlineSubnetEditForm({
   const submit = () => {
     if (!subnet) return;
 
-    const labelMap = entriesToLabels(labels);
+    const labelMap = labelsFromEntries(labels);
     const dhcp =
       dhcpDomainName || dhcpDns.length > 0 || dhcpNtp.length > 0
         ? {
@@ -253,44 +241,7 @@ export function InlineSubnetEditForm({
         </Form.Item>
 
         <Form.Item label="Метки">
-          <Space direction="vertical" size={8} style={{ width: "100%" }}>
-            {labels.map((l, idx) => (
-              <Space key={idx} size={4} style={{ width: "100%" }}>
-                <Input
-                  placeholder="ключ"
-                  value={l.key}
-                  onChange={(e) => {
-                    const next = [...labels];
-                    next[idx] = { ...next[idx], key: e.target.value };
-                    setLabels(next);
-                  }}
-                  style={{ width: 200 }}
-                />
-                <span>=</span>
-                <Input
-                  placeholder="значение"
-                  value={l.value}
-                  onChange={(e) => {
-                    const next = [...labels];
-                    next[idx] = { ...next[idx], value: e.target.value };
-                    setLabels(next);
-                  }}
-                  style={{ width: 240 }}
-                />
-                <Button
-                  type="text"
-                  icon={<DeleteOutlined />}
-                  onClick={() => setLabels(labels.filter((_, i) => i !== idx))}
-                />
-              </Space>
-            ))}
-            <Button
-              onClick={() => setLabels([...labels, { key: "", value: "" }])}
-              icon={<PlusOutlined />}
-            >
-              Добавить метку
-            </Button>
-          </Space>
+          <LabelsEditor value={labels} onChange={setLabels} />
         </Form.Item>
 
         <Form.Item
