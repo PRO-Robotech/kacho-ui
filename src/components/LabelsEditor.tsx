@@ -1,13 +1,6 @@
-// LabelsEditor — единый controlled editor для map<string,string> labels-полей.
-// Используется во всех формах ресурсов (Subnet, Network, NIC, SecurityGroup,
-// AddressPool, …) для visual unity.
-//
-// Контракт: value — массив пар {key, value} (явный, без неявных
-// преобразований). Это гарантирует корректное отображение «с первой попытки» —
-// state hydrate в parent один раз, после чего editor reflect'ит без race'ов.
-//
-// Для удобства hydrate из/в `Record<string,string>` есть утилиты
-// labelsToEntries / labelsFromEntries.
+// LabelsEditor — controlled editor для map<string,string> labels-полей.
+// Visual: список пар ключ=значение + кнопка «Добавить метку». Использует
+// AntD-стили (тот же фон что Input/Select #1c1d22 через theme tokens).
 
 import { Button, Input, Space, Typography } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
@@ -20,23 +13,9 @@ export interface LabelEntry {
 interface Props {
   value: LabelEntry[];
   onChange: (next: LabelEntry[]) => void;
-  disabled?: boolean;
 }
 
-export function LabelsEditor({ value, onChange, disabled }: Props) {
-  const update = (idx: number, patch: Partial<LabelEntry>) => {
-    const next = value.map((row, i) => (i === idx ? { ...row, ...patch } : row));
-    onChange(next);
-  };
-
-  const remove = (idx: number) => {
-    onChange(value.filter((_, i) => i !== idx));
-  };
-
-  const add = () => {
-    onChange([...value, { key: "", value: "" }]);
-  };
-
+export function LabelsEditor({ value, onChange }: Props) {
   return (
     <Space direction="vertical" size={6} style={{ width: "100%" }}>
       {value.length === 0 && (
@@ -49,29 +28,33 @@ export function LabelsEditor({ value, onChange, disabled }: Props) {
           <Input
             placeholder="ключ"
             value={l.key}
-            onChange={(e) => update(idx, { key: e.target.value })}
-            disabled={disabled}
+            onChange={(e) => {
+              const next = [...value];
+              next[idx] = { ...next[idx], key: e.target.value };
+              onChange(next);
+            }}
             style={{ flex: "0 0 220px" }}
           />
           <Input
             placeholder="значение"
             value={l.value}
-            onChange={(e) => update(idx, { value: e.target.value })}
-            disabled={disabled}
+            onChange={(e) => {
+              const next = [...value];
+              next[idx] = { ...next[idx], value: e.target.value };
+              onChange(next);
+            }}
             style={{ flex: 1 }}
           />
           <Button
             icon={<DeleteOutlined />}
-            onClick={() => remove(idx)}
-            disabled={disabled}
+            onClick={() => onChange(value.filter((_, i) => i !== idx))}
           />
         </Space.Compact>
       ))}
       <Button
-        onClick={add}
+        onClick={() => onChange([...value, { key: "", value: "" }])}
         icon={<PlusOutlined />}
         size="small"
-        disabled={disabled}
       >
         Добавить метку
       </Button>
@@ -79,17 +62,15 @@ export function LabelsEditor({ value, onChange, disabled }: Props) {
   );
 }
 
-export function labelsToEntries(
-  obj: Record<string, string> | undefined,
-): LabelEntry[] {
-  if (!obj) return [];
-  return Object.entries(obj).map(([key, value]) => ({ key, value }));
-}
-
-export function labelsFromEntries(rows: LabelEntry[]): Record<string, string> {
+export function labelsToMap(entries: LabelEntry[]): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const r of rows) {
-    if (r.key.trim()) out[r.key.trim()] = r.value;
+  for (const l of entries) {
+    if (l.key.trim()) out[l.key.trim()] = l.value;
   }
   return out;
+}
+
+export function labelsFromMap(m: Record<string, string> | undefined): LabelEntry[] {
+  if (!m) return [];
+  return Object.entries(m).map(([key, value]) => ({ key, value }));
 }
