@@ -3,6 +3,23 @@
 @tailwind utilities;
 
 /*
+ * Резервируем место под scrollbar даже когда он скрыт. Без этого Antd Modal
+ * при открытии скрывает scrollbar (body{overflow:hidden}) → виден layout
+ * shift (страница «прыгает» вправо). scrollbar-gutter:stable резервирует
+ * место — открытие модалки не двигает контент.
+ *
+ * Также фиксируем padding-right, который Antd Modal добавляет в body при
+ * открытии: без stable gutter оно перекрывает наше резервирование.
+ */
+html {
+  scrollbar-gutter: stable;
+}
+body.ant-modal-open {
+  padding-right: 0 !important;
+  overflow: hidden !important;
+}
+
+/*
  * Единый dark-режим. Light theme выкинута: kacho-ui — клон YC console,
  * который dark-only. Значения согласованы с AntD darkAlgorithm-tokens
  * в App.tsx (colorBgBase / colorBgContainer / colorBorder).

@@ -15,7 +15,7 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
-import { SubnetFormModal } from "@/components/SubnetFormModal";
+import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
@@ -301,7 +301,7 @@ export function NetworkDetailPage() {
         overviewCreateOverride={overviewCreateOverride}
         overviewExtras={overviewExtras}
       />
-      {folderId && <SubnetFormModal folderId={folderId} />}
+      {folderId && <ResourceFormModal folderId={folderId} />}
     </>
   );
 }
