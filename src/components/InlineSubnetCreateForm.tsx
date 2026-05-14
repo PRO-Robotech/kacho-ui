@@ -23,11 +23,7 @@ import {
   Tooltip,
   Typography,
 } from "antd";
-import {
-  PlusOutlined,
-  QuestionCircleOutlined,
-  DeleteOutlined,
-} from "@ant-design/icons";
+import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
@@ -49,11 +45,6 @@ interface Props {
   networkId?: string;
   onCancel: () => void;
   onSuccess?: () => void;
-}
-
-interface LabelEntry {
-  key: string;
-  value: string;
 }
 
 function autoName(): string {
