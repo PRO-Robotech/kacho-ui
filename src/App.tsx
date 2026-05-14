@@ -14,6 +14,7 @@ import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
+import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -205,7 +206,9 @@ export default function App() {
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
                           ? <SecurityGroupDetailPage />
-                          : <ResourceDetailPage spec={spec} />
+                          : spec.id === "network-interfaces"
+                            ? <NetworkInterfaceDetailPage />
+                            : <ResourceDetailPage spec={spec} />
                   }
                 />
                 {/* /edit URL ведёт на ту же detail-страницу — она авто-
@@ -220,7 +223,9 @@ export default function App() {
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
                           ? <SecurityGroupDetailPage />
-                          : <ResourceDetailPage spec={spec} />
+                          : spec.id === "network-interfaces"
+                            ? <NetworkInterfaceDetailPage />
+                            : <ResourceDetailPage spec={spec} />
                   }
                 />
                 {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
