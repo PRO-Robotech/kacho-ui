@@ -783,22 +783,28 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           const routes = (row.static_routes as Array<{
             destination_prefix?: string;
             next_hop_address?: string;
+            gateway_id?: string;
           }> | undefined) ?? [];
           if (routes.length === 0) return <span className="text-muted-foreground">—</span>;
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {routes.map((r, i) => (
-                <span
-                  key={i}
-                  style={{
-                    fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                    fontSize: 12,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {r.destination_prefix ?? "?"} → {r.next_hop_address ?? "?"}
-                </span>
-              ))}
+              {routes.map((r, i) => {
+                const nh = r.gateway_id
+                  ? `gw:${r.gateway_id.slice(0, 8)}`
+                  : r.next_hop_address ?? "?";
+                return (
+                  <span
+                    key={i}
+                    style={{
+                      fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                      fontSize: 12,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {r.destination_prefix ?? "?"} → {nh}
+                  </span>
+                );
+              })}
             </div>
           );
         },
@@ -820,39 +826,74 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_NAME_VPC,
       {
         name: "network_id",
-        label: "Network",
+        label: "Сеть",
         type: "ref",
         refResource: "networks",
         refFolderScoped: true,
         required: true,
-      },
-      {
-        name: "static_routes",
-        label: "Static Routes",
-        type: "array",
-        itemLabel: "Route",
-        description: "Full-replace при Update.",
-        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
-        itemFields: [
-          {
-            name: "destination_prefix",
-            label: "Destination CIDR",
-            type: "string",
-            required: true,
-            placeholder: "<ip>/<prefix>",
-          },
-          {
-            name: "next_hop_address",
-            label: "Next Hop",
-            type: "string",
-            required: true,
-            placeholder: "<ip-address>",
-          },
-        ],
+        immutable: true,
+        description: "Облачная сеть, в которой действуют эти маршруты.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
+      // Static Routes — в самом низу формы (объёмный блок, не должен
+      // мешать редактированию основных полей).
+      {
+        name: "static_routes",
+        label: "Статические маршруты",
+        type: "array",
+        itemLabel: "маршрут",
+        description:
+          "При обновлении список заменяется целиком (full-replace).",
+        newItem: () => ({
+          destination_prefix: "",
+          _next_hop_kind: "ip",
+          next_hop_address: "",
+          gateway_id: "",
+        }),
+        itemFields: [
+          {
+            name: "destination_prefix",
+            label: "Назначение",
+            type: "string",
+            required: true,
+            placeholder: "10.0.0.0/24",
+            description:
+              "CIDR-блок назначения. Трафик в этот блок будет направлен через указанный next-hop.",
+          },
+          {
+            name: "_next_hop_kind",
+            label: "Тип next-hop",
+            type: "enum",
+            required: true,
+            default: "ip",
+            options: [
+              { value: "ip", label: "IP-адрес" },
+              { value: "gateway", label: "Шлюз" },
+            ],
+            description:
+              "IP-адрес — произвольный next-hop в подсети. Шлюз — ресурс kacho-vpc Gateway (NAT / Internet-egress).",
+          },
+          {
+            name: "next_hop_address",
+            label: "Адрес next-hop",
+            type: "string",
+            required: true,
+            placeholder: "10.0.0.1",
+            visibleWhen: { field: "_next_hop_kind", equals: "ip" },
+          },
+          {
+            name: "gateway_id",
+            label: "Шлюз",
+            type: "ref",
+            refResource: "gateways",
+            refFolderScoped: true,
+            required: true,
+            visibleWhen: { field: "_next_hop_kind", equals: "gateway" },
+          },
+        ],
+      },
     ],
     template: ({ folderId }) => ({
       folder_id: folderId ?? "",
@@ -861,6 +902,43 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       static_routes: [],
     }),
+    hydrate: (data) => {
+      // При Edit: определяем kind по тому, какая oneof-ветка заполнена.
+      const routes = (data.static_routes as Array<Record<string, unknown>> | undefined) ?? [];
+      return {
+        ...data,
+        static_routes: routes.map((r) => {
+          const gw = (r.gateway_id as string | undefined) ?? "";
+          const addr = (r.next_hop_address as string | undefined) ?? "";
+          return {
+            ...r,
+            _next_hop_kind: gw ? "gateway" : "ip",
+            next_hop_address: addr,
+            gateway_id: gw,
+          };
+        }),
+      };
+    },
+    sanitize: (obj) => {
+      // На submit: убираем UI-discriminator и неактивную ветку oneof.
+      const routes = (obj.static_routes as Array<Record<string, unknown>> | undefined) ?? [];
+      return {
+        ...obj,
+        static_routes: routes.map((r) => {
+          const kind = r._next_hop_kind ?? "ip";
+          const out: Record<string, unknown> = {
+            destination_prefix: r.destination_prefix,
+          };
+          if (r.labels) out.labels = r.labels;
+          if (kind === "gateway") {
+            out.gateway_id = r.gateway_id;
+          } else {
+            out.next_hop_address = r.next_hop_address;
+          }
+          return out;
+        }),
+      };
+    },
   },
 
   // proto: GET /vpc/v1/networkInterfaces — AWS-ENI-подобный ресурс (эпик KAC-2).

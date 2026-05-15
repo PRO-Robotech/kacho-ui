@@ -32,8 +32,15 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
   if (field.hidden) return null;
   if (editMode && field.editHidden) return null;
   if (field.visibleWhen) {
-    // visibleWhen.field — всегда top-level path (oneof discriminator живёт у корня формы).
-    const cur = getByPath(value, field.visibleWhen.field) as string | undefined;
+    // visibleWhen.field — относительный путь (резолвится через pathPrefix),
+    // чтобы дискриминатор oneof внутри array-item тоже работал. Если поле
+    // начинается с "/" или совпадает с top-level именем — приоритетно
+    // пробуем pathPrefix-resolution, fallback на top-level.
+    const rel = field.visibleWhen.field;
+    const relPath = pathPrefix ? `${pathPrefix}.${rel}` : rel;
+    const cur =
+      (getByPath(value, relPath) as string | undefined) ??
+      (getByPath(value, rel) as string | undefined);
     const want = field.visibleWhen.equals;
     const matched = Array.isArray(want) ? want.includes(cur ?? "") : cur === want;
     if (!matched) return null;
