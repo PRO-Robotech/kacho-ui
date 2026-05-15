@@ -3,8 +3,11 @@
 // layout, тот же CIDR-chip widget. Wire-format:
 //   PATCH /vpc/v1/addressPools/{id}  { name, description, ..., update_mask }
 //
-// kind / zone_id — immutable (disabled в форме). cidr_blocks — editable
-// (backend Update принимает полный список с update_mask=cidr_blocks).
+// kind / zone_id — immutable (disabled в форме). v4_cidr_blocks / v6_cidr_blocks
+// — editable, full-replace через replace_v4_cidr_blocks / replace_v6_cidr_blocks
+// флаги (KAC-71, REQ-IPL-UPD-05/06): backend применяет replace только если
+// флаг = true. Если по полю diff — добавляем оба поля (массив + флаг) в payload
+// + соответствующий пункт в update_mask.
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -39,7 +42,8 @@ interface PoolData {
   description?: string;
   kind?: string;
   zone_id?: string;
-  cidr_blocks?: string[];
+  v4_cidr_blocks?: string[];
+  v6_cidr_blocks?: string[];
   is_default?: boolean;
   selector_priority?: number;
 }
@@ -50,10 +54,6 @@ interface PoolData {
 const KIND_OPTIONS = [
   { value: "EXTERNAL_PUBLIC", label: "External public" },
 ];
-
-function isV4(cidr: string): boolean {
-  return cidr.includes(".") && !cidr.includes(":");
-}
 
 export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props) {
   const invalidate = useInvalidateResourceList();
@@ -73,14 +73,14 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
   const [selectorPriority, setSelectorPriority] = useState<number>(0);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate из загруженных данных.
+  // Hydrate из загруженных данных. KAC-71: backend отдаёт уже split-shape
+  // (v4_cidr_blocks + v6_cidr_blocks), client-side family-фильтр больше не нужен.
   useEffect(() => {
     if (!pool || hydrated) return;
     setName(pool.name ?? "");
     setDescription(pool.description ?? "");
-    const all = pool.cidr_blocks ?? [];
-    setV4Blocks(all.filter(isV4));
-    setV6Blocks(all.filter((c) => !isV4(c)));
+    setV4Blocks(pool.v4_cidr_blocks ?? []);
+    setV6Blocks(pool.v6_cidr_blocks ?? []);
     setIsDefault(!!pool.is_default);
     setSelectorPriority(pool.selector_priority ?? 0);
     setHydrated(true);
@@ -107,15 +107,22 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
       toast.error("Добавьте хотя бы один CIDR (IPv4 или IPv6).");
       return;
     }
-    const cidrs = [...v4Blocks, ...v6Blocks];
-    const origCidrs = (pool.cidr_blocks ?? []).slice().sort();
-    const newCidrs = cidrs.slice().sort();
 
-    // Diff против текущего объекта для update_mask.
+    // KAC-71: split-shape + явные replace-флаги. Diff по каждому family
+    // отдельно — если массив изменился, добавляем (а) поле массива, (б)
+    // replace-флаг = true, (в) оба пункта в update_mask.
+    const origV4 = (pool.v4_cidr_blocks ?? []).slice().sort();
+    const origV6 = (pool.v6_cidr_blocks ?? []).slice().sort();
+    const newV4 = v4Blocks.slice().sort();
+    const newV6 = v6Blocks.slice().sort();
+    const v4Changed = JSON.stringify(origV4) !== JSON.stringify(newV4);
+    const v6Changed = JSON.stringify(origV6) !== JSON.stringify(newV6);
+
     const mask: string[] = [];
     if ((pool.name ?? "") !== name) mask.push("name");
     if ((pool.description ?? "") !== description) mask.push("description");
-    if (JSON.stringify(origCidrs) !== JSON.stringify(newCidrs)) mask.push("cidr_blocks");
+    if (v4Changed) mask.push("v4_cidr_blocks", "replace_v4_cidr_blocks");
+    if (v6Changed) mask.push("v6_cidr_blocks", "replace_v6_cidr_blocks");
     if ((pool.is_default ?? false) !== isDefault) mask.push("is_default");
     if ((pool.selector_priority ?? 0) !== selectorPriority) mask.push("selector_priority");
 
@@ -123,14 +130,22 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
       onCancel();
       return;
     }
-    mutation.mutate({
+    const payload: Record<string, unknown> = {
       name,
       description: description || "",
-      cidr_blocks: cidrs,
       is_default: isDefault,
       selector_priority: selectorPriority,
       update_mask: mask.join(","),
-    });
+    };
+    if (v4Changed) {
+      payload.v4_cidr_blocks = v4Blocks;
+      payload.replace_v4_cidr_blocks = true;
+    }
+    if (v6Changed) {
+      payload.v6_cidr_blocks = v6Blocks;
+      payload.replace_v6_cidr_blocks = true;
+    }
+    mutation.mutate(payload);
   };
 
   if (isLoading || !pool) {

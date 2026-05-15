@@ -4,8 +4,12 @@
 //
 // Wire-format submission:
 //   POST /vpc/v1/addressPools
-//   { name, description?, kind, zone_id?, cidr_blocks: [string], is_default?,
-//     selector_priority?, selector_labels? }
+//   { name, description?, kind, zone_id?, v4_cidr_blocks: [string],
+//     v6_cidr_blocks: [string], is_default?, selector_priority?, selector_labels? }
+//
+// KAC-71: cidr_blocks разделён на v4_cidr_blocks + v6_cidr_blocks (parity с
+// Subnet, явная family-семантика). Backend требует хотя бы одно семейство
+// непустым (REQ-IPL-CR-04).
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -99,13 +103,13 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
       toast.error("Добавьте хотя бы один CIDR (IPv4 или IPv6).");
       return;
     }
-    const cidrs = [...v4Blocks, ...v6Blocks];
     const payload: Record<string, unknown> = {
       name: name || undefined,
       description: description || undefined,
       kind,
       zone_id: zoneId || undefined,
-      cidr_blocks: cidrs,
+      v4_cidr_blocks: v4Blocks,
+      v6_cidr_blocks: v6Blocks,
       is_default: isDefault,
       selector_priority: selectorPriority,
     };

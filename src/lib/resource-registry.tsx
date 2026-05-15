@@ -1833,11 +1833,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       { header: "Зона", path: "zone_id", format: "text" },
       {
         header: "IPv4 CIDR",
-        path: "cidr_blocks",
-        // Фильтр массива по семейству — рендер через formatList-like.
+        path: "v4_cidr_blocks",
         render: (row) => {
-          const all = (row.cidr_blocks as string[] | undefined) ?? [];
-          const v4 = all.filter((c) => c.includes(".") && !c.includes(":"));
+          const v4 = (row.v4_cidr_blocks as string[] | undefined) ?? [];
           return v4.length > 0
             ? <span className="font-mono text-xs">{v4.join(", ")}</span>
             : <span className="text-muted-foreground">—</span>;
@@ -1845,10 +1843,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         header: "IPv6 CIDR",
-        path: "cidr_blocks",
+        path: "v6_cidr_blocks",
         render: (row) => {
-          const all = (row.cidr_blocks as string[] | undefined) ?? [];
-          const v6 = all.filter((c) => c.includes(":"));
+          const v6 = (row.v6_cidr_blocks as string[] | undefined) ?? [];
           return v6.length > 0
             ? <span className="font-mono text-xs">{v6.join(", ")}</span>
             : <span className="text-muted-foreground">—</span>;
@@ -1891,20 +1888,40 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         immutable: true,
         description: "Опционально. Если пусто — глобальный пул (fallback).",
       },
+      // KAC-71: spec address-pools используется только для admin list+filter
+      // (для Create/Edit модалок — custom InlineAddressPool*Form с
+      // <SubnetCidrChips/>, см. resource-registry.tsx top-of-file note). Поля
+      // ниже только для FormFieldRenderer-fallback'а; реальная форма всегда
+      // через ResourceFormModal custom-ветку.
       {
-        name: "cidr_blocks",
-        label: "CIDR Blocks",
+        name: "v4_cidr_blocks",
+        label: "IPv4 CIDR blocks",
         type: "array",
-        itemLabel: "CIDR",
-        description: "IPv4 CIDR-блоки, из которых аллоцируются адреса.",
+        itemLabel: "v4-CIDR",
+        description: "IPv4 CIDR-блоки, из которых аллоцируются внешние v4 адреса.",
         newItem: () => ({ value: "" }),
         itemFields: [
           {
             name: "value",
             label: "CIDR",
             type: "string",
-            required: true,
-            placeholder: "<ip>/<prefix>",
+            placeholder: "198.51.100.0/24",
+          },
+        ],
+      },
+      {
+        name: "v6_cidr_blocks",
+        label: "IPv6 CIDR blocks",
+        type: "array",
+        itemLabel: "v6-CIDR",
+        description: "IPv6 CIDR-блоки, из которых аллоцируются внешние v6 адреса.",
+        newItem: () => ({ value: "" }),
+        itemFields: [
+          {
+            name: "value",
+            label: "CIDR",
+            type: "string",
+            placeholder: "2001:db8::/64",
           },
         ],
       },
