@@ -44,7 +44,6 @@ const ICONS: Record<string, ReactNode> = {
   "address-pools": <AppstoreOutlined />,
   regions: <AppstoreOutlined />,
   zones: <AppstoreOutlined />,
-  hypervisors: <AppstoreOutlined />,
 };
 
 interface Props {
