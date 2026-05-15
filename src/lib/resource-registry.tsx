@@ -77,10 +77,9 @@ export interface ResourceSpec {
   internalGetPath?: string;
 }
 
-// Pool kinds — UI упрощено до одного типа "External". Backend enum
-// AddressPoolKind остаётся (UNSPECIFIED/EXTERNAL_PUBLIC/EXTERNAL_TEST/
-// RESERVED_INTERNAL) — мы всегда отправляем EXTERNAL_PUBLIC. EXTERNAL_TEST/
-// RESERVED_INTERNAL — legacy/future, скрыты от пользователя.
+// Pool kinds — единственный валидный тип. KAC-70 удалил EXTERNAL_TEST/
+// RESERVED_INTERNAL из proto enum kacho.cloud.vpc.v1.AddressPoolKind
+// (`reserved 2, 100`).
 const POOL_KINDS = [{ value: "EXTERNAL_PUBLIC", label: "External" }];
 
 // Общие колонки
