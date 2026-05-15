@@ -28,6 +28,7 @@ import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
 import { DopplerButton } from "@/components/DopplerButton";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -230,8 +231,17 @@ export function InlineSubnetCreateForm({
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Создание подсети
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="subnets" />
+        Создание: Subnet
       </Typography.Title>
 
       <Form

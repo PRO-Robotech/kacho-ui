@@ -23,6 +23,7 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -112,8 +113,17 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Создание пула адресов
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="address-pools" />
+        Создание: AddressPool
       </Typography.Title>
 
       <Form

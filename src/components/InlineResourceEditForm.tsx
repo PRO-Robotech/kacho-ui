@@ -13,11 +13,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Form, Space, Tooltip, Typography } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { extractOperationId } from "@/components/OperationDialog";
 import { DopplerButton } from "@/components/DopplerButton";
 import { computeUpdateMask, snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
+import { getByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
@@ -113,8 +115,20 @@ export function InlineResourceEditForm({
   };
 
   const visibleFields = useMemo(
-    () => (fields ?? []).filter((f) => !f.hidden && !f.editHidden),
-    [fields],
+    () =>
+      (fields ?? []).filter((f) => {
+        if (f.hidden || f.editHidden) return false;
+        if (f.visibleWhen) {
+          const cur = getByPath(obj, f.visibleWhen.field) as string | undefined;
+          const want = f.visibleWhen.equals;
+          const matched = Array.isArray(want)
+            ? want.includes(cur ?? "")
+            : cur === want;
+          if (!matched) return false;
+        }
+        return true;
+      }),
+    [fields, obj],
   );
 
   if (!fields) {
@@ -128,8 +142,17 @@ export function InlineResourceEditForm({
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Редактирование {spec.singular.toLowerCase()}
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId={spec.id} />
+        Редактирование: {spec.singular}
       </Typography.Title>
 
       <Form
@@ -141,11 +164,10 @@ export function InlineResourceEditForm({
         size="middle"
       >
         {visibleFields.map((f) => {
-          const renderInForm =
-            f.type !== "labels" &&
-            f.type !== "sg-rules" &&
-            f.type !== "array" &&
-            f.type !== "custom";
+          const fullWidth =
+            f.type === "sg-rules" ||
+            f.type === "array" ||
+            f.type === "custom";
           const inner = (
             <FormFieldRenderer
               field={f}
@@ -153,10 +175,10 @@ export function InlineResourceEditForm({
               value={obj}
               onChange={setObj}
               editMode
-              hideLabel={renderInForm}
+              hideLabel={!fullWidth}
             />
           );
-          if (!renderInForm) {
+          if (fullWidth) {
             return (
               <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
                 {inner}

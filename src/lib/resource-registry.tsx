@@ -105,42 +105,43 @@ const COL_ID: ResourceColumn = {
 // Совпадает с backend validate.Name (verbatim YC `/[a-z]([-a-z0-9]{0,61}[a-z0-9])?/`).
 const FIELD_NAME: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   required: true,
   placeholder: "my-resource",
-  description: "Lowercase, цифры, дефисы. Начинается с буквы, длина 2..63.",
+  description:
+    "Строчные латинские буквы, цифры и дефисы. Должно начинаться с буквы, длина 2–63 символа.",
   pattern: "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$",
 };
 
 // Permissive — для VPC ресурсов (Network/Subnet/Address/RouteTable).
-// Совпадает с backend validate.NameVPC (verbatim YC `/|[a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?/`).
-// YC принимает empty / uppercase / underscore — UI не должен блокировать заранее.
 const FIELD_NAME_VPC: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   placeholder: "my-network",
-  description: "Буквы (любой регистр), цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  description:
+    "Латинские буквы (любой регистр), цифры, «-» и «_». Должно начинаться с буквы, длина до 63 символов. Можно оставить пустым.",
   pattern: "^([a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?)?$",
 };
 
-// Compute name-regex — lowercase-only (kacho-compute/CLAUDE.md §5,
-// verbatim YC `/|[a-z]([-_a-z0-9]{0,61}[a-z0-9])?/`). НЕ NameVPC (там uppercase ок).
+// Compute name-regex — lowercase-only (kacho-compute/CLAUDE.md §5).
 const FIELD_NAME_COMPUTE: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   placeholder: "my-disk",
-  description: "Lowercase, цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  description:
+    "Строчные латинские буквы, цифры, «-» и «_». Должно начинаться с буквы, длина до 63 символов. Можно оставить пустым.",
   pattern: "^([a-z]([-_a-z0-9]{0,61}[a-z0-9])?)?$",
 };
 
 const FIELD_DESCRIPTION: FormField = {
   name: "description",
-  label: "Description",
+  label: "Описание",
   type: "text",
   rows: 2,
+  placeholder: "Краткое описание ресурса (опционально)",
 };
 
 // Hidden поля для folder-context

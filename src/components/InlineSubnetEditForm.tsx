@@ -19,6 +19,7 @@ import {
   Typography,
 } from "antd";
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import {
   QuestionCircleOutlined,
   LockOutlined,
@@ -216,8 +217,17 @@ export function InlineSubnetEditForm({
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Редактирование подсети
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="subnets" />
+        Редактирование: Subnet
       </Typography.Title>
 
       <Form

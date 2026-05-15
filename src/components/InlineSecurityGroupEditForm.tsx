@@ -17,6 +17,7 @@ import { Button, Form, Input, Space, Typography } from "antd";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
@@ -185,8 +186,17 @@ export function InlineSecurityGroupEditForm({ folderId, sgId, onCancel }: Props)
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Редактирование группы безопасности
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="security-groups" />
+        Редактирование: SecurityGroup
       </Typography.Title>
 
       <Form

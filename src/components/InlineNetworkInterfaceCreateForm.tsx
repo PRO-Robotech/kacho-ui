@@ -16,6 +16,7 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { ResourceRefChips } from "@/components/ResourceRefChips";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import {
   LabelsEditor,
   labelsToMap,
@@ -147,8 +148,17 @@ export function InlineNetworkInterfaceCreateForm({
 
   return (
     <div>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Создание сетевого интерфейса
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="network-interfaces" />
+        Создание: NetworkInterface
       </Typography.Title>
 
       <Form
