@@ -855,7 +855,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         itemFields: [
           {
             name: "destination_prefix",
-            label: "Назначение",
+            label: "CIDR",
             type: "string",
             required: true,
             placeholder: "10.0.0.0/24",
@@ -864,32 +864,36 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           },
           {
             name: "_next_hop_kind",
-            label: "Тип next-hop",
+            label: "Тип",
             type: "enum",
             required: true,
             default: "ip",
             options: [
-              { value: "ip", label: "IP-адрес" },
+              { value: "ip", label: "IP" },
               { value: "gateway", label: "Шлюз" },
             ],
             description:
-              "IP-адрес — произвольный next-hop в подсети. Шлюз — ресурс kacho-vpc Gateway (NAT / Internet-egress).",
+              "IP — произвольный next-hop в подсети. Шлюз — ресурс Gateway (NAT / Internet-egress).",
           },
           {
             name: "next_hop_address",
-            label: "Адрес next-hop",
+            label: "Next-hop",
             type: "string",
             required: true,
             placeholder: "10.0.0.1",
+            description:
+              "IP-адрес next-hop. Должен быть достижим из подсетей, использующих эту таблицу маршрутизации.",
             visibleWhen: { field: "_next_hop_kind", equals: "ip" },
           },
           {
             name: "gateway_id",
-            label: "Шлюз",
+            label: "Next-hop",
             type: "ref",
             refResource: "gateways",
             refFolderScoped: true,
             required: true,
+            description:
+              "Ресурс Gateway, через который направляется трафик (Internet egress / NAT).",
             visibleWhen: { field: "_next_hop_kind", equals: "gateway" },
           },
         ],

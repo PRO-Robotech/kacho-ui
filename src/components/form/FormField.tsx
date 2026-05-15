@@ -1,6 +1,10 @@
 import { useId } from "react";
-import { Card, Space, Typography, Button as AntButton } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Card, Space, Tooltip, Typography, Button as AntButton } from "antd";
+import {
+  DeleteOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import { Input, Textarea, Label } from "@/components/ui/input";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
@@ -180,6 +184,54 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hid
   );
 }
 
+// ArrayItemField — компактная обёртка для поля внутри array-item:
+// mini-label сверху (11px, серый), * для required справа, ⓘ-tooltip если есть
+// description. Input снизу через children (hideLabel=true в FormFieldRenderer).
+function ArrayItemField({
+  label,
+  required,
+  description,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 11,
+          color: "rgba(255,255,255,0.55)",
+          lineHeight: 1.2,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          {label}
+        </span>
+        {required && (
+          <span style={{ color: "#ff4d4f" }} aria-hidden>
+            *
+          </span>
+        )}
+        {description && (
+          <Tooltip title={description}>
+            <QuestionCircleOutlined
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}
+            />
+          </Tooltip>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disabled }: { field: ArrayField; disabled?: boolean } & Omit<Props, "field">) {
   const path = fullPath(pathPrefix, field.name);
   const items = (getByPath(value, path) as Record<string, unknown>[] | undefined) ?? [];
@@ -254,16 +306,39 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
                 flex: 1,
               }}
             >
-              {field.itemFields.map((sub) => (
-                <FormFieldRenderer
-                  key={sub.name}
-                  field={sub}
-                  pathPrefix={`${path}[${idx}]`}
-                  value={value}
-                  onChange={onChange}
-                  editMode={editMode}
-                />
-              ))}
+              {field.itemFields.map((sub) => {
+                // visibleWhen — резолвится FormFieldRenderer'ом; здесь
+                // фильтруем чтобы не оставить пустую mini-label-обёртку.
+                if (sub.visibleWhen) {
+                  const rel = sub.visibleWhen.field;
+                  const relPath = `${path}[${idx}].${rel}`;
+                  const cur =
+                    (getByPath(value, relPath) as string | undefined) ??
+                    (getByPath(value, rel) as string | undefined);
+                  const want = sub.visibleWhen.equals;
+                  const matched = Array.isArray(want)
+                    ? want.includes(cur ?? "")
+                    : cur === want;
+                  if (!matched) return null;
+                }
+                return (
+                  <ArrayItemField
+                    key={sub.name}
+                    label={sub.label}
+                    required={!!sub.required}
+                    description={sub.description}
+                  >
+                    <FormFieldRenderer
+                      field={sub}
+                      pathPrefix={`${path}[${idx}]`}
+                      value={value}
+                      onChange={onChange}
+                      editMode={editMode}
+                      hideLabel
+                    />
+                  </ArrayItemField>
+                );
+              })}
             </div>
             <AntButton
               type="text"
