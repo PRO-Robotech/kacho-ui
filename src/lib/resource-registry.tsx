@@ -1332,14 +1332,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_NAME_VPC,
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      // shared_egress_gateway — пока единственный oneof-вариант, без полей.
+      // gateway_type oneof — пока единственный вариант shared_egress_gateway_spec
+      // (proto: CreateGatewayRequest.shared_egress_gateway_spec). Backend
+      // отвергает с InvalidArgument "Illegal argument gateway" если oneof
+      // пустой или поле названо иначе (например прежнее shared_egress_gateway
+      // от response-сообщения Gateway, а не запроса). См. kacho-vpc gateway.go:91.
       FIELD_FOLDER_ID,
     ],
     template: ({ folderId }) => ({
       folder_id: folderId ?? "",
       name: "",
       description: "",
-      shared_egress_gateway: {},
+      shared_egress_gateway_spec: {},
     }),
   },
 
