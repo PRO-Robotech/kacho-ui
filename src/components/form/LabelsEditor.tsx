@@ -1,17 +1,23 @@
-// LabelsEditor — generic editor для map<string,string> (YC labels).
-// Хранит value в obj как объект; внутри держит локальный state из rows
-// (массив пар key/value), синхронизированный с obj в onChange.
-
-import { useEffect, useState } from "react";
-import { Button, Input, Space } from "antd";
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+// LabelsEditor (form-wrapper) — адаптер общего controlled `LabelsEditor` для
+// generic FormFieldRenderer-схемы (storage = obj, в нашем UI — entries).
+//
+// Чтобы избежать feedback-loop при первом клике «Добавить метку»
+// (entries=[{"":""}] → obj={} → parent перерисует value без изменений →
+// useEffect не должен сбросить rows), синхронизация с parent — через
+// signature-ref: после собственного update мы запоминаем sig нашего obj и не
+// реагируем на тот же sig обратно.
+//
+// External hydrate (например, edit-форма после первого fetch) идёт через
+// другую signature → setRows вызывается ровно один раз.
+import { useEffect, useRef, useState } from "react";
 import { Label } from "@/components/ui/input";
 import { getByPath, setByPath } from "@/lib/path";
-
-interface LabelEntry {
-  key: string;
-  value: string;
-}
+import {
+  LabelsEditor as LabelsEditorBase,
+  labelsToEntries,
+  labelsFromEntries,
+  type LabelEntry,
+} from "@/components/LabelsEditor";
 
 interface Props {
   pathPrefix: string;
@@ -21,19 +27,6 @@ interface Props {
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   disabled?: boolean;
-}
-
-function objToEntries(o: Record<string, string> | undefined): LabelEntry[] {
-  if (!o) return [];
-  return Object.entries(o).map(([key, value]) => ({ key, value }));
-}
-
-function entriesToObj(rows: LabelEntry[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const r of rows) {
-    if (r.key.trim()) out[r.key.trim()] = r.value;
-  }
-  return out;
 }
 
 export function LabelsEditor({
@@ -50,71 +43,28 @@ export function LabelsEditor({
       ? (curRaw as Record<string, string>)
       : undefined;
 
-  // Локальный state — чтобы пустой ключ не "терялся" сразу при наборе.
-  // Гидратируем при первом монтировании из value; сериализуем в obj в onChange.
-  const [rows, setRows] = useState<LabelEntry[]>(() => objToEntries(cur));
+  const [rows, setRows] = useState<LabelEntry[]>(() => labelsToEntries(cur));
+  const sigRef = useRef<string>(JSON.stringify(cur ?? {}));
 
-  // Если родительский obj обновился (например, hydrate в edit-форме после
-  // загрузки данных), пересинхронизируем — но только если ключи отличаются
-  // от текущих rows (избегаем перетереть ввод пользователя).
   useEffect(() => {
-    const incoming = objToEntries(cur);
-    const incomingKeys = JSON.stringify(incoming.map((e) => e.key).sort());
-    const localKeys = JSON.stringify(rows.map((e) => e.key).sort());
-    if (incomingKeys !== localKeys) setRows(incoming);
+    const incomingSig = JSON.stringify(cur ?? {});
+    if (incomingSig === sigRef.current) return;
+    sigRef.current = incomingSig;
+    setRows(labelsToEntries(cur));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(cur)]);
+  }, [JSON.stringify(cur ?? {})]);
 
-  const update = (next: LabelEntry[]) => {
+  const handleChange = (next: LabelEntry[]) => {
     setRows(next);
-    onChange(setByPath(value, path, entriesToObj(next)));
+    const obj = labelsFromEntries(next);
+    sigRef.current = JSON.stringify(obj);
+    onChange(setByPath(value, path, obj));
   };
 
   return (
-    <div className="space-y-1.5">
-      <Label description={description}>{label}</Label>
-      <Space direction="vertical" size={8} style={{ width: "100%" }}>
-        {rows.map((r, idx) => (
-          <Space key={idx} size={4} style={{ width: "100%" }}>
-            <Input
-              placeholder="ключ"
-              value={r.key}
-              onChange={(e) => {
-                const next = [...rows];
-                next[idx] = { ...next[idx], key: e.target.value };
-                update(next);
-              }}
-              disabled={disabled}
-              style={{ width: 220 }}
-            />
-            <span>=</span>
-            <Input
-              placeholder="значение"
-              value={r.value}
-              onChange={(e) => {
-                const next = [...rows];
-                next[idx] = { ...next[idx], value: e.target.value };
-                update(next);
-              }}
-              disabled={disabled}
-              style={{ width: 280 }}
-            />
-            <Button
-              type="text"
-              icon={<DeleteOutlined />}
-              onClick={() => update(rows.filter((_, i) => i !== idx))}
-              disabled={disabled}
-            />
-          </Space>
-        ))}
-        <Button
-          onClick={() => update([...rows, { key: "", value: "" }])}
-          icon={<PlusOutlined />}
-          disabled={disabled}
-        >
-          Добавить метку
-        </Button>
-      </Space>
+    <div className={label ? "space-y-1.5" : ""}>
+      {label && <Label description={description}>{label}</Label>}
+      <LabelsEditorBase value={rows} onChange={handleChange} disabled={disabled} />
     </div>
   );
 }

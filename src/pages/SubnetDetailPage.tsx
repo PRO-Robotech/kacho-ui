@@ -4,7 +4,7 @@
 // что и /folders/X/addresses.
 
 import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Button as AntButton, Input, Space, Typography } from "antd";
@@ -14,7 +14,7 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
-import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
+import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
@@ -24,8 +24,20 @@ import type { DetailTab } from "@/components/DetailShell";
 export function SubnetDetailPage() {
   const { uid: subnetId, folderId, networkId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const spec = REGISTRY["subnets"];
   const addrSpec = REGISTRY["addresses"];
+
+  // Открыть модалку резервирования IP в контексте текущей подсети
+  // (subnetId передаётся через query → ResourceFormModal превратит его в
+  // preset internal_ipv4/v6_address_spec.subnet_id, см. ResourceFormModal.tsx).
+  const openReserveModal = useCallback(() => {
+    if (!subnetId) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("modal", "addresses-create");
+    next.set("subnetId", subnetId);
+    setSearchParams(next, { replace: false });
+  }, [searchParams, setSearchParams, subnetId]);
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
@@ -34,12 +46,6 @@ export function SubnetDetailPage() {
       currentResourcePlural: spec.plural,
     });
 
-  const reserveLink =
-    folderId && subnetId
-      ? networkId
-        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}/addresses/create?kind=internal`
-        : `/folders/${folderId}/vpc/subnets/${subnetId}/addresses/create?kind=internal`
-      : null;
   // Адреса под subnet всегда nested под subnet'ом (с/без network в цепочке).
   const addressesBasePath =
     folderId && subnetId
@@ -89,8 +95,6 @@ export function SubnetDetailPage() {
     return cols;
   }, [addrSpec, addressesBasePath, folderId]);
 
-  const [creatingAddress, setCreatingAddress] = useState(false);
-
   const extraTabs = useMemo(
     () =>
       (): DetailTab[] => [
@@ -98,66 +102,39 @@ export function SubnetDetailPage() {
           id: "addresses",
           label: "IP-адреса",
           count: subnetAddresses.length,
-          render: () =>
-            creatingAddress && folderId && subnetId ? (
-              <InlineResourceCreateForm
-                spec={addrSpec}
-                ctx={{ folderId }}
-                // subnet_id обеих oneof-веток предзаполнены и locked — к какой бы
-                // версии (v4/v6) ни переключился пользователь, адрес привязан к
-                // этой подсети; sanitize выкинет неактивную ветку из payload.
-                presetFields={{
-                  "internal_ipv4_address_spec.subnet_id": subnetId,
-                  "internal_ipv6_address_spec.subnet_id": subnetId,
-                }}
-                // _address_kind остаётся editable: дефолт "internal" (IPv4),
-                // но пользователь может выбрать "internal_v6".
-                editablePresetFields={{ _address_kind: "internal" }}
-                // В контексте подсети `external` не имеет смысла (external-адрес
-                // не привязан к подсети) — оставляем только internal v4/v6.
-                fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
-                folderUid={folderId}
-                title="Резервирование IP-адреса"
-                onCancel={() => setCreatingAddress(false)}
-              />
-            ) : (
-              <AddressesSection
-                rows={subnetAddresses}
-                columns={addrColumns}
-                onReserve={
-                  reserveLink ? () => setCreatingAddress(true) : null
-                }
-                onClick={(id) =>
-                  addressesBasePath && navigate(`${addressesBasePath}/${id}`)
-                }
-              />
-            ),
+          render: () => (
+            <AddressesSection
+              rows={subnetAddresses}
+              columns={addrColumns}
+              onReserve={subnetId ? openReserveModal : null}
+              onClick={(id) =>
+                addressesBasePath && navigate(`${addressesBasePath}/${id}`)
+              }
+            />
+          ),
         },
         // tab "Операции" автоматически добавляется ResourceDetailPage —
         // не дублируем здесь.
       ],
     [
-      reserveLink,
       subnetAddresses,
       addrColumns,
       addressesBasePath,
       navigate,
-      creatingAddress,
-      folderId,
       subnetId,
-      addrSpec,
+      openReserveModal,
     ],
   );
 
   const headerActionsByTab = useCallback(
     (tabId: string) => {
-      if (tabId === "addresses" && reserveLink && !creatingAddress) {
+      if (tabId === "addresses" && subnetId) {
         return (
           <AntButton
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => setCreatingAddress(true)}
+            onClick={openReserveModal}
           >
             Зарезервировать IP-адрес
           </AntButton>
@@ -165,7 +142,7 @@ export function SubnetDetailPage() {
       }
       return null;
     },
-    [reserveLink, creatingAddress],
+    [subnetId, openReserveModal],
   );
 
   const renderInlineEdit = useCallback(
@@ -181,14 +158,17 @@ export function SubnetDetailPage() {
   );
 
   return (
-    <ResourceDetailPage
-      spec={spec}
-      extraTabs={extraTabs}
-      headerActionsByTab={headerActionsByTab}
-      backHrefOverride={backHrefOverride}
-      breadcrumbSegments={breadcrumbSegments}
-      renderInlineEdit={renderInlineEdit}
-    />
+    <>
+      <ResourceDetailPage
+        spec={spec}
+        extraTabs={extraTabs}
+        headerActionsByTab={headerActionsByTab}
+        backHrefOverride={backHrefOverride}
+        breadcrumbSegments={breadcrumbSegments}
+        renderInlineEdit={renderInlineEdit}
+      />
+      {folderId && <ResourceFormModal folderId={folderId} />}
+    </>
   );
 }
 

@@ -104,6 +104,7 @@ export function RefSelect({
   const options = candidates.map((it) => ({
     uid: it.id,
     name: it.name,
+    extra: extraInfoFor(refResource, it as Record<string, unknown>),
   }));
 
   const CREATE_SENTINEL = "__create__";
@@ -124,11 +125,16 @@ export function RefSelect({
         disabled={disabled || !enabled}
       >
         <option value="">{placeholder ?? `Выбрать ${spec.singular}…`}</option>
-        {options.map((o) => (
-          <option key={o.uid} value={o.uid}>
-            {o.name} — {o.uid}
-          </option>
-        ))}
+        {options.map((o) => {
+          const head = o.name || o.uid;
+          const tail = o.extra ? ` · ${o.extra}` : "";
+          return (
+            <option key={o.uid} value={o.uid}>
+              {head}
+              {tail}
+            </option>
+          );
+        })}
         {createSpec && (
           <option value={CREATE_SENTINEL}>+ Создать {createSpec.singular.toLowerCase()}…</option>
         )}
@@ -152,6 +158,7 @@ export function RefSelect({
         </p>
       )}
 
+      {/* helper closure доступен ниже — функция объявлена в file scope */}
       {creating && createSpec && (
         <Modal
           open
@@ -190,4 +197,52 @@ export function RefSelect({
       )}
     </div>
   );
+}
+
+// extraInfoFor — формирует короткую полезную подпись для option в дропдауне.
+// Для каждого ресурса показываем «адресную» информацию: CIDR / IP / ID-пула /
+// статус — чтобы пользователь различал «безымянные» ресурсы.
+function extraInfoFor(refResource: string, row: Record<string, unknown>): string {
+  switch (refResource) {
+    case "subnets": {
+      const v4 = (row.v4_cidr_blocks as string[] | undefined) ?? [];
+      const v6 = (row.v6_cidr_blocks as string[] | undefined) ?? [];
+      const cidrs = [...v4, ...v6];
+      return cidrs.length > 0 ? cidrs.join(", ") : "";
+    }
+    case "addresses": {
+      const ext4 = (row.external_ipv4_address as { address?: string } | undefined)?.address;
+      const int4 = (row.internal_ipv4_address as { address?: string } | undefined)?.address;
+      const ext6 = (row.external_ipv6_address as { address?: string } | undefined)?.address;
+      const int6 = (row.internal_ipv6_address as { address?: string } | undefined)?.address;
+      return ext4 || int4 || ext6 || int6 || "";
+    }
+    case "gateways": {
+      // Gateway proto: shared_egress_gateway oneof + ip / used_by; показываем
+      // тип шлюза если name пустое.
+      const sg = row.shared_egress_gateway as Record<string, unknown> | undefined;
+      if (sg) return "shared-egress";
+      return "";
+    }
+    case "networks": {
+      const ipv4 = (row.ipv4_cidr_blocks as string[] | undefined) ?? [];
+      return ipv4.length > 0 ? ipv4.join(", ") : "";
+    }
+    case "address-pools": {
+      const cidrs = (row.cidr_blocks as string[] | undefined) ?? [];
+      const isDefault = row.is_default === true ? " · default" : "";
+      return (cidrs.length > 0 ? cidrs.join(", ") : "") + isDefault;
+    }
+    case "zones": {
+      const r = (row.region_id as string | undefined) ?? "";
+      return r;
+    }
+    case "route-tables":
+    case "security-groups": {
+      const net = (row.network_id as string | undefined) ?? "";
+      return net ? `net:${net.slice(0, 8)}` : "";
+    }
+    default:
+      return "";
+  }
 }

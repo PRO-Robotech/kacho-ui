@@ -77,9 +77,12 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "create-subnet",
           icon: <PlusOutlined />,
           label: "Создать подсеть",
+          // Открывает модалку SubnetFormModal поверх Network detail.
+          // Query-флаг `?modal=subnets-create&networkId=<n>` подхватывается
+          // SubnetFormModal — модалка появляется над Network detail-страницей.
           onClick: stop(() =>
             navigate(
-              `/folders/${currentFolderId}/vpc/networks/${id}/subnets/create`,
+              `/folders/${currentFolderId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
             ),
           ),
         }
@@ -89,7 +92,11 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           key: "edit",
           icon: <EditOutlined />,
           label: "Редактировать",
-          onClick: stop(() => navigate(`${basePath}/${id}/edit`)),
+          // KAC-70: Edit открывается в модалке (ResourceFormModal) поверх
+          // текущей страницы — URL остаётся list, query-флаг открывает форму.
+          onClick: stop(() =>
+            navigate(`${basePath}?modal=${spec.id}-edit&id=${id}`),
+          ),
         }
       : null,
     moveCapable

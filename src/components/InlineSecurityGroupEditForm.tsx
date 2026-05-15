@@ -17,6 +17,7 @@ import { Button, Form, Input, Space, Typography } from "antd";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
@@ -184,9 +185,18 @@ export function InlineSecurityGroupEditForm({ folderId, sgId, onCancel }: Props)
   const pending = updateMain.isPending || updateRules.isPending;
 
   return (
-    <div style={{ maxWidth: 760 }}>
-      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
-        Редактирование группы безопасности
+    <div>
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId="security-groups" />
+        Редактирование: SecurityGroup
       </Typography.Title>
 
       <Form

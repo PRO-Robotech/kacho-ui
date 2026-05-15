@@ -10,13 +10,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Space, Typography } from "antd";
+import { Alert, Button, Form, Space, Tooltip, Typography } from "antd";
+import { QuestionCircleOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { extractOperationId } from "@/components/OperationDialog";
 import { DopplerButton } from "@/components/DopplerButton";
 import { computeUpdateMask, snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
+import { getByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
@@ -112,8 +115,20 @@ export function InlineResourceEditForm({
   };
 
   const visibleFields = useMemo(
-    () => (fields ?? []).filter((f) => !f.hidden && !f.editHidden),
-    [fields],
+    () =>
+      (fields ?? []).filter((f) => {
+        if (f.hidden || f.editHidden) return false;
+        if (f.visibleWhen) {
+          const cur = getByPath(obj, f.visibleWhen.field) as string | undefined;
+          const want = f.visibleWhen.equals;
+          const matched = Array.isArray(want)
+            ? want.includes(cur ?? "")
+            : cur === want;
+          if (!matched) return false;
+        }
+        return true;
+      }),
+    [fields, obj],
   );
 
   if (!fields) {
@@ -126,40 +141,90 @@ export function InlineResourceEditForm({
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%", maxWidth: 760 }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        Редактирование {spec.singular.toLowerCase()}
+    <div>
+      <Typography.Title
+        level={4}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        <ResourceIcon specId={spec.id} />
+        Редактирование: {spec.singular}
       </Typography.Title>
 
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {visibleFields.map((f) => (
-          <FormFieldRenderer
-            key={f.name}
-            field={f}
-            pathPrefix=""
-            value={obj}
-            onChange={setObj}
-            editMode
-          />
-        ))}
-      </Space>
+      <Form
+        layout="horizontal"
+        labelCol={{ flex: "200px" }}
+        wrapperCol={{ flex: "auto" }}
+        labelAlign="left"
+        colon={false}
+        size="middle"
+      >
+        {visibleFields.map((f) => {
+          const fullWidth =
+            f.type === "sg-rules" ||
+            f.type === "array" ||
+            f.type === "custom";
+          const inner = (
+            <FormFieldRenderer
+              field={f}
+              pathPrefix=""
+              value={obj}
+              onChange={setObj}
+              editMode
+              hideLabel={!fullWidth}
+            />
+          );
+          if (fullWidth) {
+            return (
+              <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
+                {inner}
+              </Form.Item>
+            );
+          }
+          return (
+            <Form.Item
+              key={f.name}
+              label={
+                f.description ? (
+                  <Space size={4}>
+                    {f.label}
+                    <Tooltip title={f.description}>
+                      <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                    </Tooltip>
+                  </Space>
+                ) : (
+                  f.label
+                )
+              }
+              required={!!f.required}
+            >
+              {inner}
+            </Form.Item>
+          );
+        })}
 
-
-      <Space>
-        <DopplerButton
-          type="primary"
-          onClick={submit}
-          pulsing={mutation.isPending || pendingOpId !== null}
-        >
-          Сохранить
-        </DopplerButton>
-        <Button
-          onClick={onCancel}
-          disabled={mutation.isPending || pendingOpId !== null}
-        >
-          Отменить
-        </Button>
-      </Space>
-    </Space>
+        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
+          <Space>
+            <DopplerButton
+              type="primary"
+              onClick={submit}
+              pulsing={mutation.isPending || pendingOpId !== null}
+            >
+              Сохранить
+            </DopplerButton>
+            <Button
+              onClick={onCancel}
+              disabled={mutation.isPending || pendingOpId !== null}
+            >
+              Отменить
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </div>
   );
 }

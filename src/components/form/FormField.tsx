@@ -1,7 +1,11 @@
 import { useId } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Card, Space, Tooltip, Typography, Button as AntButton } from "antd";
+import {
+  DeleteOutlined,
+  PlusOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
 import { Input, Textarea, Label } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
@@ -17,6 +21,10 @@ interface Props {
   // В Edit-режиме поля с `immutable: true` рендерятся disabled.
   // В Create — игнорируется.
   editMode?: boolean;
+  // Если true — встроенный <Label> внутри renderer'а не рисуется (label
+  // рендерится снаружи, например в AntD Form.Item). Используется для
+  // горизонтального YC-style layout, где label слева, input справа.
+  hideLabel?: boolean;
 }
 
 function fullPath(prefix: string, name: string): string {
@@ -24,12 +32,19 @@ function fullPath(prefix: string, name: string): string {
   return `${prefix}.${name}`;
 }
 
-export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode }: Props) {
+export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode, hideLabel }: Props) {
   if (field.hidden) return null;
   if (editMode && field.editHidden) return null;
   if (field.visibleWhen) {
-    // visibleWhen.field — всегда top-level path (oneof discriminator живёт у корня формы).
-    const cur = getByPath(value, field.visibleWhen.field) as string | undefined;
+    // visibleWhen.field — относительный путь (резолвится через pathPrefix),
+    // чтобы дискриминатор oneof внутри array-item тоже работал. Если поле
+    // начинается с "/" или совпадает с top-level именем — приоритетно
+    // пробуем pathPrefix-resolution, fallback на top-level.
+    const rel = field.visibleWhen.field;
+    const relPath = pathPrefix ? `${pathPrefix}.${rel}` : rel;
+    const cur =
+      (getByPath(value, relPath) as string | undefined) ??
+      (getByPath(value, rel) as string | undefined);
     const want = field.visibleWhen.equals;
     const matched = Array.isArray(want) ? want.includes(cur ?? "") : cur === want;
     if (!matched) return null;
@@ -38,7 +53,7 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
   if (field.type === "custom") {
     return <>{field.render({ pathPrefix, value, onChange, editMode, field })}</>;
   }
-  if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} />;
+  if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} hideLabel={hideLabel} />;
   if (field.type === "sg-rules") {
     const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
     return (
@@ -59,16 +74,16 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
         value={value}
         onChange={onChange}
         path={path}
-        label={field.label}
-        description={field.description}
+        label={hideLabel ? "" : field.label}
+        description={hideLabel ? undefined : field.description}
         disabled={disabled}
       />
     );
   }
-  return <ScalarFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} disabled={disabled} />;
+  return <ScalarFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} disabled={disabled} hideLabel={hideLabel} />;
 }
 
-function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: Props & { disabled?: boolean }) {
+function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hideLabel }: Props & { disabled?: boolean }) {
   const id = useId();
   const path = fullPath(pathPrefix, field.name);
   const cur = getByPath(value, path);
@@ -76,18 +91,20 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: P
   const set = (v: unknown) => onChange(setByPath(value, path, v));
 
   return (
-    <div className="space-y-1.5">
-      <Label
-        htmlFor={id}
-        required={field.required}
-        description={
-          disabled
-            ? `${field.description ? field.description + " " : ""}(immutable после Create)`
-            : field.description
-        }
-      >
-        {field.label}
-      </Label>
+    <div className={hideLabel ? "" : "space-y-1.5"}>
+      {!hideLabel && (
+        <Label
+          htmlFor={id}
+          required={field.required}
+          description={
+            disabled
+              ? `${field.description ? field.description + " " : ""}(immutable после Create)`
+              : field.description
+          }
+        >
+          {field.label}
+        </Label>
+      )}
       {field.type === "string" && (
         <Input
           id={id}
@@ -167,13 +184,58 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: P
   );
 }
 
+// ArrayItemField — компактная обёртка для поля внутри array-item:
+// mini-label сверху (11px, серый), * для required справа, ⓘ-tooltip если есть
+// description. Input снизу через children (hideLabel=true в FormFieldRenderer).
+function ArrayItemField({
+  label,
+  required,
+  description,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 11,
+          color: "rgba(255,255,255,0.55)",
+          lineHeight: 1.2,
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+          {label}
+        </span>
+        {required && (
+          <span style={{ color: "#ff4d4f" }} aria-hidden>
+            *
+          </span>
+        )}
+        {description && (
+          <Tooltip title={description}>
+            <QuestionCircleOutlined
+              style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}
+            />
+          </Tooltip>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disabled }: { field: ArrayField; disabled?: boolean } & Omit<Props, "field">) {
   const path = fullPath(pathPrefix, field.name);
   const items = (getByPath(value, path) as Record<string, unknown>[] | undefined) ?? [];
 
-  // KAC-55: если задан maxItems и достигли лимита — кнопка «Добавить» дизейблится,
-  // подсказывается в description. Backend всё равно отбьёт sync InvalidArgument
-  // / DB CHECK, но UI-уровень даёт мгновенный feedback.
   const atCap = field.maxItems !== undefined && items.length >= field.maxItems;
 
   const add = () => {
@@ -187,54 +249,117 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label
-          description={
-            disabled
-              ? `${field.description ? field.description + " " : ""}(immutable после Create — управляется отдельным action)`
-              : field.maxItems !== undefined
-              ? `${field.description ? field.description + " " : ""}Максимум ${field.maxItems}.`
-              : field.description
-          }
-          required={field.required}
+    <Card
+      size="small"
+      title={
+        <Space size={8}>
+          <Typography.Text strong>{field.label}</Typography.Text>
+          {field.required && (
+            <span style={{ color: "#ff4d4f", fontSize: 12 }}>*</span>
+          )}
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {items.length}
+            {field.maxItems !== undefined ? `/${field.maxItems}` : ""}
+          </Typography.Text>
+        </Space>
+      }
+      extra={
+        <AntButton
+          type="primary"
+          ghost
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={add}
+          disabled={disabled || atCap}
         >
-          {field.label}
-        </Label>
-        <Button type="button" variant="outline" size="sm" onClick={add} disabled={disabled || atCap}>
-          <Plus className="h-4 w-4" /> Добавить {field.itemLabel}
-        </Button>
-      </div>
-      {items.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Пусто. Нажмите «Добавить {field.itemLabel}».</p>
-      )}
-      <div className="space-y-3">
+          Добавить
+        </AntButton>
+      }
+      style={disabled ? { opacity: 0.6, pointerEvents: "none" } : undefined}
+    >
+      <Space direction="vertical" size={8} style={{ width: "100%" }}>
+        {items.length === 0 && (
+          <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
+            — пусто —
+          </Typography.Text>
+        )}
         {items.map((_, idx) => (
           <div
             key={idx}
-            className={`rounded-md border border-border p-3 space-y-3 bg-muted/20 ${disabled ? "opacity-60 pointer-events-none" : ""}`}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              padding: 8,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.03)",
+            }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                {field.itemLabel} #{idx + 1}
-              </span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeAt(idx)} disabled={disabled}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  field.itemFields.length > 1
+                    ? `repeat(${field.itemFields.length}, minmax(0, 1fr))`
+                    : "1fr",
+                gap: 8,
+                flex: 1,
+              }}
+            >
+              {field.itemFields.map((sub) => {
+                // visibleWhen — резолвится FormFieldRenderer'ом; здесь
+                // фильтруем чтобы не оставить пустую mini-label-обёртку.
+                if (sub.visibleWhen) {
+                  const rel = sub.visibleWhen.field;
+                  const relPath = `${path}[${idx}].${rel}`;
+                  const cur =
+                    (getByPath(value, relPath) as string | undefined) ??
+                    (getByPath(value, rel) as string | undefined);
+                  const want = sub.visibleWhen.equals;
+                  const matched = Array.isArray(want)
+                    ? want.includes(cur ?? "")
+                    : cur === want;
+                  if (!matched) return null;
+                }
+                return (
+                  <ArrayItemField
+                    key={sub.name}
+                    label={sub.label}
+                    required={!!sub.required}
+                    description={sub.description}
+                  >
+                    <FormFieldRenderer
+                      field={sub}
+                      pathPrefix={`${path}[${idx}]`}
+                      value={value}
+                      onChange={onChange}
+                      editMode={editMode}
+                      hideLabel
+                    />
+                  </ArrayItemField>
+                );
+              })}
             </div>
-            {field.itemFields.map((sub) => (
-              <FormFieldRenderer
-                key={sub.name}
-                field={sub}
-                pathPrefix={`${path}[${idx}]`}
-                value={value}
-                onChange={onChange}
-                editMode={editMode}
-              />
-            ))}
+            <AntButton
+              type="text"
+              size="small"
+              icon={<DeleteOutlined />}
+              onClick={() => removeAt(idx)}
+              disabled={disabled}
+              danger
+              style={{ flexShrink: 0, marginTop: 2 }}
+            />
           </div>
         ))}
-      </div>
-    </div>
+      </Space>
+      {field.description && (
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 11, display: "block", marginTop: 8 }}
+        >
+          {field.description}
+        </Typography.Text>
+      )}
+    </Card>
   );
 }

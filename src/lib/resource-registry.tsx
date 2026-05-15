@@ -105,42 +105,43 @@ const COL_ID: ResourceColumn = {
 // Совпадает с backend validate.Name (verbatim YC `/[a-z]([-a-z0-9]{0,61}[a-z0-9])?/`).
 const FIELD_NAME: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   required: true,
   placeholder: "my-resource",
-  description: "Lowercase, цифры, дефисы. Начинается с буквы, длина 2..63.",
+  description:
+    "Строчные латинские буквы, цифры и дефисы. Должно начинаться с буквы, длина 2–63 символа.",
   pattern: "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$",
 };
 
 // Permissive — для VPC ресурсов (Network/Subnet/Address/RouteTable).
-// Совпадает с backend validate.NameVPC (verbatim YC `/|[a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?/`).
-// YC принимает empty / uppercase / underscore — UI не должен блокировать заранее.
 const FIELD_NAME_VPC: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   placeholder: "my-network",
-  description: "Буквы (любой регистр), цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  description:
+    "Латинские буквы (любой регистр), цифры, «-» и «_». Должно начинаться с буквы, длина до 63 символов. Можно оставить пустым.",
   pattern: "^([a-zA-Z]([-_a-zA-Z0-9]{0,61}[a-zA-Z0-9])?)?$",
 };
 
-// Compute name-regex — lowercase-only (kacho-compute/CLAUDE.md §5,
-// verbatim YC `/|[a-z]([-_a-z0-9]{0,61}[a-z0-9])?/`). НЕ NameVPC (там uppercase ок).
+// Compute name-regex — lowercase-only (kacho-compute/CLAUDE.md §5).
 const FIELD_NAME_COMPUTE: FormField = {
   name: "name",
-  label: "Name",
+  label: "Имя",
   type: "string",
   placeholder: "my-disk",
-  description: "Lowercase, цифры, `-`, `_`. Начинается с буквы, длина до 63. Можно оставить пустым.",
+  description:
+    "Строчные латинские буквы, цифры, «-» и «_». Должно начинаться с буквы, длина до 63 символов. Можно оставить пустым.",
   pattern: "^([a-z]([-_a-z0-9]{0,61}[a-z0-9])?)?$",
 };
 
 const FIELD_DESCRIPTION: FormField = {
   name: "description",
-  label: "Description",
+  label: "Описание",
   type: "text",
   rows: 2,
+  placeholder: "Краткое описание ресурса (опционально)",
 };
 
 // Hidden поля для folder-context
@@ -640,11 +641,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // CLAUDE.md kacho-vpc §4.4). Скрываем в edit-форме.
       {
         name: "_address_kind",
-        label: "Address Kind",
+        label: "Тип адреса",
         type: "enum",
         required: true,
         default: "external",
-        description: "External IPv4 / External IPv6. Internal IP создаются автоматически compute-сервисом при Instance.Create через nic-spec и здесь не предлагаются.",
+        description:
+          "Тип резервируемого IP-адреса. Внутренние адреса (Internal IPv4 / Internal IPv6) создаются автоматически при запуске виртуальной машины через сетевой интерфейс и в этой форме не предлагаются.",
         // KAC-58 (epic) / KAC-61: оставили только External. Internal IPv4/IPv6
         // создаются через compute Instance.Create flow с
         // network_interface_specs[*].subnet_id — Address.Create internal через
@@ -657,19 +659,22 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         name: "external_ipv4_address_spec.zone_id",
-        label: "Zone (External IPv4)",
+        label: "Зона",
         type: "ref",
         refResource: "zones",
-        description: "Зона для External IPv4. Оставьте address пустым для auto-allocation.",
+        required: true,
+        description:
+          "Зона, в которой выделяется внешний IPv4. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv4-пула зоны.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
       {
         name: "external_ipv4_address_spec.address",
-        label: "Address (External IPv4, необязательно)",
+        label: "Адрес",
         type: "string",
-        placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется автоматически из default IPv4 pool зоны.",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv4-адрес для резервирования. Оставьте пустым — адрес будет выделен автоматически из IPv4-пула выбранной зоны.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
@@ -678,27 +683,32 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // CIDR-pool с v6 prefix создаётся через InternalAddressPoolService;
         // cascade resolve фильтрует pool по family запроса.
         name: "external_ipv6_address_spec.zone_id",
-        label: "Zone (External IPv6)",
+        label: "Зона",
         type: "ref",
         refResource: "zones",
-        description: "Зона для External IPv6. Оставьте address пустым для auto-allocation из v6 pool.",
+        required: true,
+        description:
+          "Зона, в которой выделяется внешний IPv6. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv6-пула зоны.",
         visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
         name: "external_ipv6_address_spec.address",
-        label: "Address (External IPv6, необязательно)",
+        label: "Адрес",
         type: "string",
-        placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется автоматически из v6 pool зоны.",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv6-адрес для резервирования. Оставьте пустым — адрес будет выделен автоматически из IPv6-пула выбранной зоны.",
         visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
         name: "deletion_protection",
-        label: "Deletion Protection",
+        label: "Защита от удаления",
         type: "bool",
         default: false,
+        description:
+          "Если включена, адрес нельзя будет удалить, пока защита не будет снята.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
@@ -810,39 +820,53 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_NAME_VPC,
       {
         name: "network_id",
-        label: "Network",
+        label: "Сеть",
         type: "ref",
         refResource: "networks",
         refFolderScoped: true,
         required: true,
-      },
-      {
-        name: "static_routes",
-        label: "Static Routes",
-        type: "array",
-        itemLabel: "Route",
-        description: "Full-replace при Update.",
-        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
-        itemFields: [
-          {
-            name: "destination_prefix",
-            label: "Destination CIDR",
-            type: "string",
-            required: true,
-            placeholder: "<ip>/<prefix>",
-          },
-          {
-            name: "next_hop_address",
-            label: "Next Hop",
-            type: "string",
-            required: true,
-            placeholder: "<ip-address>",
-          },
-        ],
+        immutable: true,
+        description: "Облачная сеть, в которой действуют эти маршруты.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
+      // Static Routes — в самом низу формы (объёмный блок, не должен
+      // мешать редактированию основных полей).
+      //
+      // ⚠️ Gateway-режим (next_hop oneof = gateway_id) пока НЕ поддержан
+      // backend'ом kacho-vpc: proto-поле есть, но domain.StaticRoute хранит
+      // только NextHopAddress; handler требует next_hop_address. Поэтому
+      // UI оставляет только IP-режим — до KAC-issue на поддержку gateway_id.
+      {
+        name: "static_routes",
+        label: "Статические маршруты",
+        type: "array",
+        itemLabel: "маршрут",
+        description:
+          "При обновлении список заменяется целиком (full-replace).",
+        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
+        itemFields: [
+          {
+            name: "destination_prefix",
+            label: "CIDR",
+            type: "string",
+            required: true,
+            placeholder: "10.0.0.0/24",
+            description:
+              "CIDR-блок назначения. Трафик в этот блок будет направлен через указанный next-hop.",
+          },
+          {
+            name: "next_hop_address",
+            label: "Next-hop",
+            type: "string",
+            required: true,
+            placeholder: "10.0.0.1",
+            description:
+              "IP-адрес next-hop. Должен быть достижим из подсетей, использующих эту таблицу маршрутизации.",
+          },
+        ],
+      },
     ],
     template: ({ folderId }) => ({
       folder_id: folderId ?? "",
@@ -980,9 +1004,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // IPv4 из CIDR этой подсети»). На success id появляется в списке.
       {
         name: "v4_address_ids",
-        label: "IPv4-адрес (Address-ресурс)",
+        label: "IPv4-адрес",
         type: "array",
-        itemLabel: "Address",
+        itemLabel: "адрес",
         // KAC-55: на одной NIC максимум один IPv4 (и максимум один IPv6).
         // Multi-IP per VM — через несколько NIC, не secondary addresses в одном
         // NIC. Backend отбивает > 1 sync InvalidArgument + DB CHECK
@@ -1017,9 +1041,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         name: "v6_address_ids",
-        label: "IPv6-адрес (Address-ресурс)",
+        label: "IPv6-адрес",
         type: "array",
-        itemLabel: "Address",
+        itemLabel: "адрес",
         // KAC-55: на одной NIC максимум один IPv6 (и максимум один IPv4).
         maxItems: 1,
         description: "Опционально. IPv6 Address-ресурс из выбранной подсети. Можно создать новый прямо в дропдауне.",
@@ -1240,14 +1264,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_NAME_VPC,
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      // shared_egress_gateway — пока единственный oneof-вариант, без полей.
+      // gateway_type oneof — пока единственный вариант shared_egress_gateway_spec
+      // (proto: CreateGatewayRequest.shared_egress_gateway_spec). Backend
+      // отвергает с InvalidArgument "Illegal argument gateway" если oneof
+      // пустой или поле названо иначе (например прежнее shared_egress_gateway
+      // от response-сообщения Gateway, а не запроса). См. kacho-vpc gateway.go:91.
       FIELD_FOLDER_ID,
     ],
     template: ({ folderId }) => ({
       folder_id: folderId ?? "",
       name: "",
       description: "",
-      shared_egress_gateway: {},
+      shared_egress_gateway_spec: {},
     }),
   },
 
@@ -1788,12 +1816,54 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      COL_NAME,
-      { header: "Zone", path: "zone_id", format: "text" },
-      { header: "CIDRs", path: "cidr_blocks", format: "list" },
+      // Те же колонки и стиль, что у subnets list (CopyableName/Id, отдельные
+      // v4/v6 блоки, LabelsCell): visual parity по запросу user'а.
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => (
+          <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />
+        ),
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      { header: "Тип", path: "kind", format: "text" },
+      { header: "Зона", path: "zone_id", format: "text" },
+      {
+        header: "IPv4 CIDR",
+        path: "cidr_blocks",
+        // Фильтр массива по семейству — рендер через formatList-like.
+        render: (row) => {
+          const all = (row.cidr_blocks as string[] | undefined) ?? [];
+          const v4 = all.filter((c) => c.includes(".") && !c.includes(":"));
+          return v4.length > 0
+            ? <span className="font-mono text-xs">{v4.join(", ")}</span>
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
+      {
+        header: "IPv6 CIDR",
+        path: "cidr_blocks",
+        render: (row) => {
+          const all = (row.cidr_blocks as string[] | undefined) ?? [];
+          const v6 = all.filter((c) => c.includes(":"));
+          return v6.length > 0
+            ? <span className="font-mono text-xs">{v6.join(", ")}</span>
+            : <span className="text-muted-foreground">—</span>;
+        },
+      },
       { header: "Default", path: "is_default", format: "text" },
-      { header: "Selector", path: "selector_labels", format: "code" },
-      COL_ID,
+      {
+        header: "Метки селектора",
+        path: "selector_labels",
+        render: (row) => (
+          <LabelsCell labels={row.selector_labels as Record<string, string> | undefined} />
+        ),
+      },
+      { header: "Selector priority", path: "selector_priority", format: "text" },
     ],
     fields: [
       {

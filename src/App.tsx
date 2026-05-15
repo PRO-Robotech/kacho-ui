@@ -14,6 +14,10 @@ import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
+import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
+import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
+import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
+import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
@@ -63,6 +67,20 @@ export default function App() {
   return (
     <ConfigProvider
       locale={ruRU}
+      form={{
+        // Звёздочка required справа от label (по умолчанию AntD ставит слева).
+        // По указанию user'а: все звёздочки должны быть справа.
+        requiredMark: (label, info) => (
+          <>
+            {label}
+            {info.required && (
+              <span style={{ color: "#ff4d4f", marginLeft: 4 }} aria-hidden>
+                *
+              </span>
+            )}
+          </>
+        ),
+      }}
       theme={{
         algorithm: antdTheme.darkAlgorithm,
         token: {
@@ -101,6 +119,31 @@ export default function App() {
           Table: {
             headerBg: "#26272d",
             rowHoverBg: "#2a2b32",
+          },
+          // KAC-69: единый цвет модалок + селекторов внутри форм (по
+          // указанию user'а: фон модалки rgb(52,54,61) = #34363d;
+          // внутренний цвет селектора rgb(28,29,33) = #1c1d22).
+          Modal: {
+            contentBg: "#34363d",
+            headerBg: "#34363d",
+            footerBg: "#34363d",
+          },
+          Select: {
+            // Закрытое поле + dropdown — затемнённый фон (как у Layout body).
+            colorBgContainer: "#1c1d22",
+            colorBgElevated: "#1c1d22",
+            optionSelectedBg: "#2a2b32",
+            optionActiveBg: "#26272d",
+          },
+          Input: {
+            // Чтобы Input в модалке имел тот же фон что Select — visual unity.
+            colorBgContainer: "#1c1d22",
+          },
+          InputNumber: {
+            colorBgContainer: "#1c1d22",
+          },
+          DatePicker: {
+            colorBgContainer: "#1c1d22",
           },
         },
       }}
@@ -179,7 +222,10 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}`}
                   element={
-                    <ResourceListPage
+                    // VpcListShell = ResourceListPage + ResourceFormModal mount
+                    // (модалка открывается по ?modal=<spec>-create или
+                    // ?modal=<spec>-edit&id=<uid>).
+                    <VpcListShell
                       spec={spec}
                       parentField="folder_id"
                       parentParam="folderId"
@@ -189,11 +235,19 @@ export default function App() {
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}/create`}
                   element={
-                    <ResourceCreatePage
-                      spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
-                    />
+                    // Subnet — отдельная standalone-страница SubnetCreatePage
+                    // (YC-style layout как у SubnetDetailPage в edit-mode).
+                    // Использует ?networkId=<n> для пред-фиксации сети;
+                    // без параметра — показывает RefSelect "Сеть" вверху.
+                    // Generic ResourceCreatePage оставлен для остальных VPC-
+                    // ресурсов (Network, Address, RT, SG, Gateway, PE).
+                    spec.id === "subnets"
+                      ? <SubnetCreatePage />
+                      : <ResourceCreatePage
+                          spec={spec}
+                          parentField="folder_id"
+                          parentParam="folderId"
+                        />
                   }
                 />
                 <Route
@@ -205,7 +259,9 @@ export default function App() {
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
                           ? <SecurityGroupDetailPage />
-                          : <ResourceDetailPage spec={spec} />
+                          : spec.id === "network-interfaces"
+                            ? <NetworkInterfaceDetailPage />
+                            : <VpcDetailShell spec={spec} />
                   }
                 />
                 {/* /edit URL ведёт на ту же detail-страницу — она авто-
@@ -220,7 +276,9 @@ export default function App() {
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
                           ? <SecurityGroupDetailPage />
-                          : <ResourceDetailPage spec={spec} />
+                          : spec.id === "network-interfaces"
+                            ? <NetworkInterfaceDetailPage />
+                            : <VpcDetailShell spec={spec} />
                   }
                 />
                 {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
@@ -305,13 +363,7 @@ export default function App() {
             />
             <Route
               path="/folders/:folderId/vpc/networks/:networkId/subnets/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.subnets}
-                  parentField="folder_id"
-                  parentParam="folderId"
-                />
-              }
+              element={<SubnetCreateRedirect />}
             />
             <Route
               path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"

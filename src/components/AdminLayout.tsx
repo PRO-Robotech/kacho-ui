@@ -7,6 +7,7 @@
 
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Space, Tabs, Typography } from "antd";
+import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
 
 const TABS = [
   { key: "/system/regions", label: "Регионы" },
@@ -43,6 +44,11 @@ export function AdminLayout() {
       />
 
       <Outlet />
+      {/* Глобальный mount модалок Create/Edit для admin-страниц (regions /
+          zones / address-pools). Не folder/cloud/org-scoped — используем
+          "system" как containerId-placeholder; ResourceFormModal не требует
+          конкретного folderId для cluster-scoped ресурсов. */}
+      <GlobalResourceFormModal />
     </Space>
   );
 }
