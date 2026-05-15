@@ -33,10 +33,11 @@ interface Props {
   onSuccess?: () => void;
 }
 
+// KAC-70: AddressPoolKind — единственный валидный вариант EXTERNAL_PUBLIC.
+// EXTERNAL_TEST = 2 / RESERVED_INTERNAL = 100 удалены из proto enum
+// (`reserved 2, 100` в kacho.cloud.vpc.v1.AddressPoolKind).
 const KIND_OPTIONS = [
   { value: "EXTERNAL_PUBLIC", label: "External public" },
-  { value: "EXTERNAL_TEST", label: "External test" },
-  { value: "RESERVED_INTERNAL", label: "Reserved internal" },
 ];
 
 export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
