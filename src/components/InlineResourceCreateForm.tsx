@@ -6,7 +6,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Space, Typography } from "antd";
+import { Alert, Button, Form, Space, Tooltip, Typography } from "antd";
+import { QuestionCircleOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { DopplerButton } from "@/components/DopplerButton";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -147,17 +148,20 @@ export function InlineResourceCreateForm({
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+    <div>
+      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
         {title ?? `Создание ${spec.singular.toLowerCase()}`}
       </Typography.Title>
 
-
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Form
+        layout="horizontal"
+        labelCol={{ flex: "200px" }}
+        wrapperCol={{ flex: "auto" }}
+        labelAlign="left"
+        colon={false}
+        size="middle"
+      >
         {fields
-          // Locked поля приходят из URL-context (network_id, subnet_id и т.п.) —
-          // они уже подразумеваются местом, где открыта форма. Не загромождаем
-          // UI и не дублируем выбор.
           .filter((f) => !lockedPathsRef.current.has(f.name))
           .map((f) => {
             const allowed = fieldOptionsFilter?.[f.name];
@@ -170,34 +174,69 @@ export function InlineResourceCreateForm({
                       .filter((o): o is { value: string; label: string } => !!o),
                   }
                 : f;
-            return (
+            // labels/sg-rules/array — рендерят свой собственный header/box;
+            // оборачивать в Form.Item с боковым label не имеет смысла.
+            const renderInForm =
+              field.type !== "labels" &&
+              field.type !== "sg-rules" &&
+              field.type !== "array" &&
+              field.type !== "custom";
+            const inner = (
               <FormFieldRenderer
-                key={f.name}
                 field={field}
                 pathPrefix=""
                 value={obj}
                 onChange={setObj}
+                hideLabel={renderInForm}
               />
             );
+            if (!renderInForm) {
+              return (
+                <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
+                  {inner}
+                </Form.Item>
+              );
+            }
+            return (
+              <Form.Item
+                key={f.name}
+                label={
+                  field.description ? (
+                    <Space size={4}>
+                      {field.label}
+                      <Tooltip title={field.description}>
+                        <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                      </Tooltip>
+                    </Space>
+                  ) : (
+                    field.label
+                  )
+                }
+                required={!!field.required}
+              >
+                {inner}
+              </Form.Item>
+            );
           })}
-      </Space>
 
-
-      <Space>
-        <DopplerButton
-          type="primary"
-          onClick={submit}
-          pulsing={mutation.isPending || pendingOpId !== null}
-        >
-          Создать {spec.singular.toLowerCase()}
-        </DopplerButton>
-        <Button
-          onClick={onCancel}
-          disabled={mutation.isPending || pendingOpId !== null}
-        >
-          Отменить
-        </Button>
-      </Space>
-    </Space>
+        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
+          <Space>
+            <DopplerButton
+              type="primary"
+              onClick={submit}
+              pulsing={mutation.isPending || pendingOpId !== null}
+            >
+              Создать {spec.singular.toLowerCase()}
+            </DopplerButton>
+            <Button
+              onClick={onCancel}
+              disabled={mutation.isPending || pendingOpId !== null}
+            >
+              Отменить
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </div>
   );
 }

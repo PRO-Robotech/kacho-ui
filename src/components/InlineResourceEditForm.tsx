@@ -10,7 +10,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Space, Typography } from "antd";
+import { Alert, Button, Form, Space, Tooltip, Typography } from "antd";
+import { QuestionCircleOutlined } from "@ant-design/icons";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { extractOperationId } from "@/components/OperationDialog";
 import { DopplerButton } from "@/components/DopplerButton";
@@ -126,40 +127,82 @@ export function InlineResourceEditForm({
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%", maxWidth: 760 }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+    <div>
+      <Typography.Title level={4} style={{ margin: "0 0 16px" }}>
         Редактирование {spec.singular.toLowerCase()}
       </Typography.Title>
 
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {visibleFields.map((f) => (
-          <FormFieldRenderer
-            key={f.name}
-            field={f}
-            pathPrefix=""
-            value={obj}
-            onChange={setObj}
-            editMode
-          />
-        ))}
-      </Space>
+      <Form
+        layout="horizontal"
+        labelCol={{ flex: "200px" }}
+        wrapperCol={{ flex: "auto" }}
+        labelAlign="left"
+        colon={false}
+        size="middle"
+      >
+        {visibleFields.map((f) => {
+          const renderInForm =
+            f.type !== "labels" &&
+            f.type !== "sg-rules" &&
+            f.type !== "array" &&
+            f.type !== "custom";
+          const inner = (
+            <FormFieldRenderer
+              field={f}
+              pathPrefix=""
+              value={obj}
+              onChange={setObj}
+              editMode
+              hideLabel={renderInForm}
+            />
+          );
+          if (!renderInForm) {
+            return (
+              <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
+                {inner}
+              </Form.Item>
+            );
+          }
+          return (
+            <Form.Item
+              key={f.name}
+              label={
+                f.description ? (
+                  <Space size={4}>
+                    {f.label}
+                    <Tooltip title={f.description}>
+                      <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                    </Tooltip>
+                  </Space>
+                ) : (
+                  f.label
+                )
+              }
+              required={!!f.required}
+            >
+              {inner}
+            </Form.Item>
+          );
+        })}
 
-
-      <Space>
-        <DopplerButton
-          type="primary"
-          onClick={submit}
-          pulsing={mutation.isPending || pendingOpId !== null}
-        >
-          Сохранить
-        </DopplerButton>
-        <Button
-          onClick={onCancel}
-          disabled={mutation.isPending || pendingOpId !== null}
-        >
-          Отменить
-        </Button>
-      </Space>
-    </Space>
+        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
+          <Space>
+            <DopplerButton
+              type="primary"
+              onClick={submit}
+              pulsing={mutation.isPending || pendingOpId !== null}
+            >
+              Сохранить
+            </DopplerButton>
+            <Button
+              onClick={onCancel}
+              disabled={mutation.isPending || pendingOpId !== null}
+            >
+              Отменить
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </div>
   );
 }

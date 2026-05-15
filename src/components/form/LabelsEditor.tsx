@@ -62,8 +62,8 @@ export function LabelsEditor({
   };
 
   return (
-    <div className="space-y-1.5">
-      <Label description={description}>{label}</Label>
+    <div className={label ? "space-y-1.5" : ""}>
+      {label && <Label description={description}>{label}</Label>}
       <LabelsEditorBase value={rows} onChange={handleChange} disabled={disabled} />
     </div>
   );

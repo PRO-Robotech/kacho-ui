@@ -17,6 +17,10 @@ interface Props {
   // В Edit-режиме поля с `immutable: true` рендерятся disabled.
   // В Create — игнорируется.
   editMode?: boolean;
+  // Если true — встроенный <Label> внутри renderer'а не рисуется (label
+  // рендерится снаружи, например в AntD Form.Item). Используется для
+  // горизонтального YC-style layout, где label слева, input справа.
+  hideLabel?: boolean;
 }
 
 function fullPath(prefix: string, name: string): string {
@@ -24,7 +28,7 @@ function fullPath(prefix: string, name: string): string {
   return `${prefix}.${name}`;
 }
 
-export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode }: Props) {
+export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode, hideLabel }: Props) {
   if (field.hidden) return null;
   if (editMode && field.editHidden) return null;
   if (field.visibleWhen) {
@@ -38,7 +42,7 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
   if (field.type === "custom") {
     return <>{field.render({ pathPrefix, value, onChange, editMode, field })}</>;
   }
-  if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} />;
+  if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} hideLabel={hideLabel} />;
   if (field.type === "sg-rules") {
     const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
     return (
@@ -59,16 +63,16 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
         value={value}
         onChange={onChange}
         path={path}
-        label={field.label}
-        description={field.description}
+        label={hideLabel ? "" : field.label}
+        description={hideLabel ? undefined : field.description}
         disabled={disabled}
       />
     );
   }
-  return <ScalarFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} disabled={disabled} />;
+  return <ScalarFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} disabled={disabled} hideLabel={hideLabel} />;
 }
 
-function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: Props & { disabled?: boolean }) {
+function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hideLabel }: Props & { disabled?: boolean }) {
   const id = useId();
   const path = fullPath(pathPrefix, field.name);
   const cur = getByPath(value, path);
@@ -76,18 +80,20 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled }: P
   const set = (v: unknown) => onChange(setByPath(value, path, v));
 
   return (
-    <div className="space-y-1.5">
-      <Label
-        htmlFor={id}
-        required={field.required}
-        description={
-          disabled
-            ? `${field.description ? field.description + " " : ""}(immutable после Create)`
-            : field.description
-        }
-      >
-        {field.label}
-      </Label>
+    <div className={hideLabel ? "" : "space-y-1.5"}>
+      {!hideLabel && (
+        <Label
+          htmlFor={id}
+          required={field.required}
+          description={
+            disabled
+              ? `${field.description ? field.description + " " : ""}(immutable после Create)`
+              : field.description
+          }
+        >
+          {field.label}
+        </Label>
+      )}
       {field.type === "string" && (
         <Input
           id={id}
