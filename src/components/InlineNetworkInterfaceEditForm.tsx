@@ -181,8 +181,8 @@ export function InlineNetworkInterfaceEditForm({
 
       <Form
         layout="horizontal"
-        labelCol={{ flex: "0 0 140px" }}
-        wrapperCol={{ flex: "1 1 auto" }}
+        labelCol={{ flex: "200px" }}
+        wrapperCol={{ flex: "auto" }}
         labelAlign="left"
         colon={false}
         size="middle"

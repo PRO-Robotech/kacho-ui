@@ -1,7 +1,7 @@
 import { useId } from "react";
-import { Trash2, Plus } from "lucide-react";
+import { Card, Space, Typography, Button as AntButton } from "antd";
+import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Input, Textarea, Label } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
@@ -177,9 +177,6 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
   const path = fullPath(pathPrefix, field.name);
   const items = (getByPath(value, path) as Record<string, unknown>[] | undefined) ?? [];
 
-  // KAC-55: если задан maxItems и достигли лимита — кнопка «Добавить» дизейблится,
-  // подсказывается в description. Backend всё равно отбьёт sync InvalidArgument
-  // / DB CHECK, но UI-уровень даёт мгновенный feedback.
   const atCap = field.maxItems !== undefined && items.length >= field.maxItems;
 
   const add = () => {
@@ -193,54 +190,94 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label
-          description={
-            disabled
-              ? `${field.description ? field.description + " " : ""}(immutable после Create — управляется отдельным action)`
-              : field.maxItems !== undefined
-              ? `${field.description ? field.description + " " : ""}Максимум ${field.maxItems}.`
-              : field.description
-          }
-          required={field.required}
+    <Card
+      size="small"
+      title={
+        <Space size={8}>
+          <Typography.Text strong>{field.label}</Typography.Text>
+          {field.required && (
+            <span style={{ color: "#ff4d4f", fontSize: 12 }}>*</span>
+          )}
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {items.length}
+            {field.maxItems !== undefined ? `/${field.maxItems}` : ""}
+          </Typography.Text>
+        </Space>
+      }
+      extra={
+        <AntButton
+          type="primary"
+          ghost
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={add}
+          disabled={disabled || atCap}
         >
-          {field.label}
-        </Label>
-        <Button type="button" variant="outline" size="sm" onClick={add} disabled={disabled || atCap}>
-          <Plus className="h-4 w-4" /> Добавить {field.itemLabel}
-        </Button>
-      </div>
-      {items.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">Пусто. Нажмите «Добавить {field.itemLabel}».</p>
-      )}
-      <div className="space-y-3">
+          Добавить
+        </AntButton>
+      }
+      style={disabled ? { opacity: 0.6, pointerEvents: "none" } : undefined}
+    >
+      <Space direction="vertical" size={8} style={{ width: "100%" }}>
+        {items.length === 0 && (
+          <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
+            — пусто —
+          </Typography.Text>
+        )}
         {items.map((_, idx) => (
           <div
             key={idx}
-            className={`rounded-md border border-border p-3 space-y-3 bg-muted/20 ${disabled ? "opacity-60 pointer-events-none" : ""}`}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              padding: 8,
+              borderRadius: 6,
+              background: "rgba(255,255,255,0.03)",
+            }}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                {field.itemLabel} #{idx + 1}
-              </span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeAt(idx)} disabled={disabled}>
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  field.itemFields.length > 1
+                    ? `repeat(${field.itemFields.length}, minmax(0, 1fr))`
+                    : "1fr",
+                gap: 8,
+                flex: 1,
+              }}
+            >
+              {field.itemFields.map((sub) => (
+                <FormFieldRenderer
+                  key={sub.name}
+                  field={sub}
+                  pathPrefix={`${path}[${idx}]`}
+                  value={value}
+                  onChange={onChange}
+                  editMode={editMode}
+                />
+              ))}
             </div>
-            {field.itemFields.map((sub) => (
-              <FormFieldRenderer
-                key={sub.name}
-                field={sub}
-                pathPrefix={`${path}[${idx}]`}
-                value={value}
-                onChange={onChange}
-                editMode={editMode}
-              />
-            ))}
+            <AntButton
+              type="text"
+              size="small"
+              icon={<DeleteOutlined />}
+              onClick={() => removeAt(idx)}
+              disabled={disabled}
+              danger
+              style={{ flexShrink: 0, marginTop: 2 }}
+            />
           </div>
         ))}
-      </div>
-    </div>
+      </Space>
+      {field.description && (
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 11, display: "block", marginTop: 8 }}
+        >
+          {field.description}
+        </Typography.Text>
+      )}
+    </Card>
   );
 }

@@ -1,4 +1,6 @@
-// SgRulesEditor — специализированный редактор VPC SecurityGroupRule[].
+// SgRulesEditor — редактор VPC SecurityGroupRule[]. Компактный AntD-Collapse:
+// каждое правило свёрнуто в одну строку summary («↓ INGRESS · TCP · 80–80 · CIDR …»);
+// expand → форма редактирования.
 //
 // Proto shape (kacho/cloud/vpc/v1/security_group.proto::SecurityGroupRule):
 //   - direction: INGRESS | EGRESS  (required)
@@ -6,15 +8,26 @@
 //   - protocol_name | protocol_number  (либо name, либо number, либо ничего = any)
 //   - ports: PortRange { from_port, to_port }  (отсутствие = any)
 //   - oneof target { cidr_blocks | security_group_id | predefined_target }
-//
-// UI-состояние держит дополнительные дискриминаторы `_protocol_mode`, `_ports_any`,
-// `_target_kind`, чтобы рендерить нужные ветки. Spec-level sanitize (см. registry)
-// вычищает их перед PATCH.
 
-import { useId } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { useId, useState } from "react";
+import {
+  Button as AntButton,
+  Card,
+  Checkbox,
+  Collapse,
+  Input as AntInput,
+  InputNumber,
+  Select as AntSelect,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
+import {
+  CloseOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+} from "@ant-design/icons";
+import { Label } from "@/components/ui/input";
 import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 
 type ProtocolMode = "any" | "name" | "number";
@@ -32,22 +45,17 @@ interface RuleExt {
   cidr_blocks?: { v4_cidr_blocks?: string[]; v6_cidr_blocks?: string[] };
   security_group_id?: string;
   predefined_target?: string;
-  // backend-managed
   id?: string;
 }
 
 interface Props {
-  // pathPrefix не используется — sg-rules только top-level (внутри Resource).
   pathPrefix: string;
-  // Полный resource-объект и колбэк, как у других FormField-рендереров.
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
-  path: string; // "rules"
+  path: string;
   description?: string;
 }
 
-// При первом render существующих rules дискриминаторы могут отсутствовать —
-// выводим их из shape. Делаем нормализацию на лету (без store).
 function inferProtocolMode(r: RuleExt): ProtocolMode {
   if (r._protocol_mode) return r._protocol_mode;
   if (r.protocol_name) return "name";
@@ -79,8 +87,40 @@ function emptyRule(): RuleExt {
   };
 }
 
+// One-line сводка правила для свёрнутой Collapse-панели.
+function ruleSummary(r: RuleExt): string {
+  const parts: string[] = [];
+  parts.push((r.direction ?? "INGRESS").toUpperCase());
+  const proto = inferProtocolMode(r);
+  if (proto === "any") parts.push("any");
+  else if (proto === "name") parts.push((r.protocol_name || "?").toLowerCase());
+  else parts.push(`proto ${r.protocol_number ?? "?"}`);
+  if (!inferPortsAny(r)) {
+    const f = r.ports?.from_port;
+    const t = r.ports?.to_port;
+    parts.push(f === t || t == null ? String(f ?? "?") : `${f}–${t}`);
+  } else {
+    parts.push("ports:any");
+  }
+  const tk = inferTargetKind(r);
+  if (tk === "cidr") {
+    const v4 = r.cidr_blocks?.v4_cidr_blocks ?? [];
+    const v6 = r.cidr_blocks?.v6_cidr_blocks ?? [];
+    const cs = [...v4, ...v6];
+    parts.push(`CIDR ${cs[0] ?? "—"}${cs.length > 1 ? ` +${cs.length - 1}` : ""}`);
+  } else if (tk === "sg") {
+    parts.push(`SG ${r.security_group_id?.slice(0, 8) ?? "?"}`);
+  } else {
+    parts.push(`predef ${r.predefined_target ?? "?"}`);
+  }
+  return parts.join(" · ");
+}
+
 export function SgRulesEditor({ value, onChange, path, description }: Props) {
   const rules = (getByPath(value, path) as RuleExt[] | undefined) ?? [];
+  // Активные (открытые) панели Collapse. По умолчанию все свёрнуты.
+  // Новое правило открывается автоматически.
+  const [activeKeys, setActiveKeys] = useState<string[]>([]);
 
   const setRule = (idx: number, next: RuleExt) => {
     const arr = [...rules];
@@ -89,51 +129,99 @@ export function SgRulesEditor({ value, onChange, path, description }: Props) {
   };
 
   const addRule = () => {
+    const nextIdx = rules.length;
     onChange(setByPath(value, path, [...rules, emptyRule()]));
+    setActiveKeys((prev) => [...prev, String(nextIdx)]);
   };
 
   const removeRule = (idx: number) => {
     onChange(deleteByPath(value, `${path}[${idx}]`));
+    setActiveKeys((prev) => prev.filter((k) => k !== String(idx)));
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label description={description}>Rules</Label>
-        <Button type="button" variant="outline" size="sm" onClick={addRule}>
-          <Plus className="h-4 w-4" /> Add rule
-        </Button>
-      </div>
-      {rules.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">
-          Пусто. Без правил трафик блокирован по default-deny.
-        </p>
+    <Card
+      size="small"
+      title={
+        <Space size={8}>
+          <Typography.Text strong>Правила</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {rules.length}
+          </Typography.Text>
+        </Space>
+      }
+      extra={
+        <AntButton
+          type="primary"
+          ghost
+          size="small"
+          icon={<PlusOutlined />}
+          onClick={addRule}
+        >
+          Добавить правило
+        </AntButton>
+      }
+    >
+      {description && (
+        <Typography.Text
+          type="secondary"
+          style={{ fontSize: 11, display: "block", marginBottom: 8 }}
+        >
+          {description}
+        </Typography.Text>
       )}
-      <div className="space-y-3">
-        {rules.map((rule, idx) => (
-          <RuleCard
-            key={idx}
-            idx={idx}
-            rule={rule}
-            onChange={(next) => setRule(idx, next)}
-            onRemove={() => removeRule(idx)}
-          />
-        ))}
-      </div>
-    </div>
+      {rules.length === 0 ? (
+        <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
+          — пусто, трафик блокируется (default-deny) —
+        </Typography.Text>
+      ) : (
+        <Collapse
+          ghost
+          activeKey={activeKeys}
+          onChange={(k) => setActiveKeys(Array.isArray(k) ? k : [k])}
+          items={rules.map((r, idx) => ({
+            key: String(idx),
+            label: (
+              <Space size={6} style={{ width: "100%" }}>
+                <Tag
+                  color={(r.direction ?? "INGRESS") === "INGRESS" ? "green" : "blue"}
+                  style={{ margin: 0, fontSize: 11 }}
+                >
+                  {(r.direction ?? "INGRESS").toUpperCase()}
+                </Tag>
+                <Typography.Text style={{ fontSize: 12 }}>
+                  {ruleSummary({ ...r, direction: undefined })}
+                </Typography.Text>
+              </Space>
+            ),
+            extra: (
+              <AntButton
+                type="text"
+                size="small"
+                icon={<DeleteOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeRule(idx);
+                }}
+                danger
+              />
+            ),
+            children: (
+              <RuleBody rule={r} onChange={(next) => setRule(idx, next)} />
+            ),
+          }))}
+        />
+      )}
+    </Card>
   );
 }
 
-function RuleCard({
-  idx,
+function RuleBody({
   rule,
   onChange,
-  onRemove,
 }: {
-  idx: number;
   rule: RuleExt;
   onChange: (next: RuleExt) => void;
-  onRemove: () => void;
 }) {
   const protoMode = inferProtocolMode(rule);
   const portsAny = inferPortsAny(rule);
@@ -142,57 +230,62 @@ function RuleCard({
   const set = (patch: Partial<RuleExt>) => onChange({ ...rule, ...patch });
 
   return (
-    <div className="rounded-md border border-border p-3 space-y-3 bg-muted/20">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">Rule #{idx + 1}</span>
-        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      {/* Direction + Description */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Direction" required>
-          <Select
+    <Space direction="vertical" size={10} style={{ width: "100%" }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 2fr",
+          gap: 8,
+        }}
+      >
+        <Field label="Направление" required>
+          <AntSelect
             value={rule.direction ?? "INGRESS"}
             onChange={(v) => set({ direction: v })}
             options={[
               { value: "INGRESS", label: "INGRESS" },
               { value: "EGRESS", label: "EGRESS" },
             ]}
+            style={{ width: "100%" }}
           />
         </Field>
-        <Field label="Description">
-          <Input
+        <Field label="Описание">
+          <AntInput
             value={rule.description ?? ""}
             onChange={(e) => set({ description: e.target.value })}
           />
         </Field>
       </div>
 
-      {/* Protocol */}
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Protocol">
-          <Select
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 2fr",
+          gap: 8,
+        }}
+      >
+        <Field label="Протокол">
+          <AntSelect
             value={protoMode}
-            onChange={(v) =>
+            onChange={(v: ProtocolMode) =>
               set({
-                _protocol_mode: v as ProtocolMode,
-                protocol_name: v === "name" ? (rule.protocol_name ?? "") : undefined,
+                _protocol_mode: v,
+                protocol_name: v === "name" ? rule.protocol_name ?? "" : undefined,
                 protocol_number:
-                  v === "number" ? (rule.protocol_number ?? 0) : undefined,
+                  v === "number" ? rule.protocol_number ?? 0 : undefined,
               })
             }
             options={[
-              { value: "any", label: "Any" },
-              { value: "name", label: "By name" },
-              { value: "number", label: "By number" },
+              { value: "any", label: "Любой" },
+              { value: "name", label: "По имени" },
+              { value: "number", label: "По номеру" },
             ]}
+            style={{ width: "100%" }}
           />
         </Field>
         {protoMode === "name" && (
-          <Field label="Name" className="col-span-2">
-            <Input
+          <Field label="Имя">
+            <AntInput
               placeholder="tcp / udp / icmp / …"
               value={rule.protocol_name ?? ""}
               onChange={(e) => set({ protocol_name: e.target.value })}
@@ -200,129 +293,154 @@ function RuleCard({
           </Field>
         )}
         {protoMode === "number" && (
-          <Field label="Number (IANA)" className="col-span-2">
-            <Input
-              type="number"
+          <Field label="Номер IANA">
+            <InputNumber
               min={0}
               max={255}
               placeholder="0..255"
-              value={rule.protocol_number ?? ""}
-              onChange={(e) =>
-                set({
-                  protocol_number: e.target.value === "" ? undefined : Number(e.target.value),
-                })
+              value={rule.protocol_number ?? undefined}
+              onChange={(v) =>
+                set({ protocol_number: v === null ? undefined : Number(v) })
               }
+              style={{ width: "100%" }}
             />
           </Field>
         )}
+        {protoMode === "any" && <div />}
       </div>
 
-      {/* Ports */}
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={portsAny}
-            onChange={(e) => set({ _ports_any: e.target.checked, ports: e.target.checked ? undefined : { from_port: 0, to_port: 65535 } })}
-            className="h-4 w-4 rounded border-border"
-          />
-          Ports: any
-        </label>
+      <div>
+        <Checkbox
+          checked={portsAny}
+          onChange={(e) =>
+            set({
+              _ports_any: e.target.checked,
+              ports: e.target.checked
+                ? undefined
+                : { from_port: 0, to_port: 65535 },
+            })
+          }
+        >
+          Любые порты
+        </Checkbox>
         {!portsAny && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="From">
-              <Input
-                type="number"
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 8,
+              marginTop: 6,
+            }}
+          >
+            <Field label="От">
+              <InputNumber
                 min={0}
                 max={65535}
-                value={rule.ports?.from_port ?? ""}
-                onChange={(e) =>
+                value={rule.ports?.from_port ?? undefined}
+                onChange={(v) =>
                   set({
                     ports: {
                       ...(rule.ports ?? {}),
-                      from_port: e.target.value === "" ? undefined : Number(e.target.value),
+                      from_port: v === null ? undefined : Number(v),
                     },
                   })
                 }
+                style={{ width: "100%" }}
               />
             </Field>
-            <Field label="To">
-              <Input
-                type="number"
+            <Field label="До">
+              <InputNumber
                 min={0}
                 max={65535}
-                value={rule.ports?.to_port ?? ""}
-                onChange={(e) =>
+                value={rule.ports?.to_port ?? undefined}
+                onChange={(v) =>
                   set({
                     ports: {
                       ...(rule.ports ?? {}),
-                      to_port: e.target.value === "" ? undefined : Number(e.target.value),
+                      to_port: v === null ? undefined : Number(v),
                     },
                   })
                 }
+                style={{ width: "100%" }}
               />
             </Field>
           </div>
         )}
       </div>
 
-      {/* Target oneof */}
-      <div className="space-y-2">
-        <Field label="Target">
-          <Select
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 2fr",
+          gap: 8,
+        }}
+      >
+        <Field label="Источник">
+          <AntSelect
             value={targetKind}
-            onChange={(v) =>
+            onChange={(v: TargetKind) =>
               set({
-                _target_kind: v as TargetKind,
-                cidr_blocks: v === "cidr" ? (rule.cidr_blocks ?? { v4_cidr_blocks: ["0.0.0.0/0"] }) : undefined,
-                security_group_id: v === "sg" ? (rule.security_group_id ?? "") : undefined,
-                predefined_target: v === "predefined" ? (rule.predefined_target ?? "self_security_group") : undefined,
+                _target_kind: v,
+                cidr_blocks:
+                  v === "cidr"
+                    ? rule.cidr_blocks ?? { v4_cidr_blocks: ["0.0.0.0/0"] }
+                    : undefined,
+                security_group_id:
+                  v === "sg" ? rule.security_group_id ?? "" : undefined,
+                predefined_target:
+                  v === "predefined"
+                    ? rule.predefined_target ?? "self_security_group"
+                    : undefined,
               })
             }
             options={[
-              { value: "cidr", label: "CIDR blocks" },
-              { value: "sg", label: "Security group" },
-              { value: "predefined", label: "Predefined" },
+              { value: "cidr", label: "CIDR-блоки" },
+              { value: "sg", label: "Security Group" },
+              { value: "predefined", label: "Предустановленный" },
             ]}
+            style={{ width: "100%" }}
           />
         </Field>
-        {targetKind === "cidr" && (
-          <CidrEditor
-            v4={rule.cidr_blocks?.v4_cidr_blocks ?? []}
-            v6={rule.cidr_blocks?.v6_cidr_blocks ?? []}
-            onChange={(v4, v6) =>
-              set({
-                cidr_blocks: {
-                  ...(v4.length > 0 ? { v4_cidr_blocks: v4 } : {}),
-                  ...(v6.length > 0 ? { v6_cidr_blocks: v6 } : {}),
-                },
-              })
-            }
-          />
-        )}
-        {targetKind === "sg" && (
-          <Field label="Security Group ID">
-            <Input
+        <div>
+          {targetKind === "sg" && (
+            <AntInput
               placeholder="UUID другой SG"
               value={rule.security_group_id ?? ""}
               onChange={(e) => set({ security_group_id: e.target.value })}
             />
-          </Field>
-        )}
-        {targetKind === "predefined" && (
-          <Field label="Predefined target">
-            <Select
+          )}
+          {targetKind === "predefined" && (
+            <AntSelect
               value={rule.predefined_target ?? "self_security_group"}
               onChange={(v) => set({ predefined_target: v })}
               options={[
                 { value: "self_security_group", label: "self_security_group" },
-                { value: "loadbalancer_healthchecks", label: "loadbalancer_healthchecks" },
+                {
+                  value: "loadbalancer_healthchecks",
+                  label: "loadbalancer_healthchecks",
+                },
               ]}
+              style={{ width: "100%" }}
             />
-          </Field>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+
+      {targetKind === "cidr" && (
+        <CidrEditor
+          v4={rule.cidr_blocks?.v4_cidr_blocks ?? []}
+          v6={rule.cidr_blocks?.v6_cidr_blocks ?? []}
+          onChange={(v4, v6) =>
+            set({
+              cidr_blocks: {
+                ...(v4.length > 0 ? { v4_cidr_blocks: v4 } : {}),
+                ...(v6.length > 0 ? { v6_cidr_blocks: v6 } : {}),
+              },
+            })
+          }
+        />
+      )}
+    </Space>
   );
 }
 
@@ -336,108 +454,121 @@ function CidrEditor({
   onChange: (v4: string[], v6: string[]) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <CidrList label="IPv4 CIDRs" placeholder="0.0.0.0/0" value={v4} onChange={(next) => onChange(next, v6)} />
-      <CidrList label="IPv6 CIDRs" placeholder="::/0" value={v6} onChange={(next) => onChange(v4, next)} />
-    </div>
+    <Space direction="vertical" size={8} style={{ width: "100%" }}>
+      <CidrChipList
+        label="IPv4 CIDR"
+        placeholder="0.0.0.0/0"
+        tagColor="blue"
+        value={v4}
+        onChange={(next) => onChange(next, v6)}
+      />
+      <CidrChipList
+        label="IPv6 CIDR"
+        placeholder="::/0"
+        tagColor="geekblue"
+        value={v6}
+        onChange={(next) => onChange(v4, next)}
+      />
+    </Space>
   );
 }
 
-function CidrList({
+function CidrChipList({
   label,
   placeholder,
+  tagColor,
   value,
   onChange,
 }: {
   label: string;
   placeholder: string;
+  tagColor: string;
   value: string[];
   onChange: (next: string[]) => void;
 }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (value.includes(v)) {
+      setDraft("");
+      return;
+    }
+    onChange([...value, v]);
+    setDraft("");
+  };
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 px-2"
-          onClick={() => onChange([...value, ""])}
-        >
-          <Plus className="h-3 w-3" /> Add
-        </Button>
-      </div>
-      {value.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">— пусто —</p>
-      )}
-      {value.map((cidr, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <Input
+    <Card size="small" title={label} bordered>
+      <Space direction="vertical" size={6} style={{ width: "100%" }}>
+        <div style={{ minHeight: 22 }}>
+          {value.length === 0 ? (
+            <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
+              — пусто —
+            </Typography.Text>
+          ) : (
+            <Space size={[4, 4]} wrap>
+              {value.map((cidr) => (
+                <Tag
+                  key={cidr}
+                  color={tagColor}
+                  closable
+                  closeIcon={<CloseOutlined style={{ fontSize: 10 }} />}
+                  onClose={(e) => {
+                    e.preventDefault();
+                    onChange(value.filter((c) => c !== cidr));
+                  }}
+                  style={{ fontFamily: "monospace", fontSize: 11, margin: 0 }}
+                >
+                  {cidr}
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </div>
+        <Space.Compact style={{ width: "100%" }}>
+          <AntInput
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
-            value={cidr}
-            onChange={(e) => {
-              const next = [...value];
-              next[i] = e.target.value;
-              onChange(next);
+            style={{ fontFamily: "monospace", fontSize: 12 }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
             }}
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => onChange(value.filter((_, j) => j !== i))}
+          <AntButton
+            type="primary"
+            ghost
+            icon={<PlusOutlined />}
+            disabled={!draft.trim()}
+            onClick={add}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ))}
-    </div>
+            Add
+          </AntButton>
+        </Space.Compact>
+      </Space>
+    </Card>
   );
 }
 
 function Field({
   label,
   required,
-  className,
   children,
 }: {
   label: string;
   required?: boolean;
-  className?: string;
   children: React.ReactNode;
 }) {
   const id = useId();
   return (
-    <div className={`space-y-1 ${className ?? ""}`}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <Label htmlFor={id} required={required}>
         {label}
       </Label>
       {children}
     </div>
-  );
-}
-
-function Select({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="flex h-9 w-full rounded-md border border-border bg-background px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
   );
 }

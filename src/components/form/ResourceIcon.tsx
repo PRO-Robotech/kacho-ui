@@ -1,52 +1,62 @@
-// ResourceIcon — иконка ресурса для заголовков модалок (Создание/Редактирование).
-// Centralized mapping по spec.id; недостающие — fallback к Box.
+// ResourceIcon — иконка ресурса для заголовков модалок Create/Edit.
+// Mapping синхронизирован с навигацией в сайдбаре (см. src/lib/service-modules.tsx)
+// — те же AntD Outlined-иконки, чтобы пользователь узнавал ресурс в обоих местах.
 
 import {
-  Box,
-  Cable,
-  Cloud,
-  Folder,
-  Globe,
-  HardDrive,
-  Image as ImageIcon,
-  Layers,
-  Map,
-  MapPin,
-  Network,
-  Route,
-  Server,
-  Shield,
-  ShieldCheck,
-  Building2,
-  Camera,
-} from "lucide-react";
+  ApartmentOutlined,
+  ApiOutlined,
+  AppstoreOutlined,
+  BankOutlined,
+  CameraOutlined,
+  CloudOutlined,
+  ClusterOutlined,
+  DesktopOutlined,
+  FileImageOutlined,
+  FolderOutlined,
+  GatewayOutlined,
+  GlobalOutlined,
+  HddOutlined,
+  NodeIndexOutlined,
+  SafetyOutlined,
+} from "@ant-design/icons";
+import type { ReactNode } from "react";
 
-const ICONS: Record<string, typeof Box> = {
-  organizations: Building2,
-  clouds: Cloud,
-  folders: Folder,
-  networks: Globe,
-  subnets: Network,
-  "security-groups": Shield,
-  "security-group-rules": ShieldCheck,
-  "route-tables": Route,
-  addresses: MapPin,
-  gateways: Map,
-  "address-pools": Layers,
-  "network-interfaces": Cable,
-  instances: Server,
-  disks: HardDrive,
-  images: ImageIcon,
-  snapshots: Camera,
+const ICONS: Record<string, ReactNode> = {
+  // resource-manager
+  organizations: <BankOutlined />,
+  clouds: <CloudOutlined />,
+  folders: <FolderOutlined />,
+  // vpc (сайдбар: ApartmentOutlined / ClusterOutlined / GlobalOutlined /
+  // NodeIndexOutlined / SafetyOutlined / ApiOutlined / GatewayOutlined)
+  networks: <ApartmentOutlined />,
+  subnets: <ClusterOutlined />,
+  addresses: <GlobalOutlined />,
+  "route-tables": <NodeIndexOutlined />,
+  "security-groups": <SafetyOutlined />,
+  "network-interfaces": <ApiOutlined />,
+  gateways: <GatewayOutlined />,
+  // compute (сайдбар: DesktopOutlined / HddOutlined / FileImageOutlined / CameraOutlined)
+  instances: <DesktopOutlined />,
+  disks: <HddOutlined />,
+  images: <FileImageOutlined />,
+  snapshots: <CameraOutlined />,
+  // admin / system
+  "address-pools": <AppstoreOutlined />,
+  regions: <AppstoreOutlined />,
+  zones: <AppstoreOutlined />,
+  hypervisors: <AppstoreOutlined />,
 };
 
 interface Props {
   specId: string;
-  size?: number;
   className?: string;
 }
 
-export function ResourceIcon({ specId, size = 20, className }: Props) {
-  const Icon = ICONS[specId] ?? Box;
-  return <Icon size={size} className={className} aria-hidden />;
+export function ResourceIcon({ specId, className }: Props) {
+  const icon = ICONS[specId] ?? <AppstoreOutlined />;
+  return (
+    <span className={className} style={{ fontSize: 18, lineHeight: 1 }} aria-hidden>
+      {icon}
+    </span>
+  );
 }

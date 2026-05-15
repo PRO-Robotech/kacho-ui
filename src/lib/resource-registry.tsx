@@ -641,11 +641,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // CLAUDE.md kacho-vpc §4.4). Скрываем в edit-форме.
       {
         name: "_address_kind",
-        label: "Address Kind",
+        label: "Тип адреса",
         type: "enum",
         required: true,
         default: "external",
-        description: "External IPv4 / External IPv6. Internal IP создаются автоматически compute-сервисом при Instance.Create через nic-spec и здесь не предлагаются.",
+        description:
+          "Тип резервируемого IP-адреса. Внутренние адреса (Internal IPv4 / Internal IPv6) создаются автоматически при запуске виртуальной машины через сетевой интерфейс и в этой форме не предлагаются.",
         // KAC-58 (epic) / KAC-61: оставили только External. Internal IPv4/IPv6
         // создаются через compute Instance.Create flow с
         // network_interface_specs[*].subnet_id — Address.Create internal через
@@ -658,19 +659,22 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         name: "external_ipv4_address_spec.zone_id",
-        label: "Zone (External IPv4)",
+        label: "Зона",
         type: "ref",
         refResource: "zones",
-        description: "Зона для External IPv4. Оставьте address пустым для auto-allocation.",
+        required: true,
+        description:
+          "Зона, в которой выделяется внешний IPv4. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv4-пула зоны.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
       {
         name: "external_ipv4_address_spec.address",
-        label: "Address (External IPv4, необязательно)",
+        label: "Адрес",
         type: "string",
-        placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется автоматически из default IPv4 pool зоны.",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv4-адрес для резервирования. Оставьте пустым — адрес будет выделен автоматически из IPv4-пула выбранной зоны.",
         visibleWhen: { field: "_address_kind", equals: "external" },
         editHidden: true,
       },
@@ -679,27 +683,32 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // CIDR-pool с v6 prefix создаётся через InternalAddressPoolService;
         // cascade resolve фильтрует pool по family запроса.
         name: "external_ipv6_address_spec.zone_id",
-        label: "Zone (External IPv6)",
+        label: "Зона",
         type: "ref",
         refResource: "zones",
-        description: "Зона для External IPv6. Оставьте address пустым для auto-allocation из v6 pool.",
+        required: true,
+        description:
+          "Зона, в которой выделяется внешний IPv6. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv6-пула зоны.",
         visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
         name: "external_ipv6_address_spec.address",
-        label: "Address (External IPv6, необязательно)",
+        label: "Адрес",
         type: "string",
-        placeholder: "пусто = auto-allocated",
-        description: "Если пусто — адрес выделяется автоматически из v6 pool зоны.",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv6-адрес для резервирования. Оставьте пустым — адрес будет выделен автоматически из IPv6-пула выбранной зоны.",
         visibleWhen: { field: "_address_kind", equals: "external_v6" },
         editHidden: true,
       },
       {
         name: "deletion_protection",
-        label: "Deletion Protection",
+        label: "Защита от удаления",
         type: "bool",
         default: false,
+        description:
+          "Если включена, адрес нельзя будет удалить, пока защита не будет снята.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
@@ -981,9 +990,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // IPv4 из CIDR этой подсети»). На success id появляется в списке.
       {
         name: "v4_address_ids",
-        label: "IPv4-адрес (Address-ресурс)",
+        label: "IPv4-адрес",
         type: "array",
-        itemLabel: "Address",
+        itemLabel: "адрес",
         // KAC-55: на одной NIC максимум один IPv4 (и максимум один IPv6).
         // Multi-IP per VM — через несколько NIC, не secondary addresses в одном
         // NIC. Backend отбивает > 1 sync InvalidArgument + DB CHECK
@@ -1018,9 +1027,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         name: "v6_address_ids",
-        label: "IPv6-адрес (Address-ресурс)",
+        label: "IPv6-адрес",
         type: "array",
-        itemLabel: "Address",
+        itemLabel: "адрес",
         // KAC-55: на одной NIC максимум один IPv6 (и максимум один IPv4).
         maxItems: 1,
         description: "Опционально. IPv6 Address-ресурс из выбранной подсети. Можно создать новый прямо в дропдауне.",
