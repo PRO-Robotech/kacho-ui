@@ -783,28 +783,22 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           const routes = (row.static_routes as Array<{
             destination_prefix?: string;
             next_hop_address?: string;
-            gateway_id?: string;
           }> | undefined) ?? [];
           if (routes.length === 0) return <span className="text-muted-foreground">—</span>;
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              {routes.map((r, i) => {
-                const nh = r.gateway_id
-                  ? `gw:${r.gateway_id.slice(0, 8)}`
-                  : r.next_hop_address ?? "?";
-                return (
-                  <span
-                    key={i}
-                    style={{
-                      fontFamily: "ui-monospace, SFMono-Regular, monospace",
-                      fontSize: 12,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {r.destination_prefix ?? "?"} → {nh}
-                  </span>
-                );
-              })}
+              {routes.map((r, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontFamily: "ui-monospace, SFMono-Regular, monospace",
+                    fontSize: 12,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {r.destination_prefix ?? "?"} → {r.next_hop_address ?? "?"}
+                </span>
+              ))}
             </div>
           );
         },
@@ -839,6 +833,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_FOLDER_ID,
       // Static Routes — в самом низу формы (объёмный блок, не должен
       // мешать редактированию основных полей).
+      //
+      // ⚠️ Gateway-режим (next_hop oneof = gateway_id) пока НЕ поддержан
+      // backend'ом kacho-vpc: proto-поле есть, но domain.StaticRoute хранит
+      // только NextHopAddress; handler требует next_hop_address. Поэтому
+      // UI оставляет только IP-режим — до KAC-issue на поддержку gateway_id.
       {
         name: "static_routes",
         label: "Статические маршруты",
@@ -846,12 +845,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         itemLabel: "маршрут",
         description:
           "При обновлении список заменяется целиком (full-replace).",
-        newItem: () => ({
-          destination_prefix: "",
-          _next_hop_kind: "ip",
-          next_hop_address: "",
-          gateway_id: "",
-        }),
+        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
         itemFields: [
           {
             name: "destination_prefix",
@@ -863,19 +857,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
               "CIDR-блок назначения. Трафик в этот блок будет направлен через указанный next-hop.",
           },
           {
-            name: "_next_hop_kind",
-            label: "Тип",
-            type: "enum",
-            required: true,
-            default: "ip",
-            options: [
-              { value: "ip", label: "IP" },
-              { value: "gateway", label: "Шлюз" },
-            ],
-            description:
-              "IP — произвольный next-hop в подсети. Шлюз — ресурс Gateway (NAT / Internet-egress).",
-          },
-          {
             name: "next_hop_address",
             label: "Next-hop",
             type: "string",
@@ -883,18 +864,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             placeholder: "10.0.0.1",
             description:
               "IP-адрес next-hop. Должен быть достижим из подсетей, использующих эту таблицу маршрутизации.",
-            visibleWhen: { field: "_next_hop_kind", equals: "ip" },
-          },
-          {
-            name: "gateway_id",
-            label: "Next-hop",
-            type: "ref",
-            refResource: "gateways",
-            refFolderScoped: true,
-            required: true,
-            description:
-              "Ресурс Gateway, через который направляется трафик (Internet egress / NAT).",
-            visibleWhen: { field: "_next_hop_kind", equals: "gateway" },
           },
         ],
       },
@@ -906,43 +875,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       static_routes: [],
     }),
-    hydrate: (data) => {
-      // При Edit: определяем kind по тому, какая oneof-ветка заполнена.
-      const routes = (data.static_routes as Array<Record<string, unknown>> | undefined) ?? [];
-      return {
-        ...data,
-        static_routes: routes.map((r) => {
-          const gw = (r.gateway_id as string | undefined) ?? "";
-          const addr = (r.next_hop_address as string | undefined) ?? "";
-          return {
-            ...r,
-            _next_hop_kind: gw ? "gateway" : "ip",
-            next_hop_address: addr,
-            gateway_id: gw,
-          };
-        }),
-      };
-    },
-    sanitize: (obj) => {
-      // На submit: убираем UI-discriminator и неактивную ветку oneof.
-      const routes = (obj.static_routes as Array<Record<string, unknown>> | undefined) ?? [];
-      return {
-        ...obj,
-        static_routes: routes.map((r) => {
-          const kind = r._next_hop_kind ?? "ip";
-          const out: Record<string, unknown> = {
-            destination_prefix: r.destination_prefix,
-          };
-          if (r.labels) out.labels = r.labels;
-          if (kind === "gateway") {
-            out.gateway_id = r.gateway_id;
-          } else {
-            out.next_hop_address = r.next_hop_address;
-          }
-          return out;
-        }),
-      };
-    },
   },
 
   // proto: GET /vpc/v1/networkInterfaces — AWS-ENI-подобный ресурс (эпик KAC-2).
