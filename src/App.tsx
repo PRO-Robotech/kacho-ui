@@ -7,6 +7,8 @@ import { AdminLayout } from "@/components/AdminLayout";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceCreatePage } from "@/components/ResourceCreatePage";
+import { TopLevelCreatePage } from "@/components/TopLevelCreatePage";
+import { CREATE_CHILD_SPEC_TO_SLUG } from "@/lib/create-child-url";
 import { ResourceEditPage } from "@/components/ResourceEditPage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
@@ -16,7 +18,6 @@ import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
 import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
-import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
 import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
@@ -58,6 +59,21 @@ function LegacySegmentRedirect({ segment, route }: { segment: string; route: str
   return (
     <Navigate
       to={`/folders/${folderId}/${segment}/${route}${tail}${location.search}`}
+      replace
+    />
+  );
+}
+
+// KAC-103: редирект старого `/folders/X/vpc/<route>/create` на новый YC-style
+// URL `/folders/X/vpc/create-<slug>`. Сохраняет query (e.g. ?networkId=...).
+function LegacyCreateRedirect({ specId }: { specId: string }) {
+  const { folderId } = useParams();
+  const location = useLocation();
+  const slug = CREATE_CHILD_SPEC_TO_SLUG[specId];
+  if (!folderId || !slug) return <Navigate to="/" replace />;
+  return (
+    <Navigate
+      to={`/folders/${folderId}/vpc/create-${slug}${location.search}`}
       replace
     />
   );
@@ -232,23 +248,15 @@ export default function App() {
                     />
                   }
                 />
+                {/* KAC-103: новый URL pattern /vpc/create-<slug> (YC-style). */}
+                <Route
+                  path={`/folders/:folderId/vpc/create-${CREATE_CHILD_SPEC_TO_SLUG[spec.id]}`}
+                  element={<TopLevelCreatePage spec={spec} />}
+                />
+                {/* Back-compat: старый URL `/vpc/<route>/create` → новый. */}
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}/create`}
-                  element={
-                    // Subnet — отдельная standalone-страница SubnetCreatePage
-                    // (YC-style layout как у SubnetDetailPage в edit-mode).
-                    // Использует ?networkId=<n> для пред-фиксации сети;
-                    // без параметра — показывает RefSelect "Сеть" вверху.
-                    // Generic ResourceCreatePage оставлен для остальных VPC-
-                    // ресурсов (Network, Address, RT, SG, Gateway, PE).
-                    spec.id === "subnets"
-                      ? <SubnetCreatePage />
-                      : <ResourceCreatePage
-                          spec={spec}
-                          parentField="folder_id"
-                          parentParam="folderId"
-                        />
-                  }
+                  element={<LegacyCreateRedirect specId={spec.id} />}
                 />
                 <Route
                   path={`/folders/:folderId/vpc/${spec.route}/:uid`}

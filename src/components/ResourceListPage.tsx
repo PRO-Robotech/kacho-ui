@@ -2,8 +2,14 @@
 //
 // Polling 3 сек (через useResourceList).
 
-import { useMemo, useState } from "react";
-import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Input, Select, Typography, Space } from "antd";
 import { ErrorResult } from "@/components/ErrorResult";
@@ -17,6 +23,7 @@ import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
+import { CREATE_CHILD_SPEC_TO_SLUG } from "@/lib/create-child-url";
 
 interface Props {
   spec: ResourceSpec;
@@ -28,6 +35,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const filterValue = parentParam ? (params[parentParam] ?? null) : null;
   const [query, setQuery] = useState("");
 
@@ -53,12 +61,19 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
   );
   useBreadcrumb(breadcrumb);
 
-  // KAC-70: Create открывается в модалке (ResourceFormModal) поверх list.
-  // URL: добавляем ?modal=<spec>-create — модалка показывается на текущей
-  // странице, не уходим на /create standalone route.
+  // KAC-103: Create — отдельная страница `/folders/<f>/vpc/create-<slug>`
+  // (YC-style). Для VPC-ресурсов используем создание-страницу
+  // TopLevelCreatePage. Для compute и admin — оставляем старый
+  // `/<route>/create` URL (full-page ResourceCreatePage).
+  const folderIdParam = params.folderId;
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
-    const target = `${location.pathname}?modal=${spec.id}-create`;
+    const isVpcResource =
+      spec.serviceTitle === "Virtual Private Cloud" && folderIdParam;
+    const slug = CREATE_CHILD_SPEC_TO_SLUG[spec.id];
+    const target = isVpcResource && slug
+      ? `/folders/${folderIdParam}/vpc/create-${slug}`
+      : `${location.pathname}/create`;
     return (
       <Link to={target}>
         <Button type="primary" size="small" icon={<PlusOutlined />}>
@@ -66,9 +81,27 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         </Button>
       </Link>
     );
-  }, [spec, location.pathname]);
+  }, [spec, location.pathname, folderIdParam]);
 
   useHeaderRight(cta);
+
+  // KAC-103: Back-compat — если на list-page открыли URL `?modal=<spec>-create`
+  // (без parent в query — top-level вариант), редиректим на новый URL.
+  useEffect(() => {
+    if (!folderIdParam) return;
+    const modal = searchParams.get("modal");
+    if (modal !== `${spec.id}-create`) return;
+    // parent-create случай обрабатывают сами parent detail pages (KAC-102).
+    // Здесь только top-level из списка folder'а.
+    const slug = CREATE_CHILD_SPEC_TO_SLUG[spec.id];
+    if (!slug) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete("modal");
+    params.delete("id");
+    const qs = params.toString();
+    const url = `/folders/${folderIdParam}/vpc/create-${slug}`;
+    navigate(qs ? `${url}?${qs}` : url, { replace: true });
+  }, [folderIdParam, searchParams, spec.id, navigate]);
 
   if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
 
