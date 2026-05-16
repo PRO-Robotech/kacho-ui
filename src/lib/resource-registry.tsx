@@ -645,14 +645,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         required: true,
         default: "external",
         description:
-          "Тип резервируемого IP-адреса. Внутренние адреса (Internal IPv4 / Internal IPv6) создаются автоматически при запуске виртуальной машины через сетевой интерфейс и в этой форме не предлагаются.",
-        // KAC-58 (epic) / KAC-61: оставили только External. Internal IPv4/IPv6
-        // создаются через compute Instance.Create flow с
-        // network_interface_specs[*].subnet_id — Address.Create internal через
-        // UI явно убран как часть упрощения product surface.
+          "Тип резервируемого IP-адреса. External IPv4/IPv6 выделяются из IPv4/IPv6 пула выбранной зоны. Internal IPv4/IPv6 выделяются из CIDR-блока выбранной подсети.",
+        // KAC-100: вернули Internal IPv4 / Internal IPv6 (откат UI-части KAC-61).
+        // Internal-адреса также могут аллоцироваться compute-сервисом при
+        // Instance.Create через nic-spec, но прямое резервирование с руки —
+        // поддерживается.
         options: [
           { value: "external", label: "External IPv4" },
           { value: "external_v6", label: "External IPv6" },
+          { value: "internal", label: "Internal IPv4" },
+          { value: "internal_v6", label: "Internal IPv6" },
         ],
         editHidden: true,
       },
@@ -702,6 +704,54 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         editHidden: true,
       },
       {
+        // KAC-100: Internal IPv4 — резервирование с руки. Адрес выделяется
+        // из IPv4 CIDR подсети (kacho-vpc InternalAddressService.AllocateInternalIP).
+        name: "internal_ipv4_address_spec.subnet_id",
+        label: "Подсеть",
+        type: "ref",
+        refResource: "subnets",
+        refFolderScoped: true,
+        required: true,
+        description:
+          "Подсеть, из IPv4-CIDR которой выделяется внутренний адрес. Оставьте поле «Адрес» пустым для автоматического выделения.",
+        visibleWhen: { field: "_address_kind", equals: "internal" },
+        editHidden: true,
+      },
+      {
+        name: "internal_ipv4_address_spec.address",
+        label: "Адрес",
+        type: "string",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv4-адрес из CIDR выбранной подсети. Оставьте пустым — будет выделен автоматически.",
+        visibleWhen: { field: "_address_kind", equals: "internal" },
+        editHidden: true,
+      },
+      {
+        // KAC-100: Internal IPv6 — резервирование с руки. Адрес выделяется
+        // из IPv6 CIDR подсети.
+        name: "internal_ipv6_address_spec.subnet_id",
+        label: "Подсеть",
+        type: "ref",
+        refResource: "subnets",
+        refFolderScoped: true,
+        required: true,
+        description:
+          "Подсеть, из IPv6-CIDR которой выделяется внутренний адрес. Оставьте поле «Адрес» пустым для автоматического выделения.",
+        visibleWhen: { field: "_address_kind", equals: "internal_v6" },
+        editHidden: true,
+      },
+      {
+        name: "internal_ipv6_address_spec.address",
+        label: "Адрес",
+        type: "string",
+        placeholder: "auto",
+        description:
+          "Конкретный IPv6-адрес из CIDR выбранной подсети. Оставьте пустым — будет выделен автоматически.",
+        visibleWhen: { field: "_address_kind", equals: "internal_v6" },
+        editHidden: true,
+      },
+      {
         name: "deletion_protection",
         label: "Защита от удаления",
         type: "bool",
@@ -722,9 +772,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       deletion_protection: false,
     }),
     // Убирает поле-переключатель _address_kind и неактивный oneof из payload.
-    // KAC-58: form предлагает только external IPv4 / external IPv6; internal_*
-    // ключи в форме отсутствуют, но защита от их «протекания» оставлена на
-    // случай legacy template'ов.
+    // KAC-100: оставляет активную ветку из {external, external_v6, internal,
+    // internal_v6}; неактивные внутренние ветки выкидываются.
     sanitize: (obj) => {
       const kind = obj["_address_kind"];
       const result: Record<string, unknown> = {};
@@ -732,8 +781,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         if (k === "_address_kind") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
         if (k === "external_ipv6_address_spec" && kind !== "external_v6") continue;
-        if (k === "internal_ipv4_address_spec") continue
-        if (k === "internal_ipv6_address_spec") continue
+        if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
+        if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
         result[k] = v;
       }
       return result;
