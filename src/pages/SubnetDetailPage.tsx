@@ -3,8 +3,13 @@
 // subnet (через internal_ipv4_address.subnet_id), используя те же колонки,
 // что и /folders/X/addresses.
 
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { Button as AntButton, Input, Space, Typography } from "antd";
@@ -14,30 +19,69 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
+import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
+import { InlineNetworkInterfaceCreateForm } from "@/components/InlineNetworkInterfaceCreateForm";
 import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 import { buildSpecColumns } from "@/lib/spec-columns";
+import {
+  buildCreateChildUrl,
+  detectCreateChildSpecId,
+} from "@/lib/create-child-url";
 import type { DetailTab } from "@/components/DetailShell";
 
 export function SubnetDetailPage() {
   const { uid: subnetId, folderId, networkId } = useParams();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const spec = REGISTRY["subnets"];
   const addrSpec = REGISTRY["addresses"];
 
-  // Открыть модалку резервирования IP в контексте текущей подсети
-  // (subnetId передаётся через query → ResourceFormModal превратит его в
-  // preset internal_ipv4/v6_address_spec.subnet_id, см. ResourceFormModal.tsx).
-  const openReserveModal = useCallback(() => {
-    if (!subnetId) return;
-    const next = new URLSearchParams(searchParams);
-    next.set("modal", "addresses-create");
-    next.set("subnetId", subnetId);
-    setSearchParams(next, { replace: false });
-  }, [searchParams, setSearchParams, subnetId]);
+  // KAC-102: create-child перенесён с модалки на отдельную страницу
+  // `/folders/X/vpc/subnets/<sid>/create-<slug>`. URL остаётся под /subnets/<sid>/
+  // (nested под /networks/<nid>/ при необходимости) → layout SubnetDetailPage,
+  // блок «Общее» подменяется на форму через `overviewReplace`.
+  const parentDetailPath = useMemo(() => {
+    if (!folderId || !subnetId) return "";
+    return networkId
+      ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}`
+      : `/folders/${folderId}/vpc/subnets/${subnetId}`;
+  }, [folderId, networkId, subnetId]);
+  const createChildSpecId = useMemo(
+    () => detectCreateChildSpecId(location.pathname),
+    [location.pathname],
+  );
+
+  const openCreateChild = useCallback(
+    (specId: string) => {
+      if (!parentDetailPath) return;
+      const url = buildCreateChildUrl(parentDetailPath, specId);
+      if (url) navigate(url);
+    },
+    [parentDetailPath, navigate],
+  );
+
+  // Back-compat: ?modal=addresses-create&subnetId=X → /create-address.
+  useEffect(() => {
+    if (!subnetId || !parentDetailPath) return;
+    const modal = searchParams.get("modal");
+    const modalMatch = modal?.match(/^([a-z-]+)-create$/);
+    const qSubnet = searchParams.get("subnetId") ?? searchParams.get("subnet_id");
+    if (!modalMatch || qSubnet !== subnetId) return;
+    const candidate = modalMatch[1];
+    if (candidate !== "addresses" && candidate !== "network-interfaces") return;
+    const url = buildCreateChildUrl(parentDetailPath, candidate);
+    if (!url) return;
+    const params = new URLSearchParams(searchParams);
+    params.delete("modal");
+    params.delete("subnetId");
+    params.delete("subnet_id");
+    const qs = params.toString();
+    navigate(qs ? `${url}?${qs}` : url, { replace: true });
+  }, [subnetId, parentDetailPath, searchParams, navigate]);
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
@@ -95,6 +139,11 @@ export function SubnetDetailPage() {
     return cols;
   }, [addrSpec, addressesBasePath, folderId]);
 
+  const reserveAddress = useCallback(
+    () => openCreateChild("addresses"),
+    [openCreateChild],
+  );
+
   const extraTabs = useMemo(
     () =>
       (): DetailTab[] => [
@@ -106,7 +155,7 @@ export function SubnetDetailPage() {
             <AddressesSection
               rows={subnetAddresses}
               columns={addrColumns}
-              onReserve={subnetId ? openReserveModal : null}
+              onReserve={subnetId ? reserveAddress : null}
               onClick={(id) =>
                 addressesBasePath && navigate(`${addressesBasePath}/${id}`)
               }
@@ -122,7 +171,7 @@ export function SubnetDetailPage() {
       addressesBasePath,
       navigate,
       subnetId,
-      openReserveModal,
+      reserveAddress,
     ],
   );
 
@@ -134,7 +183,7 @@ export function SubnetDetailPage() {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={openReserveModal}
+            onClick={reserveAddress}
           >
             Зарезервировать IP-адрес
           </AntButton>
@@ -142,7 +191,7 @@ export function SubnetDetailPage() {
       }
       return null;
     },
-    [subnetId, openReserveModal],
+    [subnetId, reserveAddress],
   );
 
   const renderInlineEdit = useCallback(
@@ -157,6 +206,52 @@ export function SubnetDetailPage() {
     [folderId, subnetId],
   );
 
+  const goBackToParent = useCallback(
+    (tab?: string) => {
+      if (!parentDetailPath) return;
+      navigate(tab ? `${parentDetailPath}?tab=${tab}` : parentDetailPath);
+    },
+    [parentDetailPath, navigate],
+  );
+
+  // KAC-102: render create-child form (Address / NIC) в правой колонке.
+  const overviewReplace = useMemo(() => {
+    if (!createChildSpecId || !folderId || !subnetId) return undefined;
+    const childSpec = REGISTRY[createChildSpecId];
+    if (!childSpec) return undefined;
+    return () => {
+      if (createChildSpecId === "addresses") {
+        return (
+          <InlineResourceCreateForm
+            spec={childSpec}
+            ctx={{ folderId }}
+            presetFields={{
+              "internal_ipv4_address_spec.subnet_id": subnetId,
+              "internal_ipv6_address_spec.subnet_id": subnetId,
+            }}
+            editablePresetFields={{ _address_kind: "internal" }}
+            fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
+            folderUid={folderId}
+            title="Резервирование IP-адреса"
+            onCancel={() => goBackToParent("addresses")}
+            onSuccess={() => goBackToParent("addresses")}
+          />
+        );
+      }
+      if (createChildSpecId === "network-interfaces") {
+        return (
+          <InlineNetworkInterfaceCreateForm
+            folderId={folderId}
+            subnetId={subnetId}
+            onCancel={() => goBackToParent()}
+            onSuccess={() => goBackToParent()}
+          />
+        );
+      }
+      return null;
+    };
+  }, [createChildSpecId, folderId, subnetId, goBackToParent]);
+
   return (
     <>
       <ResourceDetailPage
@@ -166,6 +261,8 @@ export function SubnetDetailPage() {
         backHrefOverride={backHrefOverride}
         breadcrumbSegments={breadcrumbSegments}
         renderInlineEdit={renderInlineEdit}
+        overviewReplace={overviewReplace}
+        hideOverviewCreate={!!createChildSpecId}
       />
       {folderId && <ResourceFormModal folderId={folderId} />}
     </>

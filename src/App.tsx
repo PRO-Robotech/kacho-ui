@@ -386,6 +386,39 @@ export default function App() {
               }
             />
 
+            {/* === KAC-102: create-child URLs (заменили модалки) === */}
+            {/* Layout: parent detail page, блок «Общее» подменён на форму
+                create-<child>. Детект URL — в самой detail-странице через
+                detectCreateChildSpecId (см. src/lib/create-child-url.ts). */}
+            <Route
+              path="/folders/:folderId/vpc/networks/:uid/create-subnet"
+              element={<NetworkDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:uid/create-route-table"
+              element={<NetworkDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:uid/create-security-group"
+              element={<NetworkDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/subnets/:uid/create-address"
+              element={<SubnetDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/subnets/:uid/create-network-interface"
+              element={<SubnetDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid/create-address"
+              element={<SubnetDetailPage />}
+            />
+            <Route
+              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid/create-network-interface"
+              element={<SubnetDetailPage />}
+            />
+
             {/* === Global VPC Operations (folder-scoped) === */}
             <Route
               path="/folders/:folderId/vpc/operations"

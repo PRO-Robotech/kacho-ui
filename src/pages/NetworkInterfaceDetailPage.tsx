@@ -11,12 +11,13 @@
 // Сравнить с SubnetDetailPage (там адреса — отдельный tab, потому что
 // их много; у NIC ≤2 адреса и обычно ≤несколько SG — компактнее в "Общее").
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, Tag, Typography } from "antd";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceFormModal } from "@/components/ResourceFormModal";
+import { InlineNetworkInterfaceEditForm } from "@/components/InlineNetworkInterfaceEditForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
@@ -188,6 +189,20 @@ export function NetworkInterfaceDetailPage() {
     [addrList, sgList, folderId, navigate],
   );
 
+  // KAC-102: inline edit на /edit — custom-форма NIC.
+  const renderInlineEdit = useCallback(
+    (_data: Record<string, unknown>, exitEdit: () => void) =>
+      folderId && nicId ? (
+        <InlineNetworkInterfaceEditForm
+          folderId={folderId}
+          nicId={nicId}
+          onCancel={exitEdit}
+          onSuccess={exitEdit}
+        />
+      ) : null,
+    [folderId, nicId],
+  );
+
   // Без uid/folderId — generic detail (он сам обработает loading/empty).
   if (!nicId || !folderId) {
     return <ResourceDetailPage spec={spec} />;
@@ -195,7 +210,11 @@ export function NetworkInterfaceDetailPage() {
 
   return (
     <>
-      <ResourceDetailPage spec={spec} overviewExtras={overviewExtras} />
+      <ResourceDetailPage
+        spec={spec}
+        overviewExtras={overviewExtras}
+        renderInlineEdit={renderInlineEdit}
+      />
       <ResourceFormModal folderId={folderId} />
     </>
   );

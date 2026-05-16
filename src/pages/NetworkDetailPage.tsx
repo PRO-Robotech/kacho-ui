@@ -6,7 +6,12 @@
 // Каждый child-tab имеет Title + filter (имя или id substring) над таблицей.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Input, Space, Typography } from "antd";
 import { ErrorResult } from "@/components/ErrorResult";
@@ -15,9 +20,15 @@ import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { ResourceFormModal } from "@/components/ResourceFormModal";
+import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
+import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
+import {
+  buildCreateChildUrl,
+  detectCreateChildSpecId,
+} from "@/lib/create-child-url";
 import type { DetailTab } from "@/components/DetailShell";
 
 export function NetworkDetailPage() {
@@ -29,45 +40,62 @@ export function NetworkDetailPage() {
 
   const subnetSpec = REGISTRY["subnets"];
 
-  // Create flow для всех child-ресурсов (Subnet/RT/SG) — через модалку
-  // ResourceFormModal, открываемую по query `?modal=<spec.id>-create&networkId=<n>`.
-  // URL остаётся на parent-странице → при close модалки user остаётся на
-  // Network detail. presetFields подхватываются ResourceFormModal автоматически
-  // (см. ResourceFormModal.tsx — networkId → network_id snake_case преобр.).
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const openCreateModal = useCallback(
-    (specId: string) => {
-      if (!networkId) return;
-      const params = new URLSearchParams(searchParams);
-      params.set("modal", `${specId}-create`);
-      params.set("networkId", networkId);
-      // Старый ?action=…-* флаг убираем — модалка теперь единый entry-point.
-      params.delete("action");
-      params.delete("createSubnet");
-      setSearchParams(params, { replace: false });
-    },
-    [networkId, searchParams, setSearchParams],
+  // KAC-102: create-child перенесён с модалки на отдельную страницу
+  // `/folders/X/vpc/networks/<nid>/create-<child-slug>`. URL остаётся под
+  // /networks/<nid>/ → layout NetworkDetailPage, блок «Общее» подменяется
+  // на форму create-child через `overviewReplace`.
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const parentDetailPath =
+    folderId && networkId ? `/folders/${folderId}/vpc/networks/${networkId}` : "";
+  const createChildSpecId = useMemo(
+    () => detectCreateChildSpecId(location.pathname),
+    [location.pathname],
   );
 
-  // Back-compat для старых ссылок (KAC-67 v2..v5 — `?action=create-…` / `?createSubnet=1`):
-  // конвертируем в `?modal=…-create`, чтобы старые закладки/линки работали.
+  const openCreateChild = useCallback(
+    (specId: string) => {
+      if (!parentDetailPath) return;
+      const url = buildCreateChildUrl(parentDetailPath, specId);
+      if (url) navigate(url);
+    },
+    [parentDetailPath, navigate],
+  );
+
+  // Back-compat для старых ссылок (KAC-67 v2..v5 / KAC-69) —
+  // `?action=create-*` / `?createSubnet=1` / `?modal=<spec>-create&networkId=X`
+  // → redirect на `/networks/<nid>/create-<slug>`.
   useEffect(() => {
+    if (!networkId || !parentDetailPath) return;
     const action = searchParams.get("action");
     const createSubnetLegacy = searchParams.get("createSubnet") === "1";
-    if (!networkId) return;
+    const modal = searchParams.get("modal");
+    const modalMatch = modal?.match(/^([a-z-]+)-create$/);
     let target: string | null = null;
     if (createSubnetLegacy || action === "create-subnet") target = "subnets";
     else if (action === "create-route-table") target = "route-tables";
     else if (action === "create-security-group") target = "security-groups";
+    else if (modalMatch && searchParams.get("networkId") === networkId) {
+      const candidate = modalMatch[1];
+      if (
+        candidate === "subnets" ||
+        candidate === "route-tables" ||
+        candidate === "security-groups"
+      ) {
+        target = candidate;
+      }
+    }
     if (!target) return;
+    const url = buildCreateChildUrl(parentDetailPath, target);
+    if (!url) return;
     const params = new URLSearchParams(searchParams);
     params.delete("action");
     params.delete("createSubnet");
-    params.set("modal", `${target}-create`);
-    params.set("networkId", networkId);
-    setSearchParams(params, { replace: true });
-  }, [networkId, searchParams, setSearchParams]);
+    params.delete("modal");
+    params.delete("networkId");
+    const qs = params.toString();
+    navigate(qs ? `${url}?${qs}` : url, { replace: true });
+  }, [networkId, parentDetailPath, searchParams, navigate]);
 
   const { data: subnetData } = useQuery({
     queryKey: ["subnets", "list", folderId],
@@ -216,7 +244,7 @@ export function NetworkDetailPage() {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => openCreateModal("route-tables")}
+            onClick={() => openCreateChild("route-tables")}
           >
             Создать таблицу маршрутизации
           </Button>
@@ -228,7 +256,7 @@ export function NetworkDetailPage() {
             type="primary"
             size="small"
             icon={<PlusOutlined />}
-            onClick={() => openCreateModal("security-groups")}
+            onClick={() => openCreateChild("security-groups")}
           >
             Создать группу безопасности
           </Button>
@@ -236,20 +264,59 @@ export function NetworkDetailPage() {
       }
       return null;
     },
-    [folderId, networkId, openCreateModal],
+    [folderId, networkId, openCreateChild],
   );
 
-  // "Создать подсеть" — открывает ту же модалку с specId=subnets.
+  // "Создать подсеть" — навигирует на /networks/<n>/create-subnet.
   const overviewCreateOverride = useMemo(
     () =>
       folderId && networkId
         ? {
             label: "Создать подсеть",
-            onClick: () => openCreateModal("subnets"),
+            onClick: () => openCreateChild("subnets"),
           }
         : undefined,
-    [folderId, networkId, openCreateModal],
+    [folderId, networkId, openCreateChild],
   );
+
+  // KAC-102: render create-child form в правой колонке (вместо «Общее»).
+  const goBackToParent = useCallback(
+    (tab?: string) => {
+      if (!parentDetailPath) return;
+      navigate(tab ? `${parentDetailPath}?tab=${tab}` : parentDetailPath);
+    },
+    [parentDetailPath, navigate],
+  );
+
+  const overviewReplace = useMemo(() => {
+    if (!createChildSpecId || !folderId || !networkId) return undefined;
+    const childSpec = REGISTRY[createChildSpecId];
+    if (!childSpec) return undefined;
+    return () => {
+      if (createChildSpecId === "subnets") {
+        return (
+          <InlineSubnetCreateForm
+            folderId={folderId}
+            networkId={networkId}
+            onCancel={() => goBackToParent()}
+            onSuccess={() => goBackToParent()}
+          />
+        );
+      }
+      // route-tables / security-groups — generic форма с preset network_id.
+      return (
+        <InlineResourceCreateForm
+          spec={childSpec}
+          ctx={{ folderId }}
+          presetFields={{ network_id: networkId }}
+          folderUid={folderId}
+          title={`Создание: ${childSpec.singular}`}
+          onCancel={() => goBackToParent(createChildSpecId)}
+          onSuccess={() => goBackToParent(createChildSpecId)}
+        />
+      );
+    };
+  }, [createChildSpecId, folderId, networkId, goBackToParent]);
 
   return (
     <>
@@ -259,6 +326,8 @@ export function NetworkDetailPage() {
         headerActionsByTab={headerActionsByTab}
         overviewCreateOverride={overviewCreateOverride}
         overviewExtras={overviewExtras}
+        overviewReplace={overviewReplace}
+        hideOverviewCreate={!!createChildSpecId}
       />
       {folderId && <ResourceFormModal folderId={folderId} />}
     </>

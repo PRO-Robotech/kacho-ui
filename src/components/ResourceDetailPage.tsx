@@ -2,7 +2,7 @@
 // Поллит GET <spec.apiPath>/{id} каждые 3 сек.
 // Restart/Start/Stop → POST <spec.apiPath>/{id}:verb → Operation.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams, Link, useSearchParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Dropdown, Space, Spin, Typography } from "antd";
@@ -118,41 +118,33 @@ export function ResourceDetailPage({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
 
-  // KAC-70: edit-flow перенесён в модалку (ResourceFormModal). Старый /edit
-  // URL — back-compat: редиректим на detail + ?modal=<spec>-edit&id=<uid>.
-  // editing-state больше не используется здесь — модалка сама управляет.
-  const isEditUrl = location.pathname.endsWith("/edit");
+  // KAC-102: edit-flow вернулся на отдельный URL `/edit` (была модалка).
+  // Layout: та же детальная страница, но блок «Общее» заменён на форму
+  // inline-edit'а (через renderInlineEdit prop у resource-specific страниц
+  // или default `InlineResourceEditForm`). Аналогично — `/create-<child>`
+  // suffix (детектится родительскими страницами через `overviewReplace`).
+  const editSuffix = "/edit";
+  const isEditUrl = location.pathname.endsWith(editSuffix);
+  // create-child suffix: /networks/<id>/create-subnet, /subnets/<id>/create-address и т.п.
+  const createChildMatch = location.pathname.match(/\/create-[a-z][a-z0-9-]*$/);
   const detailPath = isEditUrl
-    ? location.pathname.slice(0, -"/edit".length)
-    : location.pathname;
-  useEffect(() => {
-    if (isEditUrl && uid) {
-      const params = new URLSearchParams(searchParams);
-      params.set("modal", `${spec.id}-edit`);
-      params.set("id", uid);
-      navigate(`${detailPath}?${params.toString()}`, { replace: true });
-    }
-  }, [isEditUrl, uid, detailPath, navigate, searchParams, spec.id]);
+    ? location.pathname.slice(0, -editSuffix.length)
+    : createChildMatch
+      ? location.pathname.slice(0, createChildMatch.index)
+      : location.pathname;
 
   const enterEdit = useCallback(() => {
     if (!uid) return;
-    const params = new URLSearchParams(searchParams);
-    params.set("modal", `${spec.id}-edit`);
-    params.set("id", uid);
-    navigate(`${detailPath}?${params.toString()}`, { replace: false });
-  }, [detailPath, navigate, searchParams, spec.id, uid]);
+    const qs = searchParams.toString();
+    navigate(qs ? `${detailPath}/edit?${qs}` : `${detailPath}/edit`, { replace: false });
+  }, [detailPath, navigate, searchParams, uid]);
 
   const exitEdit = useCallback(() => {
-    const params = new URLSearchParams(searchParams);
-    params.delete("modal");
-    params.delete("id");
-    const qs = params.toString();
-    navigate(qs ? `${detailPath}?${qs}` : detailPath, { replace: true });
+    const qs = searchParams.toString();
+    navigate(qs ? `${detailPath}?${qs}` : detailPath, { replace: false });
   }, [detailPath, navigate, searchParams]);
 
-  // editing — legacy для renderInlineEdit. С KAC-70 edit-flow в модалке,
-  // inline-edit не используется → всегда false.
-  const editing = false;
+  const editing = isEditUrl && !!spec.ops.update;
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: [spec.id, "detail", uid],

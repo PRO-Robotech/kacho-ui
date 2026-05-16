@@ -4,9 +4,10 @@
 // addresses показываются клиентские folder/cloud/org (reverse-lookup).
 
 import { Link, useParams } from "react-router-dom";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
+import { InlineAddressPoolEditForm } from "@/components/InlineAddressPoolEditForm";
 import { IpamUtilizationBar, CIDRBreakdown } from "@/components/IpamUtilizationBar";
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
@@ -180,5 +181,24 @@ export function AddressPoolDetailPage() {
     [util, addresses, folderMap, cloudMap, orgMap, reverseLookup],
   );
 
-  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} />;
+  // KAC-102: inline edit на /edit — custom AddressPool form.
+  const renderInlineEdit = useCallback(
+    (_data: Record<string, unknown>, exitEdit: () => void) =>
+      poolId ? (
+        <InlineAddressPoolEditForm
+          poolId={poolId}
+          onCancel={exitEdit}
+          onSuccess={exitEdit}
+        />
+      ) : null,
+    [poolId],
+  );
+
+  return (
+    <ResourceDetailPage
+      spec={spec}
+      extraTabs={extraTabs}
+      renderInlineEdit={renderInlineEdit}
+    />
+  );
 }
