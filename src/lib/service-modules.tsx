@@ -27,6 +27,7 @@ import {
   SettingOutlined,
   UserOutlined,
   CloudServerOutlined,
+  LockOutlined,
 } from "@ant-design/icons";
 
 export interface NavLeaf {
@@ -144,6 +145,13 @@ export const COMMON_TOP: NavLeaf[] = [
 
 /** Нижний общий блок сайдбара (всегда виден). */
 export const COMMON_BOTTOM: NavLeaf[] = [
+  {
+    key: "iam",
+    icon: <LockOutlined />,
+    label: "Identity and Access Management",
+    to: () => "/iam/accounts",
+    matches: (p) => p.startsWith("/iam/"),
+  },
   {
     key: "system",
     icon: <SettingOutlined />,

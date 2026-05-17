@@ -24,6 +24,14 @@ import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
 import { OperationsPage } from "@/pages/OperationsPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { IamLayout } from "@/components/iam/IamLayout";
+import { AccountsPage } from "@/pages/iam/AccountsPage";
+import { ProjectsPage } from "@/pages/iam/ProjectsPage";
+import { UsersPage } from "@/pages/iam/UsersPage";
+import { ServiceAccountsPage } from "@/pages/iam/ServiceAccountsPage";
+import { GroupsPage } from "@/pages/iam/GroupsPage";
+import { RolesPage } from "@/pages/iam/RolesPage";
+import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -489,6 +497,19 @@ export default function App() {
             <Route path="/system/address-pools/:uid" element={<AddressPoolDetailPage />} />
             <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
+
+            {/* === IAM section (KAC-109, E0 UI block) ===
+                Все 7 IAM-страниц + auth-info banner в shared IamLayout. */}
+            <Route element={<IamLayout />}>
+              <Route path="/iam" element={<Navigate to="/iam/accounts" replace />} />
+              <Route path="/iam/accounts" element={<AccountsPage />} />
+              <Route path="/iam/projects" element={<ProjectsPage />} />
+              <Route path="/iam/users" element={<UsersPage />} />
+              <Route path="/iam/service-accounts" element={<ServiceAccountsPage />} />
+              <Route path="/iam/groups" element={<GroupsPage />} />
+              <Route path="/iam/roles" element={<RolesPage />} />
+              <Route path="/iam/access-bindings" element={<AccessBindingsPage />} />
+            </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
