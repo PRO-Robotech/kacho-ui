@@ -16,6 +16,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, theme } from "antd";
 import { useFolderStore } from "@/lib/folder-store";
 import { useContext } from "@/lib/context-store";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   COMMON_BOTTOM,
   COMMON_TOP,
@@ -29,7 +30,26 @@ export function ServiceSidebar() {
   const location = useLocation();
   const folderId = useFolderStore((s) => s.folder)?.id ?? null;
   const cloudId = useContext((s) => s.cloud)?.id ?? null;
+  const { user, loading: authLoading, hasPermission } = useAuth();
   const { token } = theme.useToken();
+
+  // IAM-entry: показывать только если у user'а есть `iam.read` permission
+  // (E3 OpenFGA). До auth-резолва (loading) показываем — чтобы layout не
+  // прыгал; в анонимном E0-режиме (user=null, !loading) и без `iam.read` —
+  // прячем IAM-кнопку. Profile-кнопка показывается только когда залогинены.
+  const bottomItems = useMemo<NavLeaf[]>(() => {
+    return COMMON_BOTTOM.filter((leaf) => {
+      if (leaf.key === "iam") {
+        if (authLoading) return true;
+        if (!user) return false;
+        return hasPermission("iam.read");
+      }
+      if (leaf.key === "profile") {
+        return !!user;
+      }
+      return true;
+    });
+  }, [authLoading, user, hasPermission]);
 
   const activeModule = useMemo(() => moduleFromPathname(location.pathname), [location.pathname]);
 
@@ -48,9 +68,9 @@ export function ServiceSidebar() {
 
   const middle: NavLeaf[] = activeModule ? activeModule.items : moduleLaunchers;
   const activeLeafKey = useMemo(() => {
-    const all = [...COMMON_TOP, ...middle, ...COMMON_BOTTOM];
+    const all = [...COMMON_TOP, ...middle, ...bottomItems];
     return all.find((it) => it.matches(location.pathname))?.key ?? null;
-  }, [location.pathname, middle]);
+  }, [location.pathname, middle, bottomItems]);
 
   const renderLeaf = (leaf: NavLeaf) => {
     const disabled = !!leaf.requiresFolder && !folderId;
@@ -86,7 +106,7 @@ export function ServiceSidebar() {
       {middle.map(renderLeaf)}
       <div style={{ flex: 1 }} />
       <SidebarDivider token={token} />
-      {COMMON_BOTTOM.map(renderLeaf)}
+      {bottomItems.map(renderLeaf)}
     </nav>
   );
 }
