@@ -29,10 +29,10 @@ import { REGISTRY } from "@/lib/resource-registry";
 import { api } from "@/api/client";
 
 interface Props {
-  folderId: string;
+  projectId: string;
 }
 
-export function ResourceFormModal({ folderId }: Props) {
+export function ResourceFormModal({ projectId }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const modal = searchParams.get("modal") ?? "";
 
@@ -91,7 +91,7 @@ export function ResourceFormModal({ folderId }: Props) {
     if (specId === "subnets" && action === "create") {
       return (
         <InlineSubnetCreateForm
-          folderId={folderId}
+          projectId={projectId}
           networkId={searchParams.get("networkId") ?? undefined}
           onCancel={close}
           onSuccess={close}
@@ -101,7 +101,7 @@ export function ResourceFormModal({ folderId }: Props) {
     if (specId === "subnets" && action === "edit" && id) {
       return (
         <InlineSubnetEditForm
-          folderId={folderId}
+          projectId={projectId}
           subnetId={id}
           onCancel={close}
         />
@@ -110,7 +110,7 @@ export function ResourceFormModal({ folderId }: Props) {
     if (specId === "security-groups" && action === "edit" && id) {
       return (
         <InlineSecurityGroupEditForm
-          folderId={folderId}
+          projectId={projectId}
           sgId={id}
           onCancel={close}
         />
@@ -138,7 +138,7 @@ export function ResourceFormModal({ folderId }: Props) {
     if (specId === "network-interfaces" && action === "edit" && id) {
       return (
         <InlineNetworkInterfaceEditForm
-          folderId={folderId}
+          projectId={projectId}
           nicId={id}
           onCancel={close}
           onSuccess={close}
@@ -148,7 +148,7 @@ export function ResourceFormModal({ folderId }: Props) {
     if (specId === "network-interfaces" && action === "create") {
       return (
         <InlineNetworkInterfaceCreateForm
-          folderId={folderId}
+          projectId={projectId}
           subnetId={searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined}
           onCancel={close}
           onSuccess={close}
@@ -165,14 +165,14 @@ export function ResourceFormModal({ folderId }: Props) {
         return (
           <InlineResourceCreateForm
             spec={spec}
-            ctx={{ folderId }}
+            ctx={{ projectId }}
             presetFields={{
               "internal_ipv4_address_spec.subnet_id": subnetId,
               "internal_ipv6_address_spec.subnet_id": subnetId,
             }}
             editablePresetFields={{ _address_kind: "internal" }}
             fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
-            folderUid={folderId}
+            folderUid={projectId}
             title="Резервирование IP-адреса"
             onCancel={close}
             onSuccess={close}
@@ -184,9 +184,9 @@ export function ResourceFormModal({ folderId }: Props) {
       return (
         <InlineResourceCreateForm
           spec={spec}
-          ctx={{ folderId }}
+          ctx={{ projectId }}
           presetFields={presetFields}
-          folderUid={folderId}
+          folderUid={projectId}
           title={title}
           onCancel={close}
           onSuccess={close}
@@ -198,7 +198,7 @@ export function ResourceFormModal({ folderId }: Props) {
         <InlineResourceEditForm
           spec={spec}
           data={editData}
-          folderUid={folderId}
+          folderUid={projectId}
           onCancel={close}
           onSuccess={close}
         />

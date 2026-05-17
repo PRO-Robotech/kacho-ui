@@ -28,7 +28,7 @@ import {
 export function ServiceSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const folderId = useFolderStore((s) => s.folder)?.id ?? null;
+  const projectId = useFolderStore((s) => s.folder)?.id ?? null;
   const cloudId = useContext((s) => s.cloud)?.id ?? null;
   const { user, loading: authLoading, hasPermission } = useAuth();
   const { token } = theme.useToken();
@@ -60,10 +60,10 @@ export function ServiceSidebar() {
         key: `mod-${m.key}`,
         icon: m.icon,
         label: m.label,
-        to: () => m.landing(folderId, cloudId),
+        to: () => m.landing(projectId, cloudId),
         matches: () => false,
       })),
-    [folderId, cloudId],
+    [projectId, cloudId],
   );
 
   const middle: NavLeaf[] = activeModule ? activeModule.items : moduleLaunchers;
@@ -73,7 +73,7 @@ export function ServiceSidebar() {
   }, [location.pathname, middle, bottomItems]);
 
   const renderLeaf = (leaf: NavLeaf) => {
-    const disabled = !!leaf.requiresFolder && !folderId;
+    const disabled = !!leaf.requiresFolder && !projectId;
     const active = activeLeafKey === leaf.key;
     return (
       <SidebarButton
@@ -82,7 +82,7 @@ export function ServiceSidebar() {
         label={disabled ? "Выберите каталог" : leaf.label}
         active={active}
         disabled={disabled}
-        onClick={() => !disabled && navigate(leaf.to(folderId))}
+        onClick={() => !disabled && navigate(leaf.to(projectId))}
         token={token}
       />
     );

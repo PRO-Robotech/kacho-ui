@@ -15,7 +15,7 @@ export function GlobalResourceFormModal() {
   const location = useLocation();
 
   // Парсим из pathname id активного контейнера.
-  // /folders/<id>/...        → folderId
+  // /folders/<id>/...        → projectId
   // /clouds/<id>/...         → cloudId  (Cloud-scoped resources)
   // /organizations/<id>/...  → orgId    (Org-scoped resources)
   // /system/...              → "system" (admin cluster-scoped ресурсы,
@@ -32,5 +32,5 @@ export function GlobalResourceFormModal() {
   })();
 
   if (!containerId) return null;
-  return <ResourceFormModal folderId={containerId} />;
+  return <ResourceFormModal projectId={containerId} />;
 }

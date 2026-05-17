@@ -17,7 +17,7 @@ export interface BreadcrumbSegment {
 }
 
 interface Args {
-  folderId: string | undefined;
+  projectId: string | undefined;
   /** Когда текущий ресурс лежит под Network. */
   networkId?: string | undefined;
   /** Когда текущий ресурс лежит под Subnet (внутри Network). */
@@ -40,7 +40,7 @@ interface Result {
 }
 
 export function useNestedBreadcrumb({
-  folderId,
+  projectId,
   networkId,
   subnetId,
   currentResourcePlural,
@@ -63,7 +63,7 @@ export function useNestedBreadcrumb({
   });
 
   return useMemo(() => {
-    if (!folderId || (!networkId && !subnetId)) {
+    if (!projectId || (!networkId && !subnetId)) {
       return { segments: undefined, backHref: undefined };
     }
 
@@ -73,23 +73,23 @@ export function useNestedBreadcrumb({
       const networkName = (networkData?.name as string | undefined) || networkId;
       segs.push({
         label: "Облачные сети",
-        href: `/folders/${folderId}/vpc/networks`,
+        href: `/projects/${projectId}/vpc/networks`,
       });
       segs.push({
         label: networkName,
-        href: `/folders/${folderId}/vpc/networks/${networkId}`,
+        href: `/projects/${projectId}/vpc/networks/${networkId}`,
       });
     }
 
     if (subnetId) {
       const subnetName = (subnetData?.name as string | undefined) || subnetId;
       const subnetHref = networkId
-        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}`
-        : `/folders/${folderId}/vpc/subnets/${subnetId}`;
+        ? `/projects/${projectId}/vpc/networks/${networkId}/subnets/${subnetId}`
+        : `/projects/${projectId}/vpc/subnets/${subnetId}`;
       // "Подсети" — группа-родитель; кликабельна только при flat-контексте (нет networkId).
       segs.push({
         label: "Подсети",
-        href: networkId ? undefined : `/folders/${folderId}/vpc/subnets`,
+        href: networkId ? undefined : `/projects/${projectId}/vpc/subnets`,
       });
       segs.push({ label: subnetName, href: subnetHref });
     }
@@ -105,7 +105,7 @@ export function useNestedBreadcrumb({
     }
     return { segments: segs, backHref };
   }, [
-    folderId,
+    projectId,
     networkId,
     subnetId,
     networkData,

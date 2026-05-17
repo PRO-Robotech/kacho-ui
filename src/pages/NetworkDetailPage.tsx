@@ -21,7 +21,7 @@ import { buildSpecColumns } from "@/lib/spec-columns";
 import type { DetailTab } from "@/components/DetailShell";
 
 export function NetworkDetailPage() {
-  const { uid: networkId, folderId } = useParams();
+  const { uid: networkId, projectId } = useParams();
   const navigate = useNavigate();
   const networkSpec = REGISTRY["networks"];
   const rtSpec = REGISTRY["route-tables"];
@@ -70,36 +70,36 @@ export function NetworkDetailPage() {
   }, [networkId, searchParams, setSearchParams]);
 
   const { data: subnetData } = useQuery({
-    queryKey: ["subnets", "list", folderId],
+    queryKey: ["subnets", "list", projectId],
     queryFn: () =>
       api.list<{ subnets: Array<Record<string, unknown>> }>(subnetSpec.apiPath, {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   const { data: rtData } = useQuery({
-    queryKey: ["route-tables", "list", folderId],
+    queryKey: ["route-tables", "list", projectId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   const { data: sgData } = useQuery({
-    queryKey: ["security-groups", "list", folderId],
+    queryKey: ["security-groups", "list", projectId],
     queryFn: () =>
       api.list<{ security_groups: Array<Record<string, unknown>> }>(sgSpec.apiPath, {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   const networkSubnets = useMemo(
@@ -118,10 +118,10 @@ export function NetworkDetailPage() {
   // RowActionsMenu Edit-кнопка ведёт на `${basePath}/${id}/edit` — для child-resources
   // на network-detail передаём nested basePath, чтобы edit URL остался под networks/.
   const nestedBase = (route: string) =>
-    folderId && networkId ? `/folders/${folderId}/vpc/networks/${networkId}/${route}` : null;
-  const subnetColumns = useChildColumns(subnetSpec, folderId, nestedBase("subnets"));
-  const rtColumns = useChildColumns(rtSpec, folderId, nestedBase("route-tables"));
-  const sgColumns = useChildColumns(sgSpec, folderId, nestedBase("security-groups"));
+    projectId && networkId ? `/projects/${projectId}/vpc/networks/${networkId}/${route}` : null;
+  const subnetColumns = useChildColumns(subnetSpec, projectId, nestedBase("subnets"));
+  const rtColumns = useChildColumns(rtSpec, projectId, nestedBase("route-tables"));
+  const sgColumns = useChildColumns(sgSpec, projectId, nestedBase("security-groups"));
 
   const overviewExtras = useCallback(
     () => (
@@ -131,13 +131,13 @@ export function NetworkDetailPage() {
         columns={subnetColumns}
         emptyText="В сети нет подсетей."
         onClick={(id) =>
-          folderId &&
+          projectId &&
           networkId &&
-          navigate(`/folders/${folderId}/vpc/networks/${networkId}/subnets/${id}`)
+          navigate(`/projects/${projectId}/vpc/networks/${networkId}/subnets/${id}`)
         }
       />
     ),
-    [networkSubnets, subnetColumns, folderId, networkId, navigate],
+    [networkSubnets, subnetColumns, projectId, networkId, navigate],
   );
 
   const extraTabs = useMemo(
@@ -154,10 +154,10 @@ export function NetworkDetailPage() {
               columns={rtColumns}
               emptyText="К сети не привязано ни одной таблицы маршрутизации."
               onClick={(id) =>
-                folderId &&
+                projectId &&
                 networkId &&
                 navigate(
-                  `/folders/${folderId}/vpc/networks/${networkId}/route-tables/${id}`,
+                  `/projects/${projectId}/vpc/networks/${networkId}/route-tables/${id}`,
                 )
               }
             />
@@ -174,10 +174,10 @@ export function NetworkDetailPage() {
               columns={sgColumns}
               emptyText="В сети нет групп безопасности."
               onClick={(id) =>
-                folderId &&
+                projectId &&
                 networkId &&
                 navigate(
-                  `/folders/${folderId}/vpc/networks/${networkId}/security-groups/${id}`,
+                  `/projects/${projectId}/vpc/networks/${networkId}/security-groups/${id}`,
                 )
               }
             />
@@ -201,7 +201,7 @@ export function NetworkDetailPage() {
       networkSGs,
       rtColumns,
       sgColumns,
-      folderId,
+      projectId,
       networkId,
       navigate,
     ],
@@ -209,7 +209,7 @@ export function NetworkDetailPage() {
 
   const headerActionsByTab = useCallback(
     (tabId: string) => {
-      if (!folderId || !networkId) return null;
+      if (!projectId || !networkId) return null;
       if (tabId === "route-tables") {
         return (
           <Button
@@ -236,19 +236,19 @@ export function NetworkDetailPage() {
       }
       return null;
     },
-    [folderId, networkId, openCreateModal],
+    [projectId, networkId, openCreateModal],
   );
 
   // "Создать подсеть" — открывает ту же модалку с specId=subnets.
   const overviewCreateOverride = useMemo(
     () =>
-      folderId && networkId
+      projectId && networkId
         ? {
             label: "Создать подсеть",
             onClick: () => openCreateModal("subnets"),
           }
         : undefined,
-    [folderId, networkId, openCreateModal],
+    [projectId, networkId, openCreateModal],
   );
 
   return (
@@ -260,7 +260,7 @@ export function NetworkDetailPage() {
         overviewCreateOverride={overviewCreateOverride}
         overviewExtras={overviewExtras}
       />
-      {folderId && <ResourceFormModal folderId={folderId} />}
+      {projectId && <ResourceFormModal projectId={projectId} />}
     </>
   );
 }
@@ -271,13 +271,13 @@ export function NetworkDetailPage() {
 // links оставались под parent-путём.
 function useChildColumns(
   spec: ResourceSpec,
-  folderId: string | undefined,
+  projectId: string | undefined,
   basePathOverride?: string | null,
 ): Column<Record<string, unknown>>[] {
   return useMemo(() => {
-    const cols = buildSpecColumns(spec, { folderId });
+    const cols = buildSpecColumns(spec, { projectId });
     const basePath =
-      basePathOverride ?? (folderId ? `/folders/${folderId}/${spec.route}` : null);
+      basePathOverride ?? (projectId ? `/projects/${projectId}/${spec.route}` : null);
     if (basePath) {
       cols.push({
         header: "",
@@ -287,13 +287,13 @@ function useChildColumns(
             spec={spec}
             row={row}
             basePath={basePath}
-            folderUid={folderId ?? null}
+            folderUid={projectId ?? null}
           />
         ),
       });
     }
     return cols;
-  }, [spec, folderId, basePathOverride]);
+  }, [spec, projectId, basePathOverride]);
 }
 
 // ChildSection — Title + filter + table. Используется на каждой

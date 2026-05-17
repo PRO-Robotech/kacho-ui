@@ -11,20 +11,20 @@ import { REGISTRY } from "@/lib/resource-registry";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 
 export function AddressDetailPage() {
-  const { folderId, networkId, subnetId } = useParams();
+  const { projectId, networkId, subnetId } = useParams();
   const spec = REGISTRY["addresses"];
 
   // "IP-адреса" в breadcrumb ведёт на subnet-detail с активным tab=addresses.
   const addressesTabHref =
-    folderId && subnetId
+    projectId && subnetId
       ? networkId
-        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
-        : `/folders/${folderId}/vpc/subnets/${subnetId}?tab=addresses`
+        ? `/projects/${projectId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
+        : `/projects/${projectId}/vpc/subnets/${subnetId}?tab=addresses`
       : undefined;
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
-      folderId,
+      projectId,
       networkId,
       subnetId,
       currentResourcePlural: "IP-адреса",

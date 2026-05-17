@@ -39,7 +39,7 @@ import {
 } from "@/components/LabelsEditor";
 
 interface Props {
-  folderId: string;
+  projectId: string;
   // networkId — preset (locked если задан). Если undefined — форма
   // отображает RefSelect "Сеть" как первое поле, user выбирает в форме
   // (отказались от двухшагового flow).
@@ -53,7 +53,7 @@ function autoName(): string {
 }
 
 export function InlineSubnetCreateForm({
-  folderId,
+  projectId,
   networkId: presetNetworkId,
   onCancel,
   onSuccess,
@@ -71,10 +71,10 @@ export function InlineSubnetCreateForm({
 
   // Список Networks для RefSelect (когда preset не задан).
   const { data: netData } = useQuery({
-    queryKey: ["networks", "list", folderId],
+    queryKey: ["networks", "list", projectId],
     queryFn: () =>
       api.list<{ networks: Array<{ id: string; name?: string }> }>(networkSpec.apiPath, {
-        folder_id: folderId,
+        folder_id: projectId,
         pageSize: "500",
       }),
     enabled: !networkLocked,
@@ -128,10 +128,10 @@ export function InlineSubnetCreateForm({
 
   // RouteTables: folder-scoped, ещё фильтруем по network.
   const { data: rtData } = useQuery({
-    queryKey: ["route-tables", "list", folderId, networkId],
+    queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: folderId,
+        folder_id: projectId,
         pageSize: "500",
       }),
     staleTime: 30_000,
@@ -158,7 +158,7 @@ export function InlineSubnetCreateForm({
       if (id) {
         setPendingOpId(id);
       } else {
-        invalidate(subnetSpec.id, folderId);
+        invalidate(subnetSpec.id, projectId);
         onSuccess?.();
         onCancel();
       }
@@ -180,7 +180,7 @@ export function InlineSubnetCreateForm({
       setPendingOpId(null);
       return;
     }
-    invalidate(subnetSpec.id, folderId);
+    invalidate(subnetSpec.id, projectId);
     toast.success(`Подсеть ${name} создана`);
     setPendingOpId(null);
     onSuccess?.();
@@ -214,7 +214,7 @@ export function InlineSubnetCreateForm({
         : undefined;
 
     const payload: Record<string, unknown> = {
-      folder_id: folderId,
+      folder_id: projectId,
       network_id: networkId,
       zone_id: zoneId,
       name,

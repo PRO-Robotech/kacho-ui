@@ -31,7 +31,7 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { toast } from "@/lib/toast";
 
 interface Props {
-  folderId: string;
+  projectId: string;
   /** subnet_id preset из контекста (например, из subnet detail). Если задан —
    *  Subnet locked; иначе — RefSelect. */
   subnetId?: string;
@@ -53,7 +53,7 @@ function autoName(): string {
 }
 
 export function InlineNetworkInterfaceCreateForm({
-  folderId,
+  projectId,
   subnetId: presetSubnetId,
   onCancel,
   onSuccess,
@@ -74,10 +74,10 @@ export function InlineNetworkInterfaceCreateForm({
 
   // Subnets для RefSelect.
   const { data: subnetList } = useQuery({
-    queryKey: ["subnets", "list", folderId],
+    queryKey: ["subnets", "list", projectId],
     queryFn: () =>
       api.list<{ subnets: Array<{ id: string; name?: string }> }>(subnetSpec.apiPath, {
-        folder_id: folderId,
+        folder_id: projectId,
         pageSize: "500",
       }),
     enabled: !subnetLocked,
@@ -101,7 +101,7 @@ export function InlineNetworkInterfaceCreateForm({
       const opId = extractOperationId(resp);
       if (opId) setPendingOpId(opId);
       else {
-        invalidate(spec.id, folderId);
+        invalidate(spec.id, projectId);
         toast.success(`NIC ${name} создан`);
         onSuccess?.();
         onCancel();
@@ -121,7 +121,7 @@ export function InlineNetworkInterfaceCreateForm({
       setPendingOpId(null);
       return;
     }
-    invalidate(spec.id, folderId);
+    invalidate(spec.id, projectId);
     toast.success(`NIC ${name} создан`);
     setPendingOpId(null);
     onSuccess?.();
@@ -135,7 +135,7 @@ export function InlineNetworkInterfaceCreateForm({
       return;
     }
     mutation.mutate({
-      folder_id: folderId,
+      folder_id: projectId,
       subnet_id: subnetId,
       name,
       description: description || undefined,
@@ -207,7 +207,7 @@ export function InlineNetworkInterfaceCreateForm({
           <ResourceRefChips
             title="IPv4 Address"
             refResource="addresses"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="blue"
             value={v4}
             onChange={setV4}
@@ -220,7 +220,7 @@ export function InlineNetworkInterfaceCreateForm({
           <ResourceRefChips
             title="IPv6 Address"
             refResource="addresses"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="geekblue"
             value={v6}
             onChange={setV6}
@@ -235,7 +235,7 @@ export function InlineNetworkInterfaceCreateForm({
           <ResourceRefChips
             title="Security Group"
             refResource="security-groups"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="purple"
             value={sgs}
             onChange={setSgs}

@@ -324,7 +324,7 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
         <Modal open footer={null} onCancel={() => setCreateInternalSubnet(null)} width={640} destroyOnClose title="Выделить IPv4-адрес из подсети">
           <InlineResourceCreateForm
             spec={addressesSpec}
-            ctx={{ folderId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
+            ctx={{ projectId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
             presetFields={{
               _address_kind: "internal",
               "internal_ipv4_address_spec.subnet_id": createInternalSubnet,
@@ -352,7 +352,7 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
         <Modal open footer={null} onCancel={() => setCreateExternal(false)} width={640} destroyOnClose title="Создать публичный IP-адрес">
           <InlineResourceCreateForm
             spec={addressesSpec}
-            ctx={{ folderId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
+            ctx={{ projectId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
             presetFields={{ _address_kind: "external" }}
             folderUid={folder?.uid ?? null}
             onCancel={() => setCreateExternal(false)}

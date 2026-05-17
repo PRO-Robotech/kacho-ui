@@ -24,33 +24,33 @@ type Address = Record<string, unknown> & { id: string };
 type SG = Record<string, unknown> & { id: string };
 
 export function NetworkInterfaceDetailPage() {
-  const { uid: nicId, folderId } = useParams();
+  const { uid: nicId, projectId } = useParams();
   const navigate = useNavigate();
   const spec = REGISTRY["network-interfaces"];
 
   // Загружаем все Address-ресурсы folder'а — потом client-side filter
   // по v4_address_ids ∪ v6_address_ids текущего NIC.
   const { data: addrList } = useQuery({
-    queryKey: ["addresses", "list-for-nic", folderId],
+    queryKey: ["addresses", "list-for-nic", projectId],
     queryFn: () =>
       api.list<{ addresses: Address[] }>("/vpc/v1/addresses", {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 10000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   // Аналогично — все SG folder'а для resolve security_group_ids.
   const { data: sgList } = useQuery({
-    queryKey: ["security-groups", "list-for-nic", folderId],
+    queryKey: ["security-groups", "list-for-nic", projectId],
     queryFn: () =>
       api.list<{ security_groups: SG[] }>("/vpc/v1/securityGroups", {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 10000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   const overviewExtras = useMemo(
@@ -111,7 +111,7 @@ export function NetworkInterfaceDetailPage() {
                       key={row.id}
                       className="border-t border-border hover:bg-muted/30 cursor-pointer"
                       onClick={() =>
-                        navigate(`/folders/${folderId}/vpc/addresses/${row.id}`)
+                        navigate(`/projects/${projectId}/vpc/addresses/${row.id}`)
                       }
                     >
                       <td className="py-1 pr-3">
@@ -159,7 +159,7 @@ export function NetworkInterfaceDetailPage() {
                         key={id}
                         className="border-t border-border hover:bg-muted/30 cursor-pointer"
                         onClick={() =>
-                          navigate(`/folders/${folderId}/vpc/security-groups/${id}`)
+                          navigate(`/projects/${projectId}/vpc/security-groups/${id}`)
                         }
                       >
                         <td className="py-1 pr-3">
@@ -185,18 +185,18 @@ export function NetworkInterfaceDetailPage() {
         </div>
       );
     },
-    [addrList, sgList, folderId, navigate],
+    [addrList, sgList, projectId, navigate],
   );
 
-  // Без uid/folderId — generic detail (он сам обработает loading/empty).
-  if (!nicId || !folderId) {
+  // Без uid/projectId — generic detail (он сам обработает loading/empty).
+  if (!nicId || !projectId) {
     return <ResourceDetailPage spec={spec} />;
   }
 
   return (
     <>
       <ResourceDetailPage spec={spec} overviewExtras={overviewExtras} />
-      <ResourceFormModal folderId={folderId} />
+      <ResourceFormModal projectId={projectId} />
     </>
   );
 }

@@ -1,23 +1,17 @@
 // ContextUrlSync — синхронизирует context-store с path-based URL.
-// Source of truth: path. URL-формат:
-//   /organizations                                    — корень: only org-list
-//   /organizations/:orgId                              — org selected
-//   /organizations/:orgId/clouds                       — org selected, clouds list
-//   /clouds/:cloudId                                   — cloud selected
-//   /clouds/:cloudId/folders                           — folders list
-//   /folders/:folderId                                 — folder dashboard
-//   /folders/:folderId/networks (subnets, ...)         — folder selected, vpc list
-//   /folders/:folderId/vpc/networks/:uid                   — detail
+// KAC-117: модель Account/Project (раньше Org/Cloud/Folder). URL-формат:
+//   /accounts                                  — список аккаунтов
+//   /accounts/:accountId/projects              — projects текущего account
+//   /projects/:projectId                        — project dashboard
+//   /projects/:projectId/vpc/networks (...)     — project selected, vpc list
+//   /projects/:projectId/vpc/networks/:uid      — detail
 //
 // При смене URL → парсинг → обновление context-store. Имена ресурсов в context
 // заполняются позже когда BreadcrumbSelector загрузит соответствующий list.
 //
-// Hydration: если URL содержит folderId/cloudId/orgId но context из localStorage
-// пустой (например — открыли прямую ссылку в инкогнито), мы догружаем parent'ов
-// через GET /<resource>/{id} цепочкой, чтобы pills заполнились name'ами и парами.
-//
-// При смене context (через крошки) — навигация делается прямо в BreadcrumbSelector
-// через `navigate()`; context-store обновляется сам через path.
+// Hydration: если URL содержит projectId/accountId но context из localStorage
+// пустой (прямая ссылка / инкогнито), мы догружаем родителя через
+// GET /<resource>/{id} цепочкой, чтобы pills заполнились name'ами.
 
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -25,17 +19,12 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { contextApi, useContext } from "@/lib/context-store";
 
-interface FolderApi {
+interface ProjectApi {
   id: string;
   name: string;
-  cloud_id: string;
+  accountId: string;
 }
-interface CloudApi {
-  id: string;
-  name: string;
-  organization_id: string;
-}
-interface OrgApi {
+interface AccountApi {
   id: string;
   name: string;
 }
@@ -44,114 +33,69 @@ export function ContextUrlSync() {
   const { pathname } = useLocation();
   const ctx = useContext((s) => s);
 
-  // Hydration: GET для parent ресурсов когда у нас в context есть id но
-  // нет name/parent. Срабатывает на первой загрузке прямой ссылки.
-  const folderHydrate = useQuery({
-    queryKey: ["hydrate-folder", ctx.folder?.id],
-    queryFn: () =>
-      api.get<FolderApi>(`/resource-manager/v1/folders/${ctx.folder!.id}`),
-    enabled: !!ctx.folder?.id && (!ctx.folder.name || !ctx.folder.cloudId),
+  // Hydration: GET для project/account когда у нас в context есть id но нет name.
+  const projectHydrate = useQuery({
+    queryKey: ["hydrate-project", ctx.project?.id],
+    queryFn: () => api.get<ProjectApi>(`/iam/v1/projects/${ctx.project!.id}`),
+    enabled: !!ctx.project?.id && (!ctx.project.name || !ctx.project.accountId),
     staleTime: 60_000,
   });
-  const cloudHydrate = useQuery({
-    queryKey: ["hydrate-cloud", ctx.cloud?.id],
-    queryFn: () =>
-      api.get<CloudApi>(`/resource-manager/v1/clouds/${ctx.cloud!.id}`),
-    enabled: !!ctx.cloud?.id && (!ctx.cloud.name || !ctx.cloud.organizationId),
-    staleTime: 60_000,
-  });
-  const orgHydrate = useQuery({
-    queryKey: ["hydrate-org", ctx.org?.id],
-    queryFn: () =>
-      api.get<OrgApi>(`/organization-manager/v1/organizations/${ctx.org!.id}`),
-    enabled: !!ctx.org?.id && !ctx.org.name,
+  const accountHydrate = useQuery({
+    queryKey: ["hydrate-account", ctx.account?.id],
+    queryFn: () => api.get<AccountApi>(`/iam/v1/accounts/${ctx.account!.id}`),
+    enabled: !!ctx.account?.id && !ctx.account.name,
     staleTime: 60_000,
   });
 
-  // Применяем результаты hydration в context (через hydrate-patch — НЕ
-  // через setFolder/setCloud, т.к. те сбрасывают потомков).
+  // Применяем результаты hydration в context.
   useEffect(() => {
-    if (folderHydrate.data && ctx.folder?.id === folderHydrate.data.id) {
-      const f = folderHydrate.data;
-      const needName = !ctx.folder.name && !!f.name;
-      const needCloud = !ctx.folder.cloudId && !!f.cloud_id;
-      if (needName || needCloud) {
+    if (projectHydrate.data && ctx.project?.id === projectHydrate.data.id) {
+      const p = projectHydrate.data;
+      const needName = !ctx.project.name && !!p.name;
+      const needAcc = !ctx.project.accountId && !!p.accountId;
+      if (needName || needAcc) {
         contextApi.hydrate({
-          folder: { name: f.name, cloudId: f.cloud_id },
-          // Поднимаем cloud-id в state.cloud чтобы cloudHydrate сработал.
-          cloud: needCloud
-            ? { id: f.cloud_id, name: "", organizationId: "" }
-            : undefined,
+          project: { name: p.name, accountId: p.accountId },
+          account:
+            needAcc && (!ctx.account || ctx.account.id !== p.accountId)
+              ? { id: p.accountId, name: ctx.account?.name ?? "" }
+              : undefined,
         });
       }
     }
-  }, [folderHydrate.data, ctx.folder]);
+  }, [projectHydrate.data, ctx.project, ctx.account]);
 
   useEffect(() => {
-    if (cloudHydrate.data && ctx.cloud?.id === cloudHydrate.data.id) {
-      const c = cloudHydrate.data;
-      const needName = !ctx.cloud.name && !!c.name;
-      const needOrg = !ctx.cloud.organizationId && !!c.organization_id;
-      if (needName || needOrg) {
-        contextApi.hydrate({
-          cloud: { name: c.name, organizationId: c.organization_id },
-          // hydrate умеет создавать org если он null. Не сбрасывает cloud/folder.
-          org: needOrg && (!ctx.org || ctx.org.id !== c.organization_id)
-            ? { id: c.organization_id, name: ctx.org?.name ?? "" }
-            : undefined,
-        });
+    if (accountHydrate.data && ctx.account?.id === accountHydrate.data.id) {
+      const a = accountHydrate.data;
+      if (!ctx.account.name && a.name) {
+        contextApi.hydrate({ account: { name: a.name } });
       }
     }
-  }, [cloudHydrate.data, ctx.cloud, ctx.org]);
+  }, [accountHydrate.data, ctx.account]);
 
-  useEffect(() => {
-    if (orgHydrate.data && ctx.org?.id === orgHydrate.data.id) {
-      const o = orgHydrate.data;
-      if (!ctx.org.name && o.name) {
-        contextApi.hydrate({ org: { name: o.name } });
-      }
-    }
-  }, [orgHydrate.data, ctx.org]);
-
+  // Парсинг URL → обновление context.
   useEffect(() => {
     const ids = parsePathIds(pathname);
     const cur = contextApi.get();
-    const curOrg = cur.org?.id ?? null;
-    const curCloud = cur.cloud?.id ?? null;
-    const curFolder = cur.folder?.id ?? null;
+    const curAcc = cur.account?.id ?? null;
+    const curProj = cur.project?.id ?? null;
 
-    // Принцип: URL с explicit-ID меняет context; URL без ID — НЕ сбрасывает
-    // существующий context (потому что URL `/folders/X/networks` не содержит
-    // org/cloud, но они должны оставаться выбранными в крошках).
-    //
-    // Исключение: если pathname возвращается на root `/` или `/organizations`
-    // — там пользователь явно "вышел из иерархии", сбрасываем всё ниже.
-
-    if (ids.orgId && ids.orgId !== curOrg) {
-      contextApi.setOrg({ id: ids.orgId, name: cur.org?.name ?? "" });
+    if (ids.accountId && ids.accountId !== curAcc) {
+      contextApi.setAccount({ id: ids.accountId, name: cur.account?.name ?? "" });
     }
-    if (ids.cloudId && ids.cloudId !== curCloud) {
-      contextApi.setCloud({
-        id: ids.cloudId,
-        name: cur.cloud?.name ?? "",
-        // organizationId: предпочесть existing context, потом URL, потом empty.
-        organizationId: cur.org?.id ?? ids.orgId ?? "",
-      });
-    }
-    if (ids.folderId && ids.folderId !== curFolder) {
-      contextApi.setFolder({
-        id: ids.folderId,
-        uid: ids.folderId,
-        name: cur.folder?.name ?? "",
-        cloudId: cur.cloud?.id ?? ids.cloudId ?? "",
-        organizationId: cur.org?.id ?? ids.orgId ?? "",
+    if (ids.projectId && ids.projectId !== curProj) {
+      contextApi.setProject({
+        id: ids.projectId,
+        name: cur.project?.name ?? "",
+        accountId: cur.account?.id ?? ids.accountId ?? "",
       });
     }
 
-    // Explicit reset, когда пользователь вышел в корень
-    if (pathname === "/") {
-      if (curOrg || curCloud || curFolder) {
-        contextApi.setOrg(null);
+    // Explicit reset когда пользователь вышел в корень.
+    if (pathname === "/" || pathname === "/accounts") {
+      if (curAcc || curProj) {
+        contextApi.setAccount(null);
       }
     }
   }, [pathname]);
@@ -160,16 +104,13 @@ export function ContextUrlSync() {
 }
 
 function parsePathIds(pathname: string): {
-  orgId: string | null;
-  cloudId: string | null;
-  folderId: string | null;
+  accountId: string | null;
+  projectId: string | null;
 } {
-  const orgMatch = pathname.match(/^\/organizations\/([^/]+)/);
-  const cloudMatch = pathname.match(/^\/clouds\/([^/]+)/);
-  const folderMatch = pathname.match(/^\/folders\/([^/]+)/);
+  const accMatch = pathname.match(/^\/accounts\/([^/]+)/);
+  const projMatch = pathname.match(/^\/projects\/([^/]+)/);
   return {
-    orgId: orgMatch?.[1] ?? null,
-    cloudId: cloudMatch?.[1] ?? null,
-    folderId: folderMatch?.[1] ?? null,
+    accountId: accMatch?.[1] ?? null,
+    projectId: projMatch?.[1] ?? null,
   };
 }

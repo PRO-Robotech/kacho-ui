@@ -38,12 +38,12 @@ function useFoldersInCloud(cloudId: string | null) {
 type CountMap = Record<string, number | null>;
 
 /** Counts по stat-метрикам модуля: folder-mode (один folder) или cloud-mode (сумма по folder'ам облака). */
-function useModuleCounts(module: ServiceModule, folderId: string | null, cloudFolderIds: string[] | null): CountMap {
-  const enabled = folderId != null || cloudFolderIds != null;
-  const targetFolders = folderId != null ? [folderId] : cloudFolderIds ?? [];
+function useModuleCounts(module: ServiceModule, projectId: string | null, cloudFolderIds: string[] | null): CountMap {
+  const enabled = projectId != null || cloudFolderIds != null;
+  const targetFolders = projectId != null ? [projectId] : cloudFolderIds ?? [];
   const results = useQueries({
     queries: module.stats.map((stat) => ({
-      queryKey: ["dash", module.key, stat.key, folderId, cloudFolderIds],
+      queryKey: ["dash", module.key, stat.key, projectId, cloudFolderIds],
       enabled,
       refetchInterval: 15_000,
       queryFn: async () => {
@@ -67,14 +67,14 @@ export function DashboardPage() {
   const ctx = useContext((s) => s);
   const navigate = useNavigate();
 
-  const folderId = ctx.folder?.id ?? null;
+  const projectId = ctx.folder?.id ?? null;
   const cloudId = ctx.cloud?.id ?? null;
 
-  const { folderIds: cloudFolderIds, count: foldersInCloud } = useFoldersInCloud(folderId ? null : cloudId);
+  const { folderIds: cloudFolderIds, count: foldersInCloud } = useFoldersInCloud(projectId ? null : cloudId);
 
   // Counts для каждого модуля (фиксированный список SERVICE_MODULES → хук-вызовы стабильны).
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], folderId, cloudFolderIds);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], folderId, cloudFolderIds);
+  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId, cloudFolderIds);
+  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId, cloudFolderIds);
   const countsByModule: Record<string, CountMap> = {
     [SERVICE_MODULES[0].key]: vpcCounts,
     [SERVICE_MODULES[1].key]: computeCounts,
@@ -84,7 +84,7 @@ export function DashboardPage() {
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const openModule = (m: ServiceModule) => navigate(m.landing(folderId, cloudId));
+  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, cloudId));
 
   const caption = (() => {
     if (ctx.folder) return `Каталог: ${ctx.folder.name || ctx.folder.id}`;

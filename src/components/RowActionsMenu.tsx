@@ -49,7 +49,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
   ].includes(spec.id);
 
   const isNetwork = spec.id === "networks";
-  const currentFolderId = params.folderId ?? folderUid ?? null;
+  const currentFolderId = params.projectId ?? folderUid ?? null;
 
   // antd Dropdown menu items рендерятся в portal, но React-event bubble идёт
   // через virtual-tree (а не DOM-tree). Без stopPropagation на domEvent клик по
@@ -82,7 +82,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           // SubnetFormModal — модалка появляется над Network detail-страницей.
           onClick: stop(() =>
             navigate(
-              `/folders/${currentFolderId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
+              `/projects/${currentFolderId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
             ),
           ),
         }

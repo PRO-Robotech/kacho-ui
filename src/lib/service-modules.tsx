@@ -35,7 +35,7 @@ export interface NavLeaf {
   icon: ReactNode;
   /** Tooltip / aria-label. */
   label: string;
-  to: (folderId: string | null) => string;
+  to: (projectId: string | null) => string;
   matches: (pathname: string) => boolean;
   requiresFolder?: boolean;
 }
@@ -61,12 +61,12 @@ export interface ServiceModule {
   color: string;
   description: string;
   /** Куда вести при клике по плашке / лаунчеру — с учётом наличия folder/cloud. */
-  landing: (folderId: string | null, cloudId: string | null) => string;
+  landing: (projectId: string | null, cloudId: string | null) => string;
   stats: ModuleStat[];
   items: NavLeaf[];
 }
 
-const seg = (f: string | null, path: string) => (f ? `/folders/${f}/${path}` : "/dashboard");
+const seg = (f: string | null, path: string) => (f ? `/projects/${f}/${path}` : "/dashboard");
 const folderRe = (path: string) => new RegExp(`^/folders/[^/]+/${path.replace(/\//g, "\\/")}`);
 
 export const SERVICE_MODULES: ServiceModule[] = [
@@ -78,7 +78,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <ApartmentOutlined />,
     color: "#3D8DF5",
     description: "Облачные сети, подсети, группы безопасности, публичные IP, таблицы маршрутизации.",
-    landing: (f, c) => (f ? `/folders/${f}/vpc/networks` : c ? `/clouds/${c}/folders` : "/organizations"),
+    landing: (f, c) => (f ? `/projects/${f}/vpc/networks` : c ? `/clouds/${c}/folders` : "/organizations"),
     stats: [
       { key: "networks", label: "Сетей", listPath: "/vpc/v1/networks", payloadKey: "networks" },
       { key: "subnets", label: "Подсетей", listPath: "/vpc/v1/subnets", payloadKey: "subnets" },
@@ -103,7 +103,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <CloudServerOutlined />,
     color: "#36CFC9",
     description: "Виртуальные машины, диски, образы и снимки дисков.",
-    landing: (f, c) => (f ? `/folders/${f}/compute/instances` : c ? `/clouds/${c}/folders` : "/organizations"),
+    landing: (f, c) => (f ? `/projects/${f}/compute/instances` : c ? `/clouds/${c}/folders` : "/organizations"),
     stats: [
       { key: "instances", label: "Машин", listPath: "/compute/v1/instances", payloadKey: "instances" },
       { key: "disks", label: "Дисков", listPath: "/compute/v1/disks", payloadKey: "disks" },
@@ -131,7 +131,7 @@ export const COMMON_TOP: NavLeaf[] = [
     key: "dashboard",
     icon: <HomeOutlined />,
     label: "Все сервисы",
-    to: (f) => (f ? `/folders/${f}/dashboard` : "/dashboard"),
+    to: (f) => (f ? `/projects/${f}/dashboard` : "/dashboard"),
     matches: (p) => p === "/dashboard" || /^\/folders\/[^/]+\/dashboard$/.test(p),
   },
   {

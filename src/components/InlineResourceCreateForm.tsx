@@ -21,7 +21,7 @@ import { toast } from "@/lib/toast";
 interface Props {
   spec: ResourceSpec;
   /** Контекст для ResourceSpec.template — передаётся в applyFieldDefaults. */
-  ctx: { folderId?: string; cloudId?: string; organizationId?: string };
+  ctx: { projectId?: string; cloudId?: string; organizationId?: string };
   /** Поля, которые должны быть pre-filled и locked (immutable в форме).
    *  Ключи — paths (например "network_id" или "internal_ipv4_address_spec.subnet_id"). */
   presetFields?: Record<string, unknown>;

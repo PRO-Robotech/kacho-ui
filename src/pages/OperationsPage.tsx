@@ -52,7 +52,7 @@ interface ResListResp {
 
 export function OperationsPage() {
   const folder = useFolderStore((s) => s.folder);
-  const folderId = folder?.uid ?? null;
+  const projectId = folder?.uid ?? null;
   const qc = useQueryClient();
 
   const headerRight = useMemo(
@@ -95,13 +95,13 @@ export function OperationsPage() {
     queries: VPC_RESOURCES.map((r) => {
       const spec = REGISTRY[r.id];
       return {
-        queryKey: [r.id, "list-for-ops", folderId],
+        queryKey: [r.id, "list-for-ops", projectId],
         queryFn: () =>
           api.list<ResListResp>(spec.apiPath, {
-            folder_id: folderId!,
+            folder_id: projectId!,
             pageSize: "200",
           }),
-        enabled: !!folderId && !!spec,
+        enabled: !!projectId && !!spec,
         staleTime: 30_000,
       };
     }),
@@ -109,7 +109,7 @@ export function OperationsPage() {
 
   // 2) собираем плоский список (resourceId, kind, apiPath).
   const targets = useMemo(() => {
-    if (!folderId) return [];
+    if (!projectId) return [];
     const out: { id: string; kind: string; apiPath: string }[] = [];
     VPC_RESOURCES.forEach((r, i) => {
       const spec = REGISTRY[r.id];
@@ -121,7 +121,7 @@ export function OperationsPage() {
     });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folderId, ...listQueries.map((q) => q.dataUpdatedAt)]);
+  }, [projectId, ...listQueries.map((q) => q.dataUpdatedAt)]);
 
   // 3) для каждого target грузим operations.
   const opsQueries = useQueries({
@@ -169,7 +169,7 @@ export function OperationsPage() {
     });
   }, [allOps, query, status, kind]);
 
-  if (!folderId) {
+  if (!projectId) {
     return (
       <ErrorResult
         status="warning"

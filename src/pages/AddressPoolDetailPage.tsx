@@ -77,8 +77,8 @@ export function AddressPoolDetailPage() {
   const cloudMap = new Map((clouds?.clouds ?? []).map((c) => [c.id, c]));
   const orgMap = new Map((orgs?.organizations ?? []).map((o) => [o.id, o]));
 
-  const reverseLookup = (folderId: string): { folder?: string; cloud?: string; org?: string } => {
-    const f = folderMap.get(folderId);
+  const reverseLookup = (projectId: string): { folder?: string; cloud?: string; org?: string } => {
+    const f = folderMap.get(projectId);
     if (!f) return {};
     const c = cloudMap.get(f.cloud_id);
     const o = c ? orgMap.get(c.organization_id) : undefined;
@@ -138,7 +138,7 @@ export function AddressPoolDetailPage() {
                           <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
                           <td className="px-3 py-2">
                             <Link
-                              to={`/folders/${a.folder_id}/vpc/addresses/${a.id}`}
+                              to={`/projects/${a.folder_id}/vpc/addresses/${a.id}`}
                               className="text-blue-400 hover:underline"
                             >
                               {a.name || a.id.slice(0, 12) + "…"}
@@ -147,7 +147,7 @@ export function AddressPoolDetailPage() {
                           </td>
                           <td className="px-3 py-2 font-mono text-xs">{a.zone_id}</td>
                           <td className="px-3 py-2 text-xs">
-                            <Link to={`/folders/${a.folder_id}`} className="hover:underline">
+                            <Link to={`/projects/${a.folder_id}`} className="hover:underline">
                               {lk.folder ?? a.folder_id.slice(0, 8) + "…"}
                             </Link>
                           </td>
