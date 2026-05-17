@@ -32,6 +32,9 @@ import { ServiceAccountsPage } from "@/pages/iam/ServiceAccountsPage";
 import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
+import { AuthCallback } from "@/pages/auth/AuthCallback";
+import { LogoutPage } from "@/pages/auth/Logout";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -159,6 +162,7 @@ export default function App() {
       <AntdApp>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
+        <AuthProvider>
         <Routes>
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
@@ -511,9 +515,16 @@ export default function App() {
               <Route path="/iam/access-bindings" element={<AccessBindingsPage />} />
             </Route>
 
+            {/* === Auth routes (OIDC callback + logout) ===
+                /auth/callback: api-gateway → UI redirect после OIDC-flow.
+                /logout: явный logout endpoint (используется UserMenu и прямым URL). */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
+            <Route path="/logout" element={<LogoutPage />} />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
           </Routes>
+        </AuthProvider>
         </BrowserRouter>
         <Toaster />
       </QueryClientProvider>
