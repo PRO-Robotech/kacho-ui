@@ -26,6 +26,14 @@ export default defineConfig({
         target: process.env.KACHO_API_BASE || "http://localhost:8080",
         changeOrigin: true,
       },
+      "/compute": {
+        target: process.env.KACHO_API_BASE || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/iam": {
+        target: process.env.KACHO_API_BASE || "http://localhost:8080",
+        changeOrigin: true,
+      },
       "/operations": {
         target: process.env.KACHO_API_BASE || "http://localhost:8080",
         changeOrigin: true,
