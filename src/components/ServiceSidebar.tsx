@@ -44,6 +44,13 @@ export function ServiceSidebar() {
         if (!user) return false;
         return hasPermission("iam.read");
       }
+      if (leaf.key === "system") {
+        // KAC-118: admin Administration (Regions/Zones/AddressPools) — только
+        // для admin (system principal либо * wildcard в permissions).
+        if (authLoading) return false;
+        if (!user) return false;
+        return user.subject_type === "system" || hasPermission("*") || hasPermission("admin");
+      }
       if (leaf.key === "profile") {
         return !!user;
       }
