@@ -28,7 +28,7 @@ interface AuthContextValue {
   /** Старт OIDC-flow (full-page redirect). */
   login: () => void;
   /** Очистить session cookie + сбросить state. */
-  logout: () => Promise<void>;
+  logout: () => void;
   /** Принудительно перезапросить /me (после callback). */
   refresh: () => Promise<void>;
   /** Хелпер: проверить permission у текущего user'а. */
@@ -61,13 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authApi.login();
   }, []);
 
-  const logout = useCallback(async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      // даже если backend упал — локально сбрасываем
-    }
+  const logout = useCallback(() => {
     setUser(null);
+    // Full-page navigation на Kratos logout flow — он сам сбросит cookie + редирект.
+    authApi.logout();
   }, []);
 
   const hasPermission = useCallback(

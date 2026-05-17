@@ -12,7 +12,7 @@ export function LogoutPage() {
 
   useEffect(() => {
     (async () => {
-      await logout();
+      logout();
       navigate("/", { replace: true });
     })();
   }, [logout, navigate]);

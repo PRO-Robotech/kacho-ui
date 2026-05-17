@@ -1,62 +1,38 @@
-// AuthCallback — landing page для `/auth/callback?code=...&state=...`.
-// Извлекает code+state из URL, шлёт POST в `/iam/v1/auth/callback`, на
-// success — `refresh()` /me + navigate('/').
+// AuthCallback — legacy-страница `/auth/callback` от OAuth2-flow (Zitadel-era).
 //
-// Возможные ошибки:
-//   - `error` в query (от Zitadel: user denied и т.п.) → показать.
-//   - 4xx/5xx от api-gateway (invalid state, code expired) → показать retry.
+// Ory stack (KAC-115): Kratos self-service flow завершается прямым redirect'ом
+// на `default_browser_return_url` (`/dashboard` или `/`). Этот landing больше
+// не нужен для primary userflow, но оставлен как fallback / для будущего
+// Hydra OAuth2 (CLI/yc-shim) consumer.
+//
+// Поведение сейчас: показывает Spin → navigate('/') через 1.5s. Если придёт
+// `?error=...` (например, от Hydra или OIDC-провайдера) — render error message.
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert, Button, Result, Spin } from "antd";
-import { authApi } from "@/api/auth";
-import { useAuth } from "@/contexts/AuthContext";
-
-type Status = "loading" | "ok" | "error";
 
 export function AuthCallback() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { refresh } = useAuth();
-  const [status, setStatus] = useState<Status>("loading");
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [errMsg, setErrMsg] = useState<string>("");
-  // Strict-Mode защита от двойного вызова callback (code одноразовый).
   const calledRef = useRef(false);
 
   useEffect(() => {
     if (calledRef.current) return;
     calledRef.current = true;
 
-    const code = params.get("code");
-    const state = params.get("state");
     const oidcErr = params.get("error");
     const oidcErrDesc = params.get("error_description");
-
     if (oidcErr) {
       setStatus("error");
       setErrMsg(oidcErrDesc ? `${oidcErr}: ${oidcErrDesc}` : oidcErr);
       return;
     }
-    if (!code || !state) {
-      setStatus("error");
-      setErrMsg("Отсутствует параметр `code` или `state` в URL.");
-      return;
-    }
-
-    (async () => {
-      try {
-        await authApi.callback(code, state);
-        await refresh();
-        setStatus("ok");
-        // Microsec задержка чтобы UI успел нарисовать «ok» state.
-        setTimeout(() => navigate("/", { replace: true }), 200);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setStatus("error");
-        setErrMsg(msg);
-      }
-    })();
-  }, [params, refresh, navigate]);
+    setStatus("ok");
+    setTimeout(() => navigate("/", { replace: true }), 1000);
+  }, [params, navigate]);
 
   if (status === "loading") {
     return (
@@ -65,26 +41,12 @@ export function AuthCallback() {
       </div>
     );
   }
-
   if (status === "ok") {
-    return (
-      <Result
-        status="success"
-        title="Вход выполнен"
-        subTitle="Перенаправляем на главную…"
-      />
-    );
+    return <Result status="success" title="Вход выполнен" subTitle="Перенаправляем на главную…" />;
   }
-
   return (
     <div style={{ padding: 24, maxWidth: 560, margin: "0 auto" }}>
-      <Alert
-        type="error"
-        showIcon
-        message="Не удалось завершить вход"
-        description={errMsg}
-        style={{ marginBottom: 16 }}
-      />
+      <Alert type="error" showIcon message="Не удалось завершить вход" description={errMsg} style={{ marginBottom: 16 }} />
       <Button type="primary" onClick={() => navigate("/")}>
         На главную
       </Button>

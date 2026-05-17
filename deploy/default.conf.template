@@ -1,0 +1,140 @@
+server {
+    listen 8080;
+    server_name _;
+
+    # k8s DNS resolver — lazy upstream resolve (не fail на startup если api-gateway DNS slow)
+    resolver ${KUBE_DNS_SERVER} valid=10s ipv6=off;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback: все route-ы отдают index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # API proxy: verbatim YC paths → api-gateway:8080.
+    # WebSocket/Watch убраны в 1.0 — только REST polling.
+    # NB: для /iam/ матчим только API-paths (/iam/v1/*), т.к. SPA-маршрутом
+    # `/iam/accounts` мог бы фолбэк-уйти в api-gateway 404. UI-route'ы
+    # `/iam/<resource>` обрабатывает SPA (см. fallback `location /` выше).
+    location ~ ^/(organization-manager|resource-manager|vpc|compute|operations)/ {
+        # lazy resolve через переменную — nginx не падает если DNS slow на startup
+        set $api_gw_upstream "api-gateway.kacho.svc.cluster.local:8080";
+        proxy_pass http://$api_gw_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $http_x_request_id;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    # IAM API proxy — только версионированный path /iam/v1/* (а не SPA route'ы
+    # `/iam/accounts`). KAC-109 (IAM E0 UI block).
+    location ~ ^/iam/v1/ {
+        # lazy resolve через переменную — nginx не падает если DNS slow на startup
+        set $api_gw_upstream "api-gateway.kacho.svc.cluster.local:8080";
+        proxy_pass http://$api_gw_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Request-ID $http_x_request_id;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    # KAC-115: Ory stack reverse-proxy.
+    # /.ory/kratos/public/* → Kratos public API (session/login/registration flows).
+    # /.ory/hydra/public/* → Hydra public OAuth2/OIDC endpoints.
+    # /login,/registration,/recovery,/verification,/settings,/error,/consent →
+    #   kratos-selfservice-ui-node (готовый UI).
+
+    # NB: prefix location (без `~`) + trailing-slash в proxy_pass = nginx сам chops
+    # prefix. Это надёжнее чем `set $var; rewrite ... break;` (квирк nginx
+    # "uninitialized variable" — set после rewrite в location не propagate'ится
+    # к proxy_pass с переменной).
+    location /.ory/kratos/public/ {
+        proxy_pass http://kacho-umbrella-kratos-public.kacho.svc.cluster.local:80/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    location /.ory/hydra/public/ {
+        proxy_pass http://kacho-umbrella-hydra-public.kacho.svc.cluster.local:4444/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    # kratos-selfservice-ui — UI flows. Regex чтобы пропускать SPA-route /iam/...
+    # NB: используем `set` + literal proxy_pass (без переменной) — переменная нужна
+    # только для lazy DNS resolve, который не требуется когда target stable.
+    location ~ ^/(login|registration|recovery|verification|settings|error|consent|logout)(/|$) {
+        proxy_pass http://kratos-selfservice-ui.kacho.svc.cluster.local:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 30s;
+    }
+
+    location = /healthz {
+        access_log off;
+        return 200 'ok';
+        add_header Content-Type text/plain;
+    }
+
+    # gzip
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # Disable cache for index.html
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+    }
+
+    # Long cache для assets с hash в имени.
+    # KAC-116: статика любого root-level пути пытается сначала локально
+    # (kacho-ui dist/), при 404 — fallback на kratos-selfservice-ui-node
+    # (его страницы /registration, /login шлют /style.css, /theme.css,
+    # /main.css, /auth-layout.css, /ory-small.svg, /assets/inter-font.css
+    # из своего static-tree).
+    location ^~ /assets/ {
+        root /usr/share/nginx/html;
+        try_files $uri @kratos_ui_assets_fallback;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location ~* \.(js|css|svg|png|jpg|jpeg|gif|ico|woff2?|ttf|eot|otf)$ {
+        root /usr/share/nginx/html;
+        try_files $uri @kratos_ui_assets_fallback;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location @kratos_ui_assets_fallback {
+        proxy_pass http://kratos-selfservice-ui.kacho.svc.cluster.local:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 10s;
+    }
+}

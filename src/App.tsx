@@ -33,6 +33,7 @@ import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
 import { AuthCallback } from "@/pages/auth/AuthCallback";
+import { SignupPage } from "@/pages/auth/SignupPage";
 import { LogoutPage } from "@/pages/auth/Logout";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -164,6 +165,8 @@ export default function App() {
           <BrowserRouter>
         <AuthProvider>
         <Routes>
+          {/* Public signup/login pages (без Layout — full-screen) */}
+          <Route path="/signup" element={<SignupPage />} />
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />
