@@ -184,8 +184,9 @@ function ProjectCrumb({ current, accountId, onSelect, onDelete }: ProjectCrumbPr
   const { data, isLoading } = useQuery({
     queryKey: ["projects-crumb", accountId],
     queryFn: async () => {
-      const r = await api.get<{ projects: Array<{ id: string; name: string; accountId: string }> }>(
-        `${PROJECT_API_PATH}?accountId=${encodeURIComponent(accountId)}`,
+      // KAC-123: gateway ожидает snake_case query param (account_id), не camelCase.
+      const r = await api.get<{ projects: Array<{ id: string; name: string; account_id: string }> }>(
+        `${PROJECT_API_PATH}?account_id=${encodeURIComponent(accountId)}`,
       );
       return r.projects ?? [];
     },
@@ -280,19 +281,35 @@ function DropdownRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  // KAC-123: DropdownMenu.Item обеспечивает закрытие меню после выбора.
+  // Raw <button> внутри DropdownMenu.Content в Radix НЕ закрывает меню и
+  // у некоторых конфигураций не получает фокус-event'ы → клик не работает.
   return (
-    <div className="group flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-zinc-700/50">
-      <button
-        onClick={onClick}
-        className="flex flex-1 items-center gap-2 text-left text-sm"
-      >
+    <DropdownMenu.Item
+      onSelect={(e) => {
+        // Не давать радиксу закрыть меню до того как мы успели сделать setState
+        e.preventDefault();
+        onClick();
+      }}
+      className="group flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1 outline-none hover:bg-zinc-700/50 data-[highlighted]:bg-zinc-700/50"
+    >
+      <div className="flex flex-1 items-center gap-2 text-left text-sm">
         {selected ? <Check className="size-3.5 text-emerald-400" /> : <span className="size-3.5" />}
         <span className="truncate">{name || id}</span>
-      </button>
+      </div>
       <CopyableId id={id} className="text-xs opacity-60" />
       <DropdownMenu.Root>
-        <DropdownMenu.Trigger className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-zinc-600/50">
-          <MoreVertical className="size-3.5" />
+        <DropdownMenu.Trigger
+          asChild
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-zinc-600/50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="size-3.5" />
+          </button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
@@ -317,6 +334,6 @@ function DropdownRow({
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-    </div>
+    </DropdownMenu.Item>
   );
 }

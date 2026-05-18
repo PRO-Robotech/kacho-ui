@@ -8,6 +8,7 @@
 import { useState, useMemo } from "react";
 import {
   Button,
+  Card,
   Form,
   Input,
   Modal,
@@ -37,6 +38,7 @@ import {
   fmtTs,
   CopyableMonoId,
 } from "@/components/iam/IamCommon";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ViewMode = "byResource" | "bySubject";
 type SubjectType = "user" | "service_account" | "group";
@@ -52,8 +54,20 @@ const RESOURCE_TYPES: ResourceType[] = [
 ];
 
 export function AccessBindingsPage() {
+  const { user } = useAuth();
   const [mode, setMode] = useState<ViewMode>("byResource");
   const [createOpen, setCreateOpen] = useState(false);
+
+  // KAC-123: Мои AccessBinding'и — авто-вызов /iam/v1/accessBindings:listBySubject
+  // для текущего user'а, показываем сверху страницы.
+  const myBindings = useQuery({
+    queryKey: ["iam", "access-bindings", "by-subject", "user", user?.id ?? ""],
+    queryFn: () =>
+      iamApi.listAccessBindingsBySubject("user", user!.id, { pageSize: "200" }),
+    enabled: !!user?.id,
+    refetchInterval: 5_000,
+    staleTime: 0,
+  });
 
   // byResource state
   const [resType, setResType] = useState<ResourceType>("account");
@@ -156,11 +170,43 @@ export function AccessBindingsPage() {
     },
   ];
 
+  const myBindingsRows = myBindings.data?.access_bindings ?? [];
+
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
       <Typography.Title level={4} style={{ margin: 0 }}>
         Access Bindings
       </Typography.Title>
+
+      {user?.id && (
+        <Card
+          size="small"
+          title={
+            <Space>
+              <span>Мои AccessBinding'и</span>
+              <Tag color="blue">{myBindingsRows.length}</Tag>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                субъект: <code>user:{user.id}</code>
+              </Typography.Text>
+            </Space>
+          }
+        >
+          {myBindingsRows.length === 0 ? (
+            <Typography.Text type="secondary">
+              У вас нет привязанных ролей.
+            </Typography.Text>
+          ) : (
+            <Table<AccessBinding>
+              rowKey="id"
+              size="small"
+              loading={myBindings.isLoading}
+              dataSource={myBindingsRows}
+              columns={columns.filter((c) => c.key !== "subject")}
+              pagination={false}
+            />
+          )}
+        </Card>
+      )}
 
       <Space size={12} wrap>
         <Segmented
