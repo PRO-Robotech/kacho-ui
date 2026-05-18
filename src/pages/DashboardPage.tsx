@@ -9,31 +9,13 @@
 
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert } from "antd";
 import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { useBreadcrumb, useHeaderRight, usePageTitle } from "@/components/PageHeaderSlot";
 import { api } from "@/api/client";
 import { useContext } from "@/lib/context-store";
 import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
-
-interface FolderRow {
-  id: string;
-}
-
-/** Список folder'ов в облаке (для cloud-level агрегации). */
-function useFoldersInCloud(cloudId: string | null) {
-  const q = useQuery({
-    queryKey: ["dash", "cloud-folders", cloudId],
-    queryFn: () => api.list<{ folders?: FolderRow[] }>("/resource-manager/v1/folders", { cloud_id: cloudId! }),
-    enabled: !!cloudId,
-    refetchInterval: 30_000,
-  });
-  return {
-    folderIds: q.data?.folders ? q.data.folders.map((f) => f.id) : null,
-    count: q.data?.folders?.length ?? null,
-  };
-}
 
 type CountMap = Record<string, number | null>;
 
@@ -160,11 +142,6 @@ export function DashboardPage() {
                       </Col>
                     ))}
                   </Row>
-                  {!ctx.folder && foldersInCloud !== null && (
-                    <Typography.Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 12 }}>
-                      Каталогов в облаке: {foldersInCloud}
-                    </Typography.Text>
-                  )}
                 </Card>
               </Col>
             ))}
