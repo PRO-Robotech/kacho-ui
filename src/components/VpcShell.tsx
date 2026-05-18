@@ -19,11 +19,11 @@ interface ListProps {
 }
 
 export function VpcListShell({ spec, parentField, parentParam }: ListProps) {
-  const { folderId } = useParams();
+  const { projectId } = useParams();
   return (
     <>
       <ResourceListPage spec={spec} parentField={parentField} parentParam={parentParam} />
-      {folderId && <ResourceFormModal folderId={folderId} />}
+      {projectId && <ResourceFormModal projectId={projectId} />}
     </>
   );
 }
@@ -34,11 +34,11 @@ interface DetailProps {
 }
 
 export function VpcDetailShell({ spec, paramKey }: DetailProps) {
-  const { folderId } = useParams();
+  const { projectId } = useParams();
   return (
     <>
       <ResourceDetailPage spec={spec} paramKey={paramKey} />
-      {folderId && <ResourceFormModal folderId={folderId} />}
+      {projectId && <ResourceFormModal projectId={projectId} />}
     </>
   );
 }

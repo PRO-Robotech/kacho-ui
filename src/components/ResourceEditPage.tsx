@@ -59,11 +59,11 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
 
   const name = (data?.name as string | undefined) ?? uid ?? "";
 
-  // Auto-detect nested-context из URL params (folderId/networkId/subnetId).
+  // Auto-detect nested-context из URL params (projectId/networkId/subnetId).
   // Возвращает дополнительные breadcrumb-сегменты для тех ресурсов, чей
   // detail-URL nested под Network/Subnet.
   const nested = useNestedBreadcrumb({
-    folderId: params.folderId,
+    projectId: params.projectId,
     networkId: params.networkId,
     subnetId: params.subnetId,
     currentResourcePlural: spec.plural,

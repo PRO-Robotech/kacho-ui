@@ -15,7 +15,7 @@ function specSingular(resourceId: string): string {
 }
 
 function toDataNode(n: DepNode, token: ReturnType<typeof theme.useToken>["token"]): DataNode {
-  const href = n.folderId ? `/folders/${n.folderId}/${n.routeSegment}/${n.id}` : null;
+  const href = n.projectId ? `/projects/${n.projectId}/${n.routeSegment}/${n.id}` : null;
   const label = (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, fontSize: 12 }}>
       {n.blocks && (

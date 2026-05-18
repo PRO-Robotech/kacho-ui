@@ -10,15 +10,15 @@
 import { Navigate, useParams } from "react-router-dom";
 
 export function SubnetCreateRedirect() {
-  const { folderId, networkId } = useParams();
-  if (!folderId || !networkId) {
+  const { projectId, networkId } = useParams();
+  if (!projectId || !networkId) {
     // Защита от мисматча route — fallback на список сетей.
     return <Navigate to="/" replace />;
   }
   // Открываем модалку SubnetFormModal на Network detail.
   return (
     <Navigate
-      to={`/folders/${folderId}/vpc/networks/${networkId}?modal=subnets-create&networkId=${networkId}`}
+      to={`/projects/${projectId}/vpc/networks/${networkId}?modal=subnets-create&networkId=${networkId}`}
       replace
     />
   );

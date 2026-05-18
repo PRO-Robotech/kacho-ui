@@ -12,28 +12,28 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { getByPath, type ResourceColumn, type ResourceSpec } from "@/lib/resource-registry";
 
 // Опции для рендеринга generic-форматов, которым нужен контекст вокруг ячейки.
-// Сейчас используется только `folderId` для построения SPA-ссылок в format:
-// "references" (used_by → /folders/<folderId>/compute/instances/<id> и т.п.).
+// Сейчас используется только `projectId` для построения SPA-ссылок в format:
+// "references" (used_by → /folders/<projectId>/compute/instances/<id> и т.п.).
 export interface FormatCellOpts {
-  folderId?: string | null;
+  projectId?: string | null;
 }
 
 // referrerHref — маппинг kacho.cloud.reference.Reference.referrer → SPA-route.
 // Структурирован как switch по `referrer.type`, чтобы при появлении новых
 // referrer-типов (compute_disk, nlb_target_group, ...) дописывать один case.
-// Возвращает `null` если folderId не известен или тип не поддерживается —
+// Возвращает `null` если projectId не известен или тип не поддерживается —
 // caller тогда рендерит plain-текст (forward-compat fallback).
 export function referrerHref(
-  folderId: string | null | undefined,
+  projectId: string | null | undefined,
   referrer: { type?: string; id?: string } | undefined,
 ): string | null {
-  if (!folderId) return null;
+  if (!projectId) return null;
   const t = referrer?.type;
   const id = referrer?.id;
   if (!t || !id) return null;
   switch (t) {
     case "compute_instance":
-      return `/folders/${folderId}/compute/instances/${id}`;
+      return `/projects/${projectId}/compute/instances/${id}`;
     default:
       return null;
   }
@@ -70,15 +70,15 @@ export function referrerMeta(type: string | undefined): { label: string; color?:
 // триггерил navigation на parent-ресурс (см. ResourceTable.tsx — там есть
 // дополнительный skip на closest('a'), это просто defense-in-depth).
 export function ReferrerLink({
-  folderId,
+  projectId,
   referrer,
 }: {
-  folderId: string | null | undefined;
+  projectId: string | null | undefined;
   referrer: { type?: string; id?: string } | undefined;
 }): ReactNode {
   const meta = referrerMeta(referrer?.type);
   const id = referrer?.id ?? "";
-  const href = referrerHref(folderId, referrer);
+  const href = referrerHref(projectId, referrer);
   const inner = (
     <>
       <span style={{ color: meta.color, fontWeight: 500, fontSize: 12 }}>
@@ -184,8 +184,8 @@ export function formatCellByFormat(
       if (Array.isArray(v) && v.length > 0) {
         const first = v[0] as { referrer?: { type?: string; id?: string } } | undefined;
         const more = v.length > 1 ? v.length - 1 : 0;
-        const folderId =
-          opts.folderId ?? (getByPath<string>(row, "folder_id") || null);
+        const projectId =
+          opts.projectId ?? (getByPath<string>(row, "folder_id") || null);
         const restTitle = more
           ? (v.slice(1) as Array<{ referrer?: { type?: string; id?: string } }>)
               .map((r) => `${r.referrer?.type ?? "?"} ${r.referrer?.id ?? ""}`)
@@ -193,7 +193,7 @@ export function formatCellByFormat(
           : undefined;
         return (
           <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, fontSize: 12 }}>
-            <ReferrerLink folderId={folderId} referrer={first?.referrer} />
+            <ReferrerLink projectId={projectId} referrer={first?.referrer} />
             {more > 0 && (
               <span style={{ color: "rgba(0,0,0,.45)", fontSize: 11 }} title={restTitle}>
                 +{more} more

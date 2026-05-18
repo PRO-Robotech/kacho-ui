@@ -46,7 +46,7 @@ export function AdminLayout() {
       {/* Глобальный mount модалок Create/Edit для admin-страниц (regions /
           zones / address-pools). Не folder/cloud/org-scoped — используем
           "system" как containerId-placeholder; ResourceFormModal не требует
-          конкретного folderId для cluster-scoped ресурсов. */}
+          конкретного projectId для cluster-scoped ресурсов. */}
       <GlobalResourceFormModal />
     </Space>
   );

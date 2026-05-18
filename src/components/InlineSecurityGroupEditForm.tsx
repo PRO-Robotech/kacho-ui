@@ -25,7 +25,7 @@ import { operationStore } from "@/lib/use-operation-store";
 import { toast } from "@/lib/toast";
 
 interface Props {
-  folderId: string;
+  projectId: string;
   sgId: string;
   onCancel: () => void;
 }
@@ -35,7 +35,7 @@ interface Rule {
   [k: string]: unknown;
 }
 
-export function InlineSecurityGroupEditForm({ folderId, sgId, onCancel }: Props) {
+export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props) {
   const sgSpec = REGISTRY["security-groups"];
   const invalidate = useInvalidateResourceList();
 
@@ -154,11 +154,11 @@ export function InlineSecurityGroupEditForm({ folderId, sgId, onCancel }: Props)
                 ? `Сохранение группы безопасности ${name}`
                 : `Сохранение правил группы безопасности ${name}`,
             resourceId: sgSpec.id,
-            folderUid: folderId,
+            folderUid: projectId,
           });
         }
       });
-      invalidate(sgSpec.id, folderId);
+      invalidate(sgSpec.id, projectId);
       onCancel();
     } catch (err) {
       const m =

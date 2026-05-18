@@ -33,6 +33,7 @@ import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
 import { AuthCallback } from "@/pages/auth/AuthCallback";
+import { SignupPage } from "@/pages/auth/SignupPage";
 import { LogoutPage } from "@/pages/auth/Logout";
 import { AuthProvider } from "@/contexts/AuthContext";
 
@@ -56,22 +57,31 @@ const COMPUTE_SCOPED = ["compute-disks", "compute-images", "compute-snapshots", 
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 
-// LegacySegmentRedirect — редирект старых/RefNameLink flat-URL `/folders/<id>/<route>/...`
-// на новые `/folders/<id>/<segment>/<route>/...` (segment = "vpc" | "compute").
-// Сохраняет хвост path + query.
+// LegacySegmentRedirect — редирект старых flat-URL `/projects/<id>/<route>/...`
+// на новые `/projects/<id>/<segment>/<route>/...` (segment = "vpc" | "compute").
+// KAC-117: model переименована Folder → Project.
 function LegacySegmentRedirect({ segment, route }: { segment: string; route: string }) {
-  const { folderId } = useParams();
+  const { projectId } = useParams();
   const location = useLocation();
-  const prefix = `/folders/${folderId}/${route}`;
+  const prefix = `/projects/${projectId}/${route}`;
   const tail = location.pathname.startsWith(prefix)
     ? location.pathname.slice(prefix.length)
     : "";
   return (
     <Navigate
-      to={`/folders/${folderId}/${segment}/${route}${tail}${location.search}`}
+      to={`/projects/${projectId}/${segment}/${route}${tail}${location.search}`}
       replace
     />
   );
+}
+
+// FoldersLegacyRedirect — KAC-117: SPA continue работает на старых URL
+// `/folders/<id>/...` (RefNameLinks из прошлых сессий / закладки browser) —
+// редирект в `/projects/<id>/...` (сохраняя хвост + query).
+function FoldersLegacyRedirect() {
+  const location = useLocation();
+  const newPath = location.pathname.replace(/^\/folders\//, "/projects/");
+  return <Navigate to={`${newPath}${location.search}`} replace />;
 }
 
 export default function App() {
@@ -164,12 +174,17 @@ export default function App() {
           <BrowserRouter>
         <AuthProvider>
         <Routes>
+          {/* Public signup/login pages (без Layout — full-screen) */}
+          <Route path="/signup" element={<SignupPage />} />
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            {/* Dashboard with folder context in URL. */}
-            <Route path="/folders/:folderId/dashboard" element={<DashboardPage />} />
+            {/* Dashboard with project context in URL. */}
+            <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
+
+            {/* KAC-117: legacy redirect /folders/<id>/* → /projects/<id>/* */}
+            <Route path="/folders/*" element={<FoldersLegacyRedirect />} />
 
             {/* === Resource Manager hierarchy (через path) === */}
 
@@ -228,24 +243,24 @@ export default function App() {
             />
 
             {/* === Folder-scoped VPC ресурсы === */}
-            {/* /folders/:folderId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
+            {/* /projects/:projectId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
             {FOLDER_SCOPED.map((spec) => (
               <Route key={spec.id}>
                 <Route
-                  path={`/folders/:folderId/vpc/${spec.route}`}
+                  path={`/projects/:projectId/vpc/${spec.route}`}
                   element={
                     // VpcListShell = ResourceListPage + ResourceFormModal mount
                     // (модалка открывается по ?modal=<spec>-create или
                     // ?modal=<spec>-edit&id=<uid>).
                     <VpcListShell
                       spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
+                      parentField="project_id"
+                      parentParam="projectId"
                     />
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/vpc/${spec.route}/create`}
+                  path={`/projects/:projectId/vpc/${spec.route}/create`}
                   element={
                     // Subnet — отдельная standalone-страница SubnetCreatePage
                     // (YC-style layout как у SubnetDetailPage в edit-mode).
@@ -257,13 +272,13 @@ export default function App() {
                       ? <SubnetCreatePage />
                       : <ResourceCreatePage
                           spec={spec}
-                          parentField="folder_id"
-                          parentParam="folderId"
+                          parentField="project_id"
+                          parentParam="projectId"
                         />
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/vpc/${spec.route}/:uid`}
+                  path={`/projects/:projectId/vpc/${spec.route}/:uid`}
                   element={
                     spec.id === "networks"
                       ? <NetworkDetailPage />
@@ -280,7 +295,7 @@ export default function App() {
                     детектит /edit-суффикс и разворачивает inline-форму
                     редактирования в правой панели вместо "Общее". */}
                 <Route
-                  path={`/folders/:folderId/vpc/${spec.route}/:uid/edit`}
+                  path={`/projects/:projectId/vpc/${spec.route}/:uid/edit`}
                   element={
                     spec.id === "networks"
                       ? <NetworkDetailPage />
@@ -296,38 +311,38 @@ export default function App() {
                 {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
                     автоматически редиректятся на /folders/X/vpc/<resource>/... */}
                 <Route
-                  path={`/folders/:folderId/${spec.route}/*`}
+                  path={`/projects/:projectId/${spec.route}/*`}
                   element={<LegacySegmentRedirect segment="vpc" route={spec.route} />}
                 />
               </Route>
             ))}
 
             {/* === Folder-scoped Compute ресурсы === */}
-            {/* /folders/:folderId/compute/{disks|images|snapshots|instances} */}
+            {/* /projects/:projectId/compute/{disks|images|snapshots|instances} */}
             {COMPUTE_SCOPED.map((spec) => (
               <Route key={spec.id}>
                 <Route
-                  path={`/folders/:folderId/compute/${spec.route}`}
+                  path={`/projects/:projectId/compute/${spec.route}`}
                   element={
                     <ResourceListPage
                       spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
+                      parentField="project_id"
+                      parentParam="projectId"
                     />
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/compute/${spec.route}/create`}
+                  path={`/projects/:projectId/compute/${spec.route}/create`}
                   element={
                     <ResourceCreatePage
                       spec={spec}
-                      parentField="folder_id"
-                      parentParam="folderId"
+                      parentField="project_id"
+                      parentParam="projectId"
                     />
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/compute/${spec.route}/:uid`}
+                  path={`/projects/:projectId/compute/${spec.route}/:uid`}
                   element={
                     spec.id === "compute-instances"
                       ? <InstanceDetailPage />
@@ -335,7 +350,7 @@ export default function App() {
                   }
                 />
                 <Route
-                  path={`/folders/:folderId/compute/${spec.route}/:uid/edit`}
+                  path={`/projects/:projectId/compute/${spec.route}/:uid/edit`}
                   element={
                     spec.id === "compute-instances"
                       ? <InstanceDetailPage />
@@ -344,7 +359,7 @@ export default function App() {
                 />
                 {/* Legacy/RefNameLink redirect: `/folders/X/<route>/...` → `/folders/X/compute/<route>/...` */}
                 <Route
-                  path={`/folders/:folderId/${spec.route}/*`}
+                  path={`/projects/:projectId/${spec.route}/*`}
                   element={<LegacySegmentRedirect segment="compute" route={spec.route} />}
                 />
               </Route>
@@ -354,112 +369,112 @@ export default function App() {
             {/* Сохраняет network-context: при создании RT/SG из network detail
                 URL остаётся под /networks/<n>/. */}
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/route-tables/create"
+              path="/projects/:projectId/vpc/networks/:networkId/route-tables/create"
               element={
                 <ResourceCreatePage
                   spec={REGISTRY["route-tables"]}
-                  parentField="folder_id"
-                  parentParam="folderId"
+                  parentField="project_id"
+                  parentParam="projectId"
                 />
               }
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/security-groups/create"
+              path="/projects/:projectId/vpc/networks/:networkId/security-groups/create"
               element={
                 <ResourceCreatePage
                   spec={REGISTRY["security-groups"]}
-                  parentField="folder_id"
-                  parentParam="folderId"
+                  parentField="project_id"
+                  parentParam="projectId"
                 />
               }
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/create"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/create"
               element={<SubnetCreateRedirect />}
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
               element={
                 <ResourceCreatePage
                   spec={REGISTRY.addresses}
-                  parentField="folder_id"
-                  parentParam="folderId"
+                  parentField="project_id"
+                  parentParam="projectId"
                 />
               }
             />
             <Route
-              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/create"
+              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/create"
               element={
                 <ResourceCreatePage
                   spec={REGISTRY.addresses}
-                  parentField="folder_id"
-                  parentParam="folderId"
+                  parentField="project_id"
+                  parentParam="projectId"
                 />
               }
             />
 
             {/* === Global VPC Operations (folder-scoped) === */}
             <Route
-              path="/folders/:folderId/vpc/operations"
+              path="/projects/:projectId/vpc/operations"
               element={<OperationsPage />}
             />
 
             {/* === Network-nested ресурсы (YC-style URL) === */}
-            {/* /folders/:folderId/vpc/networks/:networkId/subnets/:uid */}
+            {/* /projects/:projectId/vpc/networks/:networkId/subnets/:uid */}
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/:uid"
               element={<SubnetDetailPage />}
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/:uid/edit"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/:uid/edit"
               element={<SubnetDetailPage />}
             />
-            {/* /folders/:folderId/vpc/networks/:networkId/route-tables/:uid */}
+            {/* /projects/:projectId/vpc/networks/:networkId/route-tables/:uid */}
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/route-tables/:uid"
+              path="/projects/:projectId/vpc/networks/:networkId/route-tables/:uid"
               element={<RouteTableDetailPage />}
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/route-tables/:uid/edit"
+              path="/projects/:projectId/vpc/networks/:networkId/route-tables/:uid/edit"
               element={<RouteTableDetailPage />}
             />
-            {/* /folders/:folderId/vpc/networks/:networkId/security-groups/:uid */}
+            {/* /projects/:projectId/vpc/networks/:networkId/security-groups/:uid */}
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/security-groups/:uid"
+              path="/projects/:projectId/vpc/networks/:networkId/security-groups/:uid"
               element={<SecurityGroupDetailPage />}
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/security-groups/:uid/edit"
+              path="/projects/:projectId/vpc/networks/:networkId/security-groups/:uid/edit"
               element={<SecurityGroupDetailPage />}
             />
-            {/* /folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid */}
+            {/* /projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid */}
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid"
               element={<AddressDetailPage />}
             />
             <Route
-              path="/folders/:folderId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid/edit"
+              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid/edit"
               element={<AddressDetailPage />}
             />
-            {/* /folders/:folderId/vpc/subnets/:subnetId/addresses/:uid (flat-subnet-context) */}
+            {/* /projects/:projectId/vpc/subnets/:subnetId/addresses/:uid (flat-subnet-context) */}
             <Route
-              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/:uid"
+              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/:uid"
               element={<AddressDetailPage />}
             />
             <Route
-              path="/folders/:folderId/vpc/subnets/:subnetId/addresses/:uid/edit"
+              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/:uid/edit"
               element={<AddressDetailPage />}
             />
 
-            {/* /folders/:folderId — редирект на dashboard */}
+            {/* /projects/:projectId — редирект на dashboard */}
             <Route
-              path="/folders/:folderId"
+              path="/projects/:projectId"
               element={<FolderDefaultRedirect />}
             />
             {/* Edit folder — full-page форма */}
             <Route
-              path="/folders/:folderId/edit"
-              element={<ResourceEditPage spec={REGISTRY.folders} paramKey="folderId" />}
+              path="/projects/:projectId/edit"
+              element={<ResourceEditPage spec={REGISTRY.folders} paramKey="projectId" />}
             />
 
             {/* Detail-страницы для Resource Manager */}
@@ -533,8 +548,8 @@ export default function App() {
   );
 }
 
-// FolderDefaultRedirect: /folders/:folderId → /folders/:folderId/dashboard
+// ProjectDefaultRedirect: /projects/:projectId → /projects/:projectId/dashboard
 function FolderDefaultRedirect() {
-  const { folderId } = useParams();
-  return <Navigate to={`/folders/${folderId}/dashboard`} replace />;
+  const { projectId } = useParams();
+  return <Navigate to={`/projects/${projectId}/dashboard`} replace />;
 }

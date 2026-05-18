@@ -16,7 +16,7 @@ interface Props {
   /** ID ресурса в REGISTRY (например, "addresses", "security-groups"). */
   refResource: string;
   /** folder_id для ListXxxRequest. */
-  folderId: string;
+  projectId: string;
   /** Опц. client-side filter (например, только internal IPv4 Address'ы). */
   refFilter?: (row: Record<string, unknown>) => boolean;
   /** Цвет chip'ов (для visual diff между IPv4/IPv6/SG). */
@@ -30,7 +30,7 @@ interface Props {
 export function ResourceRefChips({
   title,
   refResource,
-  folderId,
+  projectId,
   refFilter,
   tagColor = "blue",
   value,
@@ -42,10 +42,10 @@ export function ResourceRefChips({
 
   // Загружаем список ресурсов folder'а для resolve id→name + dropdown options.
   const { data: listData } = useQuery({
-    queryKey: [refResource, "list", folderId],
+    queryKey: [refResource, "list", projectId],
     queryFn: () =>
       api.list<Record<string, unknown>>(spec!.apiPath, {
-        folder_id: folderId,
+        folder_id: projectId,
         pageSize: "500",
       }),
     enabled: !!spec,

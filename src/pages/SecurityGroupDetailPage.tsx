@@ -92,11 +92,11 @@ function RulesTable({ rules }: { rules: SgRule[] }) {
 
 export function SecurityGroupDetailPage() {
   const spec = REGISTRY["security-groups"];
-  const { folderId, networkId } = useParams();
+  const { projectId, networkId } = useParams();
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
-      folderId,
+      projectId,
       networkId,
       currentResourcePlural: spec.plural,
     });
@@ -127,17 +127,17 @@ export function SecurityGroupDetailPage() {
   const renderInlineEdit = useCallback(
     (data: Record<string, unknown>, exitEdit: () => void) => {
       const id = (data.id as string | undefined) ?? "";
-      const fid = (data.folder_id as string | undefined) ?? folderId ?? "";
+      const fid = (data.folder_id as string | undefined) ?? projectId ?? "";
       if (!id || !fid) return null;
       return (
         <InlineSecurityGroupEditForm
-          folderId={fid}
+          projectId={fid}
           sgId={id}
           onCancel={exitEdit}
         />
       );
     },
-    [folderId],
+    [projectId],
   );
 
   return (
@@ -149,7 +149,7 @@ export function SecurityGroupDetailPage() {
         breadcrumbSegments={breadcrumbSegments}
         renderInlineEdit={renderInlineEdit}
       />
-      {folderId && <ResourceFormModal folderId={folderId} />}
+      {projectId && <ResourceFormModal projectId={projectId} />}
     </>
   );
 }

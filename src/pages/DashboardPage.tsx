@@ -9,7 +9,7 @@
 
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert } from "antd";
 import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined } from "@ant-design/icons";
 import { useBreadcrumb, useHeaderRight, usePageTitle } from "@/components/PageHeaderSlot";
@@ -17,33 +17,15 @@ import { api } from "@/api/client";
 import { useContext } from "@/lib/context-store";
 import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
 
-interface FolderRow {
-  id: string;
-}
-
-/** Список folder'ов в облаке (для cloud-level агрегации). */
-function useFoldersInCloud(cloudId: string | null) {
-  const q = useQuery({
-    queryKey: ["dash", "cloud-folders", cloudId],
-    queryFn: () => api.list<{ folders?: FolderRow[] }>("/resource-manager/v1/folders", { cloud_id: cloudId! }),
-    enabled: !!cloudId,
-    refetchInterval: 30_000,
-  });
-  return {
-    folderIds: q.data?.folders ? q.data.folders.map((f) => f.id) : null,
-    count: q.data?.folders?.length ?? null,
-  };
-}
-
 type CountMap = Record<string, number | null>;
 
 /** Counts по stat-метрикам модуля: folder-mode (один folder) или cloud-mode (сумма по folder'ам облака). */
-function useModuleCounts(module: ServiceModule, folderId: string | null, cloudFolderIds: string[] | null): CountMap {
-  const enabled = folderId != null || cloudFolderIds != null;
-  const targetFolders = folderId != null ? [folderId] : cloudFolderIds ?? [];
+function useModuleCounts(module: ServiceModule, projectId: string | null, cloudFolderIds: string[] | null): CountMap {
+  const enabled = projectId != null || cloudFolderIds != null;
+  const targetFolders = projectId != null ? [projectId] : cloudFolderIds ?? [];
   const results = useQueries({
     queries: module.stats.map((stat) => ({
-      queryKey: ["dash", module.key, stat.key, folderId, cloudFolderIds],
+      queryKey: ["dash", module.key, stat.key, projectId, cloudFolderIds],
       enabled,
       refetchInterval: 15_000,
       queryFn: async () => {
@@ -67,36 +49,37 @@ export function DashboardPage() {
   const ctx = useContext((s) => s);
   const navigate = useNavigate();
 
-  const folderId = ctx.folder?.id ?? null;
-  const cloudId = ctx.cloud?.id ?? null;
+  const projectId = ctx.project?.id ?? null;
+  const accountId = ctx.account?.id ?? null;
 
-  const { folderIds: cloudFolderIds, count: foldersInCloud } = useFoldersInCloud(folderId ? null : cloudId);
-
-  // Counts для каждого модуля (фиксированный список SERVICE_MODULES → хук-вызовы стабильны).
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], folderId, cloudFolderIds);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], folderId, cloudFolderIds);
+  // Counts для каждого модуля. SERVICE_MODULES[0..2] = vpc/compute/iam.
+  // IAM не требует projectId (его ресурсы — account-level), счётчики работают всегда.
+  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId, null);
+  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId, null);
+  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*", null); // "*" — fake projectId чтобы хук активировался
   const countsByModule: Record<string, CountMap> = {
     [SERVICE_MODULES[0].key]: vpcCounts,
     [SERVICE_MODULES[1].key]: computeCounts,
+    [SERVICE_MODULES[2].key]: iamCounts,
   };
 
   useBreadcrumb(useMemo(() => <Typography.Text strong>Все сервисы</Typography.Text>, []));
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const openModule = (m: ServiceModule) => navigate(m.landing(folderId, cloudId));
+  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, accountId));
 
   const caption = (() => {
-    if (ctx.folder) return `Каталог: ${ctx.folder.name || ctx.folder.id}`;
-    if (ctx.cloud) return `Облако: ${ctx.cloud.name || ctx.cloud.id} — счётчики суммарно по всем каталогам. Выберите каталог, чтобы перейти к ресурсам.`;
-    return "Контекст не выбран — выберите Cloud и Folder в шапке.";
+    if (ctx.project) return `Проект: ${ctx.project.name || ctx.project.id}`;
+    if (ctx.account) return `Аккаунт: ${ctx.account.name || ctx.account.id} — выберите проект чтобы перейти к ресурсам.`;
+    return "Контекст не выбран — выберите Account и Project в шапке. IAM-блок доступен всегда.";
   })();
 
-  // Плашки показываем как только выбран хотя бы Cloud.
-  const tilesVisible = !!ctx.cloud;
+  // Плашки VPC/Compute требуют Project context. IAM — всегда виден.
+  const tilesVisible = true;
   const allEmpty =
-    !!ctx.folder &&
-    SERVICE_MODULES.every((m) =>
+    !!ctx.project &&
+    SERVICE_MODULES.filter((m) => m.key !== "iam").every((m) =>
       m.stats.every((s) => (countsByModule[m.key]?.[s.key] ?? null) === 0),
     );
 
@@ -110,19 +93,19 @@ export function DashboardPage() {
           <Typography.Text type="secondary">{caption}</Typography.Text>
         </div>
 
-        {!ctx.cloud && (
+        {!ctx.account && (
           <Alert
             type="info"
             showIcon
-            message="Чтобы увидеть плашки сервисов — выберите Cloud (через шапку или дерево слева)."
+            message="Выберите Account и Project в шапке для просмотра VPC и Compute ресурсов. IAM доступен всегда."
             action={
               <Button
                 size="small"
                 icon={<ArrowRightOutlined />}
-                onClick={() => navigate("/organizations")}
-                data-testid="dashboard-go-organizations"
+                onClick={() => navigate("/iam/accounts")}
+                data-testid="dashboard-go-iam"
               >
-                Organizations
+                Перейти в IAM
               </Button>
             }
           />
@@ -159,11 +142,6 @@ export function DashboardPage() {
                       </Col>
                     ))}
                   </Row>
-                  {!ctx.folder && foldersInCloud !== null && (
-                    <Typography.Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: 12 }}>
-                      Каталогов в облаке: {foldersInCloud}
-                    </Typography.Text>
-                  )}
                 </Card>
               </Col>
             ))}

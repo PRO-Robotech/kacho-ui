@@ -30,7 +30,7 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { toast } from "@/lib/toast";
 
 interface Props {
-  folderId: string;
+  projectId: string;
   nicId: string;
   onCancel: () => void;
   onSuccess?: () => void;
@@ -57,7 +57,7 @@ const labelWithInfo = (text: string, info: string) => (
 );
 
 export function InlineNetworkInterfaceEditForm({
-  folderId,
+  projectId,
   nicId,
   onCancel,
   onSuccess,
@@ -99,7 +99,7 @@ export function InlineNetworkInterfaceEditForm({
       const opId = extractOperationId(resp);
       if (opId) setPendingOpId(opId);
       else {
-        invalidate(spec.id, folderId);
+        invalidate(spec.id, projectId);
         toast.success(`NIC ${name || nicId} сохранён`);
         onSuccess?.();
         onCancel();
@@ -119,7 +119,7 @@ export function InlineNetworkInterfaceEditForm({
       setPendingOpId(null);
       return;
     }
-    invalidate(spec.id, folderId);
+    invalidate(spec.id, projectId);
     toast.success(`NIC ${name || nicId} сохранён`);
     setPendingOpId(null);
     onSuccess?.();
@@ -214,7 +214,7 @@ export function InlineNetworkInterfaceEditForm({
           <ResourceRefChips
             title="IPv4 Address"
             refResource="addresses"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="blue"
             value={v4}
             onChange={setV4}
@@ -227,7 +227,7 @@ export function InlineNetworkInterfaceEditForm({
           <ResourceRefChips
             title="IPv6 Address"
             refResource="addresses"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="geekblue"
             value={v6}
             onChange={setV6}
@@ -242,7 +242,7 @@ export function InlineNetworkInterfaceEditForm({
           <ResourceRefChips
             title="Security Group"
             refResource="security-groups"
-            folderId={folderId}
+            projectId={projectId}
             tagColor="purple"
             value={sgs}
             onChange={setSgs}

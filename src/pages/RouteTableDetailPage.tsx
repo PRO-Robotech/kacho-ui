@@ -8,12 +8,12 @@ import { REGISTRY } from "@/lib/resource-registry";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 
 export function RouteTableDetailPage() {
-  const { folderId, networkId } = useParams();
+  const { projectId, networkId } = useParams();
   const spec = REGISTRY["route-tables"];
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
-      folderId,
+      projectId,
       networkId,
       currentResourcePlural: spec.plural,
     });

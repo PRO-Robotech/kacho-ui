@@ -171,7 +171,7 @@ export function RefSelect({
           <InlineResourceCreateForm
             spec={createSpec}
             ctx={{
-              folderId: folder?.uid,
+              projectId: folder?.uid,
               cloudId: cloud?.id,
               organizationId: org?.id,
             }}

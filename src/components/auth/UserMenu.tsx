@@ -37,7 +37,7 @@ export function UserMenu() {
       icon: <LogoutOutlined />,
       label: "Выйти",
       onClick: async () => {
-        await logout();
+        logout();
         navigate("/");
       },
     },

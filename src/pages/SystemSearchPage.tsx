@@ -32,7 +32,7 @@ const DOMAINS = [
   { resource: "zones",         path: "/compute/v1/zones",                          key: "zones",         linkBase: "/system/zones/:id" },
 ];
 
-// ВАЖНО: VPC list endpoints (networks/subnets/addresses) обычно требуют folderId,
+// ВАЖНО: VPC list endpoints (networks/subnets/addresses) обычно требуют projectId,
 // но в нашем bекенде они работают и без него (cross-folder, вернут все).
 // Тогда client-side filter сделает остальное.
 

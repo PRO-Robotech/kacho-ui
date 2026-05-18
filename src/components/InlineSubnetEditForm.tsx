@@ -38,7 +38,7 @@ import {
 } from "@/components/LabelsEditor";
 
 interface Props {
-  folderId: string;
+  projectId: string;
   subnetId: string;
   onCancel: () => void;
   onSuccess?: () => void;
@@ -53,7 +53,7 @@ const MUTABLE_FIELDS = [
 ] as const;
 
 export function InlineSubnetEditForm({
-  folderId,
+  projectId,
   subnetId,
   onCancel,
   onSuccess,
@@ -107,13 +107,13 @@ export function InlineSubnetEditForm({
   }, [subnet, hydrated]);
 
   const { data: rtData } = useQuery({
-    queryKey: ["route-tables", "list", folderId, networkId],
+    queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: folderId,
+        folder_id: projectId,
         pageSize: "500",
       }),
-    enabled: !!folderId && !!networkId,
+    enabled: !!projectId && !!networkId,
     staleTime: 30_000,
   });
   const rtOptions = useMemo(
@@ -134,7 +134,7 @@ export function InlineSubnetEditForm({
       if (opId) {
         setPendingOpId(opId);
       } else {
-        invalidate(subnetSpec.id, folderId);
+        invalidate(subnetSpec.id, projectId);
         onSuccess?.();
         onCancel();
       }
@@ -153,7 +153,7 @@ export function InlineSubnetEditForm({
     if (op.error) {
       toast.error(`Сохранить подсеть: ${op.error.message ?? "ошибка"}`);
     } else {
-      invalidate(subnetSpec.id, folderId);
+      invalidate(subnetSpec.id, projectId);
       toast.success(`Подсеть ${name} сохранена`);
       onSuccess?.();
     }

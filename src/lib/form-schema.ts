@@ -20,7 +20,7 @@ interface BaseField {
   label: string;
   description?: string;
   required?: boolean;
-  // Hidden — поле формы не показывается, но входит в payload (например metadata.folderId fills из контекста)
+  // Hidden — поле формы не показывается, но входит в payload (например metadata.projectId fills из контекста)
   hidden?: boolean;
   // Immutable after Create — в Edit-режиме поле рендерится disabled и
   // не попадает в update_mask. Backend всё равно бы отказал (см.

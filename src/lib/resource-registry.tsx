@@ -57,7 +57,7 @@ export interface ResourceSpec {
   // для иерархического drill-flow Org → Clouds → Folders → VPC.
   childRoute?: string;
   // skeleton-объект для Create-формы
-  template: (ctx: { folderId?: string; cloudId?: string; organizationId?: string }) => unknown;
+  template: (ctx: { projectId?: string; cloudId?: string; organizationId?: string }) => unknown;
   // Опциональная нормализация payload перед отправкой на API.
   // Используется для конвертации form-internal представления (wrapper-объекты, toggle-поля)
   // в wire format (plain arrays, oneof etc.).
@@ -329,8 +329,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       description: "",
       labels: {},
@@ -482,8 +482,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       network_id: "",
       zone_id: "",
@@ -763,8 +763,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       description: "",
       _address_kind: "external",
@@ -916,8 +916,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
       },
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       network_id: "",
       description: "",
@@ -1150,8 +1150,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       subnet_id: "",
       v4_address_ids: [],
@@ -1250,8 +1250,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       network_id: "",
       description: "",
@@ -1319,8 +1319,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // от response-сообщения Gateway, а не запроса). См. kacho-vpc gateway.go:91.
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       description: "",
       shared_egress_gateway_spec: {},
@@ -1448,8 +1448,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       zone_id: "",
       type_id: "",
@@ -1540,8 +1540,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       _image_source: "disk",
       description: "",
@@ -1610,8 +1610,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       disk_id: "",
       description: "",
@@ -1760,8 +1760,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_DESCRIPTION,
       FIELD_FOLDER_ID,
     ],
-    template: ({ folderId }) => ({
-      folder_id: folderId ?? "",
+    template: ({ projectId }) => ({
+      folder_id: projectId ?? "",
       name: "",
       zone_id: "",
       platform_id: "standard-v3",

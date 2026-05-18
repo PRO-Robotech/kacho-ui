@@ -22,7 +22,7 @@ import { buildSpecColumns } from "@/lib/spec-columns";
 import type { DetailTab } from "@/components/DetailShell";
 
 export function SubnetDetailPage() {
-  const { uid: subnetId, folderId, networkId } = useParams();
+  const { uid: subnetId, projectId, networkId } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const spec = REGISTRY["subnets"];
@@ -41,29 +41,29 @@ export function SubnetDetailPage() {
 
   const { segments: breadcrumbSegments, backHref: backHrefOverride } =
     useNestedBreadcrumb({
-      folderId,
+      projectId,
       networkId,
       currentResourcePlural: spec.plural,
     });
 
   // Адреса под subnet всегда nested под subnet'ом (с/без network в цепочке).
   const addressesBasePath =
-    folderId && subnetId
+    projectId && subnetId
       ? networkId
-        ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}/addresses`
-        : `/folders/${folderId}/vpc/subnets/${subnetId}/addresses`
+        ? `/projects/${projectId}/vpc/networks/${networkId}/subnets/${subnetId}/addresses`
+        : `/projects/${projectId}/vpc/subnets/${subnetId}/addresses`
       : null;
 
   // Address-ресурсы folder'а — будем фильтровать по subnet_id client-side.
   const { data: addrList } = useQuery({
-    queryKey: ["addresses", "list", folderId],
+    queryKey: ["addresses", "list", projectId],
     queryFn: () =>
       api.list<{ addresses: Array<Record<string, unknown>> }>(addrSpec.apiPath, {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
-    enabled: !!folderId,
+    enabled: !!projectId,
   });
 
   const subnetAddresses = useMemo(() => {
@@ -77,7 +77,7 @@ export function SubnetDetailPage() {
 
   // Колонки = те же, что у Addresses list, плюс actions.
   const addrColumns = useMemo<Column<Record<string, unknown>>[]>(() => {
-    const cols = buildSpecColumns(addrSpec, { folderId });
+    const cols = buildSpecColumns(addrSpec, { projectId });
     if (addressesBasePath) {
       cols.push({
         header: "",
@@ -87,13 +87,13 @@ export function SubnetDetailPage() {
             spec={addrSpec}
             row={row}
             basePath={addressesBasePath}
-            folderUid={folderId ?? null}
+            folderUid={projectId ?? null}
           />
         ),
       });
     }
     return cols;
-  }, [addrSpec, addressesBasePath, folderId]);
+  }, [addrSpec, addressesBasePath, projectId]);
 
   const extraTabs = useMemo(
     () =>
@@ -147,14 +147,14 @@ export function SubnetDetailPage() {
 
   const renderInlineEdit = useCallback(
     (_data: Record<string, unknown>, exitEdit: () => void) =>
-      folderId && subnetId ? (
+      projectId && subnetId ? (
         <InlineSubnetEditForm
-          folderId={folderId}
+          projectId={projectId}
           subnetId={subnetId}
           onCancel={exitEdit}
         />
       ) : null,
-    [folderId, subnetId],
+    [projectId, subnetId],
   );
 
   return (
@@ -167,7 +167,7 @@ export function SubnetDetailPage() {
         breadcrumbSegments={breadcrumbSegments}
         renderInlineEdit={renderInlineEdit}
       />
-      {folderId && <ResourceFormModal folderId={folderId} />}
+      {projectId && <ResourceFormModal projectId={projectId} />}
     </>
   );
 }

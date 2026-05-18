@@ -31,7 +31,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   const ctx = useMemo(
     () => ({
-      folderId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
+      projectId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
       cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
       organizationId:
         parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
@@ -102,17 +102,17 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   // полученный URL `/folders/X/vpc/networks/Y/route-tables` не существует —
   // вместо этого возвращаемся к parent detail (network detail с табом).
   const rawBack = location.pathname.replace(/\/create$/, "") || "/";
-  const folderId = params.folderId as string | undefined;
+  const projectId = params.projectId as string | undefined;
   const networkId = params.networkId as string | undefined;
   const subnetId = params.subnetId as string | undefined;
-  const isNestedUnderSubnet = !!(folderId && subnetId);
-  const isNestedUnderNetwork = !!(folderId && networkId);
+  const isNestedUnderSubnet = !!(projectId && subnetId);
+  const isNestedUnderNetwork = !!(projectId && networkId);
   const backHref = isNestedUnderSubnet
     ? networkId
-      ? `/folders/${folderId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
-      : `/folders/${folderId}/vpc/subnets/${subnetId}?tab=addresses`
+      ? `/projects/${projectId}/vpc/networks/${networkId}/subnets/${subnetId}?tab=addresses`
+      : `/projects/${projectId}/vpc/subnets/${subnetId}?tab=addresses`
     : isNestedUnderNetwork
-      ? `/folders/${folderId}/vpc/networks/${networkId}?tab=${spec.route}`
+      ? `/projects/${projectId}/vpc/networks/${networkId}?tab=${spec.route}`
       : rawBack;
 
   const breadcrumb = useMemo(

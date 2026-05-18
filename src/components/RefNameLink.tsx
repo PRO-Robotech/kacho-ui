@@ -1,6 +1,6 @@
 // RefNameLink — name+ссылка на detail для любого folder-scoped ресурса по id.
 // Заменяет SgNameById. Берёт spec из registry, делает один folder-scoped list-query
-// (дедуплицируется TanStack по (specId, folderId)), находит row.name по id.
+// (дедуплицируется TanStack по (specId, projectId)), находит row.name по id.
 // При клике stopPropagation чтобы не триггерить row-click таблицы-родителя.
 
 import { Link, useParams } from "react-router-dom";
@@ -13,27 +13,27 @@ import { REGISTRY } from "@/lib/resource-registry";
 interface Props {
   specId: string;       // "networks" | "route-tables" | "security-groups" | ...
   refId: string | null | undefined;
-  folderId?: string;
+  projectId?: string;
   /** Render как antd Tag (chip-стиль). Default — обычная ссылка. */
   asTag?: boolean;
   /** Если задан — обрезать имя по N символов с многоточием. Title даёт полное имя. */
   maxChars?: number;
 }
 
-export function RefNameLink({ specId, refId, folderId: folderOverride, asTag, maxChars }: Props) {
+export function RefNameLink({ specId, refId, projectId: folderOverride, asTag, maxChars }: Props) {
   const params = useParams();
   const folder = useFolderStore((s) => s.folder);
-  const folderId = folderOverride ?? params.folderId ?? folder?.id ?? null;
+  const projectId = folderOverride ?? params.projectId ?? folder?.id ?? null;
   const spec = REGISTRY[specId];
 
   const { data } = useQuery({
-    queryKey: ["ref-name", specId, folderId],
+    queryKey: ["ref-name", specId, projectId],
     queryFn: () =>
       api.list<Record<string, Array<{ id: string; name?: string }>>>(spec!.apiPath, {
-        folder_id: folderId!,
+        folder_id: projectId!,
         pageSize: "500",
       }),
-    enabled: !!spec && !!folderId && !!refId,
+    enabled: !!spec && !!projectId && !!refId,
     staleTime: 30_000,
   });
 
@@ -47,7 +47,7 @@ export function RefNameLink({ specId, refId, folderId: folderOverride, asTag, ma
     maxChars && fullName.length > maxChars
       ? fullName.slice(0, maxChars) + "…"
       : fullName;
-  const href = folderId ? `/folders/${folderId}/${spec.route}/${refId}` : null;
+  const href = projectId ? `/projects/${projectId}/${spec.route}/${refId}` : null;
 
   const inner = href ? (
     <Link

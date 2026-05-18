@@ -68,7 +68,7 @@ interface Props {
    *  Полезно когда форма создания уже развёрнута через overviewReplace. */
   hideOverviewCreate?: boolean;
   /** Опциональный override URL для back-навигации и breadcrumb-ссылки на список.
-   *  По умолчанию вычисляется как `/folders/<folderId>/<spec.route>`. Используется
+   *  По умолчанию вычисляется как `/folders/<projectId>/<spec.route>`. Используется
    *  для nested-роутов (Subnet под Network → back к network detail). */
   backHrefOverride?: string;
   /** Опциональный override label для back-link breadcrumb (если задан). */
@@ -197,8 +197,8 @@ export function ResourceDetailPage({
 
   const backHref = useMemo(() => {
     if (backHrefOverride) return backHrefOverride;
-    const folderId = params.folderId;
-    if (folderId) return `/folders/${folderId}/${spec.route}`;
+    const projectId = params.projectId;
+    if (projectId) return `/projects/${projectId}/${spec.route}`;
     if (spec.id === "clouds" && data) {
       const orgId = getByPath<string>(data, "organization_id");
       return orgId ? `/organizations/${orgId}/clouds` : "/organizations";
@@ -208,7 +208,7 @@ export function ResourceDetailPage({
       return cloudId ? `/clouds/${cloudId}/folders` : "/organizations";
     }
     return "/organizations";
-  }, [params.folderId, spec.id, spec.route, data, backHrefOverride]);
+  }, [params.projectId, spec.id, spec.route, data, backHrefOverride]);
 
   const segments = useMemo(
     () =>
@@ -731,13 +731,13 @@ function JsonIntTab({ path, queryKey }: { path: string; queryKey: unknown[] }) {
 // `used_by` is absent or empty. Каждый referrer рендерится как «<Tag>{label}</Tag>
 // {id}» в одном кликабельном <Link> (для известных referrer-типов) либо plain
 // (для unknown — forward-compat fallback), через общий ReferrerLink helper
-// (та же визуальная форма, что и в list-view used_by column). folderId берём
-// из data.folder_id, либо из URL-параметров (:folderId) как fallback. В отличие
+// (та же визуальная форма, что и в list-view used_by column). projectId берём
+// из data.folder_id, либо из URL-параметров (:projectId) как fallback. В отличие
 // от list-view, здесь все рефереры показаны полностью (нет "+N" — stack-вью).
 function UsedByBlock({ data }: { data: Record<string, unknown> }) {
   const params = useParams();
-  const folderId =
-    (getByPath<string>(data, "folder_id") || null) ?? params.folderId ?? null;
+  const projectId =
+    (getByPath<string>(data, "folder_id") || null) ?? params.projectId ?? null;
   const raw = getByPath<unknown>(data, "used_by");
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const items = raw as Array<{
@@ -753,7 +753,7 @@ function UsedByBlock({ data }: { data: Record<string, unknown> }) {
           const id = r.referrer?.id ?? "";
           return (
             <li key={`${type}-${id}-${i}`} className="flex items-center gap-2">
-              <ReferrerLink folderId={folderId} referrer={r.referrer} />
+              <ReferrerLink projectId={projectId} referrer={r.referrer} />
             </li>
           );
         })}

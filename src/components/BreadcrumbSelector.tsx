@@ -1,6 +1,11 @@
-// BreadcrumbSelector — Org → Cloud → Folder breadcrumbs (pills).
-// Каждая крошка: dropdown со списком текущего parent + Create-кнопка (navigate)
-// + per-row Edit (navigate /edit) и Delete (DeleteDialog).
+// BreadcrumbSelector — Account → Project breadcrumbs (pills).
+//
+// KAC-117: модель Organization/Cloud/Folder заменена на Account/Project
+// (workspace CLAUDE.md «Что это за проект»: Account = top-level tenant,
+// Project = child Account). Old Org/Cloud/Folder селекторы удалены.
+//
+// Каждая крошка — dropdown со списком + Create-кнопка (navigate to /iam/...)
+// + per-row Edit/Delete.
 
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,7 +13,6 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
 import {
   Building,
-  Cloud,
   ChevronDown,
   FolderOpen,
   Check,
@@ -21,461 +25,298 @@ import { api } from "@/api/client";
 import {
   contextApi,
   useContext,
-  type CloudRef,
-  type FolderRef,
-  type OrgRef,
+  type AccountRef,
+  type ProjectRef,
 } from "@/lib/context-store";
 import { cn } from "@/lib/utils";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import { CopyableId } from "@/components/CopyableId";
 
-const ORG_API_PATH = "/organization-manager/v1/organizations";
+const ACCOUNT_API_PATH = "/iam/v1/accounts";
+const PROJECT_API_PATH = "/iam/v1/projects";
 
 interface DeleteState {
   apiPath: string;
   name: string;
-  resourceId: string; // для invalidate (organizations/clouds/folders)
+  resourceId: string;
   resourceLabel: string;
   onSuccess?: () => void;
 }
 
 export function BreadcrumbSelector() {
-  const org = useContext((s) => s.org);
-  const cloud = useContext((s) => s.cloud);
-  const folder = useContext((s) => s.folder);
+  const account = useContext((s) => s.account);
+  const project = useContext((s) => s.project);
   const navigate = useNavigate();
 
   const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
 
-  const goOrg = (id: string, name: string) => {
-    contextApi.setOrg({ id, name });
-    navigate(`/organizations/${id}/clouds`);
+  const goAccount = (id: string, name: string) => {
+    contextApi.setAccount({ id, name });
+    navigate(`/accounts/${id}/projects`);
   };
-  const goCloud = (id: string, name: string, orgId: string) => {
-    contextApi.setCloud({ id, name, organizationId: orgId });
-    navigate(`/clouds/${id}/folders`);
-  };
-  const goFolder = (id: string, name: string, cloudId: string, orgId: string) => {
-    contextApi.setFolder({ id, uid: id, name, cloudId, organizationId: orgId });
-    navigate(`/folders/${id}/dashboard`);
+  const goProject = (id: string, name: string, accountId: string) => {
+    contextApi.setProject({ id, name, accountId });
+    navigate(`/projects/${id}/dashboard`);
   };
 
   return (
-    <div className="flex items-center gap-1 text-sm">
-      <OrgCrumb
-        selected={org}
-        onSelect={(it) => goOrg(it.id, it.name)}
-        onDelete={setDeleteState}
-      />
-      <CrumbSeparator />
-      <CloudCrumb
-        selected={cloud}
-        parentOrgId={org?.id ?? null}
-        onSelect={(it) => goCloud(it.id, it.name, it.organization_id)}
-        onDelete={setDeleteState}
-      />
-      <CrumbSeparator />
-      <FolderCrumb
-        selected={folder}
-        parentCloudId={cloud?.id ?? null}
-        onSelect={(it) => goFolder(it.id, it.name, it.cloud_id, org?.id ?? "")}
-        onDelete={setDeleteState}
-      />
-
-      {deleteState && (
+    <>
+      <div className="flex items-center gap-1.5 text-sm">
+        <AccountCrumb
+          current={account}
+          onSelect={goAccount}
+          onDelete={(a) =>
+            setDeleteState({
+              apiPath: `${ACCOUNT_API_PATH}/${a.id}`,
+              name: a.name,
+              resourceId: a.id,
+              resourceLabel: "аккаунт",
+              onSuccess: () => {
+                if (account?.id === a.id) contextApi.setAccount(null);
+              },
+            })
+          }
+        />
+        {account ? (
+          <>
+            <ChevronDown className="size-3.5 -rotate-90 text-zinc-500" />
+            <ProjectCrumb
+              current={project}
+              accountId={account.id}
+              onSelect={(id, name) => goProject(id, name, account.id)}
+              onDelete={(p) =>
+                setDeleteState({
+                  apiPath: `${PROJECT_API_PATH}/${p.id}`,
+                  name: p.name,
+                  resourceId: p.id,
+                  resourceLabel: "проект",
+                  onSuccess: () => {
+                    if (project?.id === p.id) contextApi.setProject(null);
+                  },
+                })
+              }
+            />
+          </>
+        ) : null}
+      </div>
+      {deleteState ? (
         <DeleteDialog
           open
-          onOpenChange={(o) => !o && setDeleteState(null)}
-          apiPath={deleteState.apiPath}
+          onOpenChange={(o) => {
+            if (!o) setDeleteState(null);
+          }}
+          name={deleteState.name}
           resourceId={deleteState.resourceId}
           resourceLabel={deleteState.resourceLabel}
-          name={deleteState.name}
+          apiPath={deleteState.apiPath}
           onSuccess={() => {
             deleteState.onSuccess?.();
             setDeleteState(null);
           }}
         />
-      )}
-    </div>
+      ) : null}
+    </>
   );
 }
 
-// ====== Row shapes ======
+// ── AccountCrumb ────────────────────────────────────────────────────────────
 
-interface OrgRow {
-  id: string;
-  name: string;
-  title?: string;
-  description?: string;
-  labels?: Record<string, string>;
-}
-interface CloudRow {
-  id: string;
-  name: string;
-  description?: string;
-  organization_id: string;
-  labels?: Record<string, string>;
-}
-interface FolderRow {
-  id: string;
-  name: string;
-  description?: string;
-  cloud_id: string;
-  labels?: Record<string, string>;
+interface AccountCrumbProps {
+  current: AccountRef | null;
+  onSelect: (id: string, name: string) => void;
+  onDelete: (a: { id: string; name: string }) => void;
 }
 
-// ====== Separator ======
-
-function CrumbSeparator() {
-  return (
-    <span className="text-muted-foreground select-none" aria-hidden style={{ fontSize: 13 }}>
-      /
-    </span>
-  );
-}
-
-// ====== Org crumb ======
-
-function OrgCrumb({
-  selected,
-  onSelect,
-  onDelete,
-}: {
-  selected: OrgRef | null;
-  onSelect: (row: OrgRow) => void;
-  onDelete: (s: DeleteState) => void;
-}) {
+function AccountCrumb({ current, onSelect, onDelete }: AccountCrumbProps) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
-    queryKey: ["bc.orgs"],
-    queryFn: () => api.list<{ organizations: OrgRow[] }>(ORG_API_PATH),
-    refetchInterval: 30_000,
+    queryKey: ["accounts-crumb"],
+    queryFn: async () => {
+      const r = await api.get<{ accounts: Array<{ id: string; name: string }> }>(ACCOUNT_API_PATH);
+      return r.accounts ?? [];
+    },
+    staleTime: 30_000,
   });
-  const items = data?.organizations ?? [];
 
   return (
     <Crumb
-      icon={<Building className="h-4 w-4 text-muted-foreground" />}
-      label={
-        selected?.name ||
-        items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id : "Organization")
-      }
-      placeholder={!selected}
-      loading={isLoading && items.length === 0}
-      items={items.map((it) => ({
-        id: it.id,
-        label: it.name,
-        sub: it.id,
-        selected: selected?.id === it.id,
-        onSelect: () => onSelect(it),
-        onEdit: () => navigate(`/organizations/${it.id}/edit`),
-        onDelete: () =>
-          onDelete({
-            apiPath: `${ORG_API_PATH}/${it.id}`,
-            name: it.name,
-            resourceId: "organizations",
-            resourceLabel: "Organization",
-            onSuccess: () => {
-              if (selected?.id === it.id) navigate("/organizations");
-            },
-          }),
-      }))}
-      onCreate={() => navigate("/organizations/create")}
-    />
+      icon={<Building className="size-4" />}
+      label={current?.name || "Выберите аккаунт"}
+      labelMuted={!current}
+    >
+      <DropdownMenu.Label className="px-2 py-1 text-xs text-zinc-500">
+        Аккаунты {isLoading ? "(загрузка...)" : ""}
+      </DropdownMenu.Label>
+      {(data ?? []).map((a) => (
+        <DropdownRow
+          key={a.id}
+          name={a.name}
+          id={a.id}
+          selected={current?.id === a.id}
+          onClick={() => onSelect(a.id, a.name)}
+          onEdit={() => navigate(`/iam/accounts?modal=accounts-edit&id=${a.id}`)}
+          onDelete={() => onDelete({ id: a.id, name: a.name })}
+        />
+      ))}
+      <DropdownMenu.Separator className="my-1 h-px bg-zinc-700" />
+      <DropdownMenu.Item
+        onClick={() => navigate("/iam/accounts?modal=accounts-create")}
+        className="cursor-pointer rounded px-2 py-1.5 text-sm hover:bg-zinc-700/50 flex items-center gap-2"
+      >
+        <Plus className="size-4" />
+        Создать аккаунт
+      </DropdownMenu.Item>
+    </Crumb>
   );
 }
 
-// ====== Cloud crumb ======
+// ── ProjectCrumb ────────────────────────────────────────────────────────────
 
-function CloudCrumb({
-  selected,
-  parentOrgId,
-  onSelect,
-  onDelete,
-}: {
-  selected: CloudRef | null;
-  parentOrgId: string | null;
-  onSelect: (row: CloudRow) => void;
-  onDelete: (s: DeleteState) => void;
-}) {
+interface ProjectCrumbProps {
+  current: ProjectRef | null;
+  accountId: string;
+  onSelect: (id: string, name: string) => void;
+  onDelete: (p: { id: string; name: string }) => void;
+}
+
+function ProjectCrumb({ current, accountId, onSelect, onDelete }: ProjectCrumbProps) {
   const navigate = useNavigate();
   const { data, isLoading } = useQuery({
-    queryKey: ["bc.clouds", parentOrgId],
-    queryFn: () =>
-      api.list<{ clouds: CloudRow[] }>("/resource-manager/v1/clouds", {
-        organization_id: parentOrgId!,
-      }),
-    refetchInterval: 30_000,
-    enabled: !!parentOrgId,
+    queryKey: ["projects-crumb", accountId],
+    queryFn: async () => {
+      const r = await api.get<{ projects: Array<{ id: string; name: string; accountId: string }> }>(
+        `${PROJECT_API_PATH}?accountId=${encodeURIComponent(accountId)}`,
+      );
+      return r.projects ?? [];
+    },
+    enabled: !!accountId,
+    staleTime: 30_000,
   });
-  const items = data?.clouds ?? [];
 
   return (
     <Crumb
-      icon={<Cloud className="h-4 w-4 text-muted-foreground" />}
-      label={
-        selected?.name ||
-        items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id : "Cloud")
-      }
-      placeholder={!selected}
-      disabled={!parentOrgId}
-      loading={isLoading && items.length === 0}
-      disabledHint="Выберите Organization"
-      items={items.map((it) => ({
-        id: it.id,
-        label: it.name,
-        sub: it.id,
-        selected: selected?.id === it.id,
-        onSelect: () => onSelect(it),
-        onEdit: () => navigate(`/clouds/${it.id}/edit`),
-        onDelete: () =>
-          onDelete({
-            apiPath: `/resource-manager/v1/clouds/${it.id}`,
-            name: it.name,
-            resourceId: "clouds",
-            resourceLabel: "Cloud",
-            onSuccess: () => {
-              if (selected?.id === it.id && parentOrgId)
-                navigate(`/organizations/${parentOrgId}/clouds`);
-            },
-          }),
-      }))}
-      onCreate={
-        parentOrgId
-          ? () => navigate(`/organizations/${parentOrgId}/clouds/create`)
-          : undefined
-      }
-    />
+      icon={<FolderOpen className="size-4" />}
+      label={current?.name || "Выберите проект"}
+      labelMuted={!current}
+    >
+      <DropdownMenu.Label className="px-2 py-1 text-xs text-zinc-500">
+        Проекты {isLoading ? "(загрузка...)" : ""}
+      </DropdownMenu.Label>
+      {(data ?? []).map((p) => (
+        <DropdownRow
+          key={p.id}
+          name={p.name}
+          id={p.id}
+          selected={current?.id === p.id}
+          onClick={() => onSelect(p.id, p.name)}
+          onEdit={() => navigate(`/iam/projects?modal=projects-edit&id=${p.id}`)}
+          onDelete={() => onDelete({ id: p.id, name: p.name })}
+        />
+      ))}
+      <DropdownMenu.Separator className="my-1 h-px bg-zinc-700" />
+      <DropdownMenu.Item
+        onClick={() =>
+          navigate(`/iam/projects?modal=projects-create&accountId=${encodeURIComponent(accountId)}`)
+        }
+        className="cursor-pointer rounded px-2 py-1.5 text-sm hover:bg-zinc-700/50 flex items-center gap-2"
+      >
+        <Plus className="size-4" />
+        Создать проект
+      </DropdownMenu.Item>
+    </Crumb>
   );
 }
 
-// ====== Folder crumb ======
-
-function FolderCrumb({
-  selected,
-  parentCloudId,
-  onSelect,
-  onDelete,
-}: {
-  selected: FolderRef | null;
-  parentCloudId: string | null;
-  onSelect: (row: FolderRow) => void;
-  onDelete: (s: DeleteState) => void;
-}) {
-  const navigate = useNavigate();
-  const { data, isLoading } = useQuery({
-    queryKey: ["bc.folders", parentCloudId],
-    queryFn: () =>
-      api.list<{ folders: FolderRow[] }>("/resource-manager/v1/folders", {
-        cloud_id: parentCloudId!,
-      }),
-    refetchInterval: 30_000,
-    enabled: !!parentCloudId,
-  });
-  const items = data?.folders ?? [];
-
-  return (
-    <Crumb
-      icon={<FolderOpen className="h-4 w-4 text-muted-foreground" />}
-      beforeLabel={
-        selected ? (
-          <span className="inline-flex h-4 items-center px-1 rounded text-[10px] font-bold tracking-wider bg-blue-700/40 text-blue-300 border border-blue-500/30">
-            IN
-          </span>
-        ) : null
-      }
-      label={
-        selected?.name ||
-        items.find((it) => it.id === selected?.id)?.name ||
-        (selected ? selected.id : "Folder")
-      }
-      placeholder={!selected}
-      disabled={!parentCloudId}
-      loading={isLoading && items.length === 0}
-      disabledHint="Выберите Cloud"
-      items={items.map((it) => ({
-        id: it.id,
-        label: it.name,
-        sub: it.id,
-        selected: selected?.id === it.id,
-        onSelect: () => onSelect(it),
-        // Folder /edit route нет — Edit пока навигирует на dashboard;
-        // когда появится folder edit-page, тут поменяется на /folders/<id>/edit.
-        onEdit: () => navigate(`/folders/${it.id}/edit`),
-        onDelete: () =>
-          onDelete({
-            apiPath: `/resource-manager/v1/folders/${it.id}`,
-            name: it.name,
-            resourceId: "folders",
-            resourceLabel: "Folder",
-            onSuccess: () => {
-              if (selected?.id === it.id && parentCloudId)
-                navigate(`/clouds/${parentCloudId}/folders`);
-            },
-          }),
-      }))}
-      onCreate={
-        parentCloudId
-          ? () => navigate(`/clouds/${parentCloudId}/folders/create`)
-          : undefined
-      }
-    />
-  );
-}
-
-// ====== Crumb primitive ======
-
-interface CrumbItem {
-  id: string;
-  label: string;
-  sub?: string;
-  selected: boolean;
-  onSelect: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-}
-
-interface CrumbProps {
-  icon: ReactNode;
-  label: string;
-  beforeLabel?: ReactNode;
-  placeholder?: boolean;
-  disabled?: boolean;
-  loading?: boolean;
-  items?: CrumbItem[];
-  contentMinWidth?: number;
-  disabledHint?: string;
-  onCreate?: () => void;
-}
+// ── Crumb shell ─────────────────────────────────────────────────────────────
 
 function Crumb({
   icon,
   label,
-  beforeLabel,
-  placeholder,
-  disabled,
-  loading,
-  items,
-  contentMinWidth = 280,
-  disabledHint,
-  onCreate,
-}: CrumbProps) {
+  labelMuted,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  labelMuted?: boolean;
+  children: ReactNode;
+}) {
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <button
-          disabled={disabled}
-          className={cn(
-            "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md hover:bg-accent transition-colors max-w-[200px]",
-            disabled && "opacity-50 cursor-not-allowed hover:bg-transparent",
-          )}
-          title={disabled ? disabledHint : label}
-        >
-          {icon}
-          {beforeLabel}
-          <span className={cn("truncate", placeholder && "text-muted-foreground italic")}>
-            {label}
-          </span>
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        </button>
+      <DropdownMenu.Trigger
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-zinc-700/40 text-sm",
+          labelMuted ? "text-zinc-500" : "text-zinc-100",
+        )}
+      >
+        {icon}
+        <span>{label}</span>
+        <ChevronDown className="size-3.5 opacity-70" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="start"
           sideOffset={4}
-          style={{ minWidth: contentMinWidth }}
-          className="z-30 max-h-[70vh] overflow-y-auto rounded-md border border-border bg-card shadow-lg p-1"
+          className="z-50 min-w-[260px] max-h-[400px] overflow-auto rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-lg"
         >
-          {loading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Загрузка…</div>
-          )}
-          {!loading && (items?.length ?? 0) === 0 && (
-            <div className="px-3 py-2 text-xs text-muted-foreground italic">
-              Список пуст. Создайте первый элемент.
-            </div>
-          )}
-          {(items ?? []).map((it) => (
-            <CrumbRow key={it.id} item={it} />
-          ))}
-
-          {onCreate && (
-            <>
-              <DropdownMenu.Separator className="my-1 h-px bg-border" />
-              <DropdownMenu.Item
-                onSelect={() => onCreate()}
-                className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent text-emerald-400 font-medium"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Create new</span>
-              </DropdownMenu.Item>
-            </>
-          )}
+          {children}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
 }
 
-function CrumbRow({ item }: { item: CrumbItem }) {
-  const hasActions = !!item.onEdit || !!item.onDelete;
+function DropdownRow({
+  name,
+  id,
+  selected,
+  onClick,
+  onEdit,
+  onDelete,
+}: {
+  name: string;
+  id: string;
+  selected: boolean;
+  onClick: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <div className="flex items-stretch rounded hover:bg-accent group">
-      <DropdownMenu.Item
-        onSelect={() => item.onSelect()}
-        className={cn(
-          "flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer outline-none flex-1 min-w-0 rounded",
-          "data-[highlighted]:bg-accent",
-        )}
+    <div className="group flex items-center justify-between gap-2 rounded px-2 py-1 hover:bg-zinc-700/50">
+      <button
+        onClick={onClick}
+        className="flex flex-1 items-center gap-2 text-left text-sm"
       >
-        <Check
-          className={cn("h-4 w-4 shrink-0", item.selected ? "opacity-100" : "opacity-0")}
-        />
-        <span className="truncate flex-1">{item.label}</span>
-        {item.sub && <CopyableId id={item.sub} />}
-      </DropdownMenu.Item>
-
-      {hasActions && (
-        <DropdownMenu.Sub>
-          <DropdownMenu.SubTrigger
-            className={cn(
-              "flex items-center justify-center px-1.5 rounded outline-none",
-              "opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100",
-              "data-[highlighted]:bg-accent",
-            )}
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Действия"
+        {selected ? <Check className="size-3.5 text-emerald-400" /> : <span className="size-3.5" />}
+        <span className="truncate">{name || id}</span>
+      </button>
+      <CopyableId id={id} className="text-xs opacity-60" />
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-zinc-600/50">
+          <MoreVertical className="size-3.5" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            align="end"
+            sideOffset={2}
+            className="z-[60] min-w-[120px] rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-lg"
           >
-            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-          </DropdownMenu.SubTrigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.SubContent
-              sideOffset={4}
-              className="z-40 min-w-[160px] rounded-md border border-border bg-card shadow-md p-1"
+            <DropdownMenu.Item
+              onClick={onEdit}
+              className="cursor-pointer rounded px-2 py-1.5 text-sm hover:bg-zinc-700/50 flex items-center gap-2"
             >
-              {item.onEdit && (
-                <DropdownMenu.Item
-                  onSelect={() => item.onEdit?.()}
-                  className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-accent"
-                >
-                  <Pencil className="h-4 w-4" />
-                  Редактировать
-                </DropdownMenu.Item>
-              )}
-              {item.onDelete && (
-                <DropdownMenu.Item
-                  onSelect={() => item.onDelete?.()}
-                  className="flex items-center gap-2 rounded px-2 py-1.5 text-sm cursor-pointer outline-none data-[highlighted]:bg-rose-500/15 data-[highlighted]:text-rose-300 text-rose-400"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Удалить
-                </DropdownMenu.Item>
-              )}
-            </DropdownMenu.SubContent>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Sub>
-      )}
+              <Pencil className="size-3.5" />
+              Изменить
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onClick={onDelete}
+              className="cursor-pointer rounded px-2 py-1.5 text-sm hover:bg-zinc-700/50 text-red-400 flex items-center gap-2"
+            >
+              <Trash2 className="size-3.5" />
+              Удалить
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
     </div>
   );
 }

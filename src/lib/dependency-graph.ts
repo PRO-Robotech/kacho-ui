@@ -31,7 +31,7 @@ export interface DepNode {
   id: string;
   name: string;
   /** folder id ресурса — для построения ссылки. */
-  folderId: string;
+  projectId: string;
   /** URL-сегмент под /folders/:fid/ (например "vpc/subnets"). */
   routeSegment: string;
   /** Блокирует удаление родителя? */
@@ -58,7 +58,7 @@ function mkNode(resourceId: string, r: AnyRec, blocks: boolean, children: DepNod
     resourceId,
     id: String(r.id),
     name: (r.name as string) || String(r.id),
-    folderId: (r.folder_id as string) || "",
+    projectId: (r.folder_id as string) || "",
     routeSegment: routeSegmentFor(resourceId),
     blocks,
     children,
@@ -72,11 +72,11 @@ function nicAttachedInstanceId(ni: AnyRec): string {
 }
 
 /** Дети подсети: internal-Address'ы (RESTRICT) и NetworkInterface'ы (RESTRICT). */
-async function subnetChildren(subnetId: string, folderId: string): Promise<DepNode[]> {
-  if (!folderId) return [];
+async function subnetChildren(subnetId: string, projectId: string): Promise<DepNode[]> {
+  if (!projectId) return [];
   const [addrs, nics] = await Promise.all([
-    listAll("/vpc/v1/addresses", "addresses", { folder_id: folderId }),
-    listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: folderId }),
+    listAll("/vpc/v1/addresses", "addresses", { folder_id: projectId }),
+    listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: projectId }),
   ]);
   const out: DepNode[] = [];
   for (const a of addrs) {
@@ -93,9 +93,9 @@ async function subnetChildren(subnetId: string, folderId: string): Promise<DepNo
 }
 
 /** NIC'и, ссылающиеся на адрес в v4_address_ids / v6_address_ids. */
-async function addressDependents(addressId: string, folderId: string): Promise<DepNode[]> {
-  if (!folderId) return [];
-  const nics = await listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: folderId });
+async function addressDependents(addressId: string, projectId: string): Promise<DepNode[]> {
+  if (!projectId) return [];
+  const nics = await listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: projectId });
   const out: DepNode[] = [];
   for (const ni of nics) {
     const v4: string[] = ni.v4_address_ids ?? [];
@@ -120,7 +120,7 @@ export async function loadDependents(
   resourceId: string,
   resource: { id: string; folder_id?: string | null },
 ): Promise<DepNode[]> {
-  const folderId = resource.folder_id ?? "";
+  const projectId = resource.folder_id ?? "";
 
   if (resourceId === "networks") {
     const [subnets, routeTables, sgs] = await Promise.all([
@@ -130,7 +130,7 @@ export async function loadDependents(
     ]);
     const out: DepNode[] = [];
     for (const s of subnets) {
-      const kids = await subnetChildren(String(s.id), (s.folder_id as string) || folderId);
+      const kids = await subnetChildren(String(s.id), (s.folder_id as string) || projectId);
       out.push(mkNode("subnets", s, true, kids));
     }
     for (const rt of routeTables) out.push(mkNode("route-tables", rt, true));
@@ -142,11 +142,11 @@ export async function loadDependents(
   }
 
   if (resourceId === "subnets") {
-    return subnetChildren(resource.id, folderId);
+    return subnetChildren(resource.id, projectId);
   }
 
   if (resourceId === "addresses") {
-    return addressDependents(resource.id, folderId);
+    return addressDependents(resource.id, projectId);
   }
 
   if (resourceId === "network-interfaces") {
@@ -163,7 +163,7 @@ export async function loadDependents(
     return [
       mkNode(
         "compute-instances",
-        { id: instId, name: instId, folder_id: (ni?.folder_id as string) || folderId },
+        { id: instId, name: instId, folder_id: (ni?.folder_id as string) || projectId },
         true,
       ),
     ];

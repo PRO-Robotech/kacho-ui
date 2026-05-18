@@ -28,7 +28,7 @@ import {
 export function ServiceSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const folderId = useFolderStore((s) => s.folder)?.id ?? null;
+  const projectId = useFolderStore((s) => s.folder)?.id ?? null;
   const cloudId = useContext((s) => s.cloud)?.id ?? null;
   const { user, loading: authLoading, hasPermission } = useAuth();
   const { token } = theme.useToken();
@@ -39,10 +39,12 @@ export function ServiceSidebar() {
   // прячем IAM-кнопку. Profile-кнопка показывается только когда залогинены.
   const bottomItems = useMemo<NavLeaf[]>(() => {
     return COMMON_BOTTOM.filter((leaf) => {
-      if (leaf.key === "iam") {
-        if (authLoading) return true;
+      if (leaf.key === "system") {
+        // KAC-118: admin Administration (Regions/Zones/AddressPools) — только
+        // для admin (system principal либо * wildcard в permissions).
+        if (authLoading) return false;
         if (!user) return false;
-        return hasPermission("iam.read");
+        return user.subject_type === "system" || hasPermission("*") || hasPermission("admin");
       }
       if (leaf.key === "profile") {
         return !!user;
@@ -60,10 +62,10 @@ export function ServiceSidebar() {
         key: `mod-${m.key}`,
         icon: m.icon,
         label: m.label,
-        to: () => m.landing(folderId, cloudId),
+        to: () => m.landing(projectId, cloudId),
         matches: () => false,
       })),
-    [folderId, cloudId],
+    [projectId, cloudId],
   );
 
   const middle: NavLeaf[] = activeModule ? activeModule.items : moduleLaunchers;
@@ -73,7 +75,7 @@ export function ServiceSidebar() {
   }, [location.pathname, middle, bottomItems]);
 
   const renderLeaf = (leaf: NavLeaf) => {
-    const disabled = !!leaf.requiresFolder && !folderId;
+    const disabled = !!leaf.requiresFolder && !projectId;
     const active = activeLeafKey === leaf.key;
     return (
       <SidebarButton
@@ -82,7 +84,7 @@ export function ServiceSidebar() {
         label={disabled ? "Выберите каталог" : leaf.label}
         active={active}
         disabled={disabled}
-        onClick={() => !disabled && navigate(leaf.to(folderId))}
+        onClick={() => !disabled && navigate(leaf.to(projectId))}
         token={token}
       />
     );
