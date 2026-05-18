@@ -6,10 +6,12 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Select, Space, Tag, Typography } from "antd";
+import { Button, Card, Modal, Select, Space, Tag, Typography } from "antd";
 import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
+import { useContext } from "@/lib/context-store";
+import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 
 interface Props {
   title: string;
@@ -25,6 +27,19 @@ interface Props {
   onChange: (next: string[]) => void;
   /** Максимум элементов (KAC-55: ≤1 v4/v6 Address на NIC). */
   maxItems?: number;
+  /** KAC-101: ID ресурса в REGISTRY для inline-create в dropdown.
+   *  Если задан — в списке появляется «+ Создать …» entry, открывающая
+   *  InlineResourceCreateForm в модалке; на success id созданного ресурса
+   *  автоматически добавляется в текущий chip-list. */
+  createResource?: string;
+  /** Опц. preset для form'ы (например, internal_ipv4_address_spec.subnet_id
+   *  из контекста NIC формы). Поля locked. */
+  createPresetFields?: Record<string, unknown>;
+  /** Опц. редактируемые preset-поля (например, _address_kind). Дефолт, но
+   *  пользователь может изменить. */
+  createEditablePresetFields?: Record<string, unknown>;
+  /** Опц. title модалки. */
+  createTitle?: string;
 }
 
 export function ResourceRefChips({
@@ -36,12 +51,20 @@ export function ResourceRefChips({
   value,
   onChange,
   maxItems,
+  createResource,
+  createPresetFields,
+  createEditablePresetFields,
+  createTitle,
 }: Props) {
   const spec = getResource(refResource);
+  const createSpec = createResource ? getResource(createResource) : undefined;
+  const cloud = useContext((s) => s.cloud);
+  const org = useContext((s) => s.org);
   const [draft, setDraft] = useState<string | undefined>(undefined);
+  const [creating, setCreating] = useState(false);
 
   // Загружаем список ресурсов folder'а для resolve id→name + dropdown options.
-  const { data: listData } = useQuery({
+  const { data: listData, refetch } = useQuery({
     queryKey: [refResource, "list", projectId],
     queryFn: () =>
       api.list<Record<string, unknown>>(spec!.apiPath, {
@@ -63,25 +86,49 @@ export function ResourceRefChips({
     [rows],
   );
 
-  // Options для dropdown — только те, что ещё не добавлены.
-  const options = useMemo(
-    () =>
-      rows
-        .filter((r) => !value.includes((r.id as string) ?? ""))
-        .map((r) => ({
-          value: (r.id as string) ?? "",
-          label: ((r.name as string) || (r.id as string)) ?? "",
-        })),
-    [rows, value],
-  );
+  const CREATE_SENTINEL = "__create__";
+
+  // Options для dropdown — только те, что ещё не добавлены. KAC-101: при
+  // createResource добавляем sentinel-опцию «+ Создать <singular>…».
+  const options = useMemo(() => {
+    const base = rows
+      .filter((r) => !value.includes((r.id as string) ?? ""))
+      .map((r) => ({
+        value: (r.id as string) ?? "",
+        label: ((r.name as string) || (r.id as string)) ?? "",
+      }));
+    if (createSpec) {
+      base.push({
+        value: CREATE_SENTINEL,
+        label: `+ Создать ${createSpec.singular.toLowerCase()}…`,
+      });
+    }
+    return base;
+  }, [rows, value, createSpec]);
 
   const atCap = maxItems !== undefined && value.length >= maxItems;
 
   const onAdd = () => {
     if (!draft || atCap) return;
+    if (draft === CREATE_SENTINEL) {
+      setCreating(true);
+      setDraft(undefined);
+      return;
+    }
     if (value.includes(draft)) return;
     onChange([...value, draft]);
     setDraft(undefined);
+  };
+
+  // KAC-101: на выбор sentinel-опции открываем inline-create modal
+  // (alt-flow: пользователь не жмёт Add, а сразу выбирает «+ Создать…»).
+  const onDraftChange = (next: string | undefined) => {
+    if (next === CREATE_SENTINEL) {
+      setCreating(true);
+      setDraft(undefined);
+      return;
+    }
+    setDraft(next);
   };
 
   const onRemove = (id: string) => {
@@ -135,7 +182,7 @@ export function ResourceRefChips({
           <Select
             showSearch
             value={draft}
-            onChange={setDraft}
+            onChange={onDraftChange}
             options={options}
             placeholder={atCap ? `Максимум ${maxItems}` : `Выбрать ${title}`}
             optionFilterProp="label"
@@ -153,6 +200,52 @@ export function ResourceRefChips({
           </Button>
         </Space.Compact>
       </Space>
+      {creating && createSpec && (
+        <Modal
+          open
+          footer={null}
+          onCancel={() => setCreating(false)}
+          width={860}
+          destroyOnClose
+          maskClosable
+          title={null}
+        >
+          <InlineResourceCreateForm
+            spec={createSpec}
+            ctx={{ projectId, cloudId: cloud?.id, organizationId: org?.id }}
+            presetFields={createPresetFields}
+            editablePresetFields={createEditablePresetFields}
+            folderUid={projectId}
+            title={createTitle}
+            onCancel={() => setCreating(false)}
+            onSuccess={() => {
+              // KAC-101: refetch candidate-list — новый ресурс должен появиться;
+              // diff'им до/после и подхватываем fresh id в текущий chip-list.
+              const beforeIds = new Set(
+                rows.map((r) => (r.id as string) ?? "").filter(Boolean),
+              );
+              void refetch().then((r) => {
+                const after = (r.data?.[spec!.payloadKey] as
+                  | Record<string, unknown>[]
+                  | undefined) ?? [];
+                const filtered = refFilter ? after.filter(refFilter) : after;
+                const fresh = filtered.find(
+                  (it) => !beforeIds.has((it.id as string) ?? ""),
+                );
+                if (fresh) {
+                  const id = (fresh.id as string) ?? "";
+                  if (id && !value.includes(id)) {
+                    if (!(maxItems !== undefined && value.length >= maxItems)) {
+                      onChange([...value, id]);
+                    }
+                  }
+                }
+                setCreating(false);
+              });
+            }}
+          />
+        </Modal>
+      )}
     </Card>
   );
 }

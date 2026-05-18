@@ -220,6 +220,14 @@ export function InlineNetworkInterfaceEditForm({
             onChange={setV4}
             maxItems={1}
             refFilter={(row) => !!row.internal_ipv4_address}
+            createResource="addresses"
+            createPresetFields={{
+              _address_kind: "internal",
+              ...(nic.subnet_id
+                ? { "internal_ipv4_address_spec.subnet_id": nic.subnet_id }
+                : {}),
+            }}
+            createTitle="Создание Internal IPv4-адреса"
           />
         </Form.Item>
 
@@ -235,6 +243,14 @@ export function InlineNetworkInterfaceEditForm({
             refFilter={(row) =>
               !!row.internal_ipv6_address || !!row.external_ipv6_address
             }
+            createResource="addresses"
+            createEditablePresetFields={{ _address_kind: "internal_v6" }}
+            createPresetFields={
+              nic.subnet_id
+                ? { "internal_ipv6_address_spec.subnet_id": nic.subnet_id }
+                : undefined
+            }
+            createTitle="Создание IPv6-адреса"
           />
         </Form.Item>
 
@@ -246,6 +262,8 @@ export function InlineNetworkInterfaceEditForm({
             tagColor="purple"
             value={sgs}
             onChange={setSgs}
+            createResource="security-groups"
+            createTitle="Создание группы безопасности"
           />
         </Form.Item>
 
