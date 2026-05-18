@@ -107,6 +107,11 @@ export const api = {
     return fetchJson("POST", path, body);
   },
 
+  /** POST <path>  body, raw return — для custom RPC (e.g. :invite, :listBySubject). */
+  post<T>(path: string, body: unknown): Promise<T> {
+    return fetchJson<T>("POST", path, body);
+  },
+
   /** PATCH <path>/{id}  body=resource → Operation */
   update(path: string, body: unknown): Promise<{ operation: import("./types").Operation }> {
     return fetchJson("PATCH", path, body);
