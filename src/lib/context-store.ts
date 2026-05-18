@@ -151,10 +151,13 @@ export const contextApi = {
       setState({ account: state.account, project: null });
       return;
     }
+    // KAC-120: если проект из другого Account — переключаем account-ref на новый id
+    // (name догрузится через ContextUrlSync hydration). Это решает проблему "выбор
+    // аккаунта не работает" — теперь setProject автоматически syncs Account.
     const account =
       state.account && state.account.id === project.accountId
         ? state.account
-        : { id: project.accountId, name: state.account?.name ?? "" };
+        : { id: project.accountId, name: "" }; // name fresh из hydration
     setState({ account, project });
   },
 

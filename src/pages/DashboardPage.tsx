@@ -67,36 +67,37 @@ export function DashboardPage() {
   const ctx = useContext((s) => s);
   const navigate = useNavigate();
 
-  const projectId = ctx.folder?.id ?? null;
-  const cloudId = ctx.cloud?.id ?? null;
+  const projectId = ctx.project?.id ?? null;
+  const accountId = ctx.account?.id ?? null;
 
-  const { folderIds: cloudFolderIds, count: foldersInCloud } = useFoldersInCloud(projectId ? null : cloudId);
-
-  // Counts для каждого модуля (фиксированный список SERVICE_MODULES → хук-вызовы стабильны).
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId, cloudFolderIds);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId, cloudFolderIds);
+  // Counts для каждого модуля. SERVICE_MODULES[0..2] = vpc/compute/iam.
+  // IAM не требует projectId (его ресурсы — account-level), счётчики работают всегда.
+  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId, null);
+  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId, null);
+  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*", null); // "*" — fake projectId чтобы хук активировался
   const countsByModule: Record<string, CountMap> = {
     [SERVICE_MODULES[0].key]: vpcCounts,
     [SERVICE_MODULES[1].key]: computeCounts,
+    [SERVICE_MODULES[2].key]: iamCounts,
   };
 
   useBreadcrumb(useMemo(() => <Typography.Text strong>Все сервисы</Typography.Text>, []));
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, cloudId));
+  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, accountId));
 
   const caption = (() => {
-    if (ctx.folder) return `Каталог: ${ctx.folder.name || ctx.folder.id}`;
-    if (ctx.cloud) return `Облако: ${ctx.cloud.name || ctx.cloud.id} — счётчики суммарно по всем каталогам. Выберите каталог, чтобы перейти к ресурсам.`;
-    return "Контекст не выбран — выберите Cloud и Folder в шапке.";
+    if (ctx.project) return `Проект: ${ctx.project.name || ctx.project.id}`;
+    if (ctx.account) return `Аккаунт: ${ctx.account.name || ctx.account.id} — выберите проект чтобы перейти к ресурсам.`;
+    return "Контекст не выбран — выберите Account и Project в шапке. IAM-блок доступен всегда.";
   })();
 
-  // Плашки показываем как только выбран хотя бы Cloud.
-  const tilesVisible = !!ctx.cloud;
+  // Плашки VPC/Compute требуют Project context. IAM — всегда виден.
+  const tilesVisible = true;
   const allEmpty =
-    !!ctx.folder &&
-    SERVICE_MODULES.every((m) =>
+    !!ctx.project &&
+    SERVICE_MODULES.filter((m) => m.key !== "iam").every((m) =>
       m.stats.every((s) => (countsByModule[m.key]?.[s.key] ?? null) === 0),
     );
 
@@ -110,19 +111,19 @@ export function DashboardPage() {
           <Typography.Text type="secondary">{caption}</Typography.Text>
         </div>
 
-        {!ctx.cloud && (
+        {!ctx.account && (
           <Alert
             type="info"
             showIcon
-            message="Чтобы увидеть плашки сервисов — выберите Cloud (через шапку или дерево слева)."
+            message="Выберите Account и Project в шапке для просмотра VPC и Compute ресурсов. IAM доступен всегда."
             action={
               <Button
                 size="small"
                 icon={<ArrowRightOutlined />}
-                onClick={() => navigate("/organizations")}
-                data-testid="dashboard-go-organizations"
+                onClick={() => navigate("/iam/accounts")}
+                data-testid="dashboard-go-iam"
               >
-                Organizations
+                Перейти в IAM
               </Button>
             }
           />

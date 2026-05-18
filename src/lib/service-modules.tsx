@@ -67,7 +67,9 @@ export interface ServiceModule {
 }
 
 const seg = (f: string | null, path: string) => (f ? `/projects/${f}/${path}` : "/dashboard");
-const folderRe = (path: string) => new RegExp(`^/folders/[^/]+/${path.replace(/\//g, "\\/")}`);
+const folderRe = (path: string) => new RegExp(`^/projects/[^/]+/${path.replace(/\//g, "\\/")}`);
+const iamSeg = (path: string) => `/iam/${path}`;
+const iamRe = (path: string) => new RegExp(`^/iam/${path.replace(/\//g, "\\/")}`);
 
 export const SERVICE_MODULES: ServiceModule[] = [
   {
@@ -103,7 +105,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <CloudServerOutlined />,
     color: "#36CFC9",
     description: "Виртуальные машины, диски, образы и снимки дисков.",
-    landing: (f, c) => (f ? `/projects/${f}/compute/instances` : c ? `/clouds/${c}/folders` : "/organizations"),
+    landing: (f) => (f ? `/projects/${f}/compute/instances` : "/dashboard"),
     stats: [
       { key: "instances", label: "Машин", listPath: "/compute/v1/instances", payloadKey: "instances" },
       { key: "disks", label: "Дисков", listPath: "/compute/v1/disks", payloadKey: "disks" },
@@ -114,6 +116,33 @@ export const SERVICE_MODULES: ServiceModule[] = [
       { key: "compute-disks", icon: <HddOutlined />, label: "Диски", to: (f) => seg(f, "compute/disks"), matches: (p) => folderRe("compute/disks").test(p), requiresFolder: true },
       { key: "compute-images", icon: <FileImageOutlined />, label: "Образы", to: (f) => seg(f, "compute/images"), matches: (p) => folderRe("compute/images").test(p), requiresFolder: true },
       { key: "compute-snapshots", icon: <CameraOutlined />, label: "Снимки дисков", to: (f) => seg(f, "compute/snapshots"), matches: (p) => folderRe("compute/snapshots").test(p), requiresFolder: true },
+    ],
+  },
+  // KAC-117/120: IAM — отдельный module-block, параллельно VPC/Compute.
+  // IAM ресурсы: Account, Project, User, ServiceAccount, Group, Role, AccessBinding.
+  // Не требует folder/project context (живёт на уровне /iam/*).
+  {
+    key: "iam",
+    segment: "iam",
+    label: "Identity and Access Management",
+    short: "IAM",
+    icon: <LockOutlined />,
+    color: "#9B59F6",
+    description: "Аккаунты, проекты, пользователи, сервисные аккаунты, группы, роли и связки прав.",
+    landing: () => "/iam/accounts",
+    stats: [
+      { key: "accounts", label: "Аккаунтов", listPath: "/iam/v1/accounts", payloadKey: "accounts" },
+      { key: "projects", label: "Проектов", listPath: "/iam/v1/projects", payloadKey: "projects" },
+      { key: "roles", label: "Ролей", listPath: "/iam/v1/roles", payloadKey: "roles" },
+    ],
+    items: [
+      { key: "iam-accounts", icon: <ApartmentOutlined />, label: "Аккаунты", to: () => iamSeg("accounts"), matches: (p) => iamRe("accounts").test(p) },
+      { key: "iam-projects", icon: <ClusterOutlined />, label: "Проекты", to: () => iamSeg("projects"), matches: (p) => iamRe("projects").test(p) },
+      { key: "iam-users", icon: <UserOutlined />, label: "Пользователи", to: () => iamSeg("users"), matches: (p) => iamRe("users").test(p) },
+      { key: "iam-service-accounts", icon: <ApiOutlined />, label: "Сервисные аккаунты", to: () => iamSeg("service-accounts"), matches: (p) => iamRe("service-accounts").test(p) },
+      { key: "iam-groups", icon: <NodeIndexOutlined />, label: "Группы", to: () => iamSeg("groups"), matches: (p) => iamRe("groups").test(p) },
+      { key: "iam-roles", icon: <SafetyOutlined />, label: "Роли", to: () => iamSeg("roles"), matches: (p) => iamRe("roles").test(p) },
+      { key: "iam-access-bindings", icon: <GatewayOutlined />, label: "Связки прав", to: () => iamSeg("access-bindings"), matches: (p) => iamRe("access-bindings").test(p) },
     ],
   },
 ];
@@ -143,15 +172,9 @@ export const COMMON_TOP: NavLeaf[] = [
   },
 ];
 
-/** Нижний общий блок сайдбара (всегда виден). */
+/** Нижний общий блок сайдбара (всегда виден). KAC-120: IAM удалён отсюда —
+ *  теперь регистрируется как module-block в SERVICE_MODULES (параллельно VPC/Compute). */
 export const COMMON_BOTTOM: NavLeaf[] = [
-  {
-    key: "iam",
-    icon: <LockOutlined />,
-    label: "Identity and Access Management",
-    to: () => "/iam/accounts",
-    matches: (p) => p.startsWith("/iam/"),
-  },
   {
     key: "system",
     icon: <SettingOutlined />,

@@ -39,11 +39,6 @@ export function ServiceSidebar() {
   // прячем IAM-кнопку. Profile-кнопка показывается только когда залогинены.
   const bottomItems = useMemo<NavLeaf[]>(() => {
     return COMMON_BOTTOM.filter((leaf) => {
-      if (leaf.key === "iam") {
-        if (authLoading) return true;
-        if (!user) return false;
-        return hasPermission("iam.read");
-      }
       if (leaf.key === "system") {
         // KAC-118: admin Administration (Regions/Zones/AddressPools) — только
         // для admin (system principal либо * wildcard в permissions).
