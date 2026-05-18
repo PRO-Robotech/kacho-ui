@@ -32,6 +32,7 @@ import { ServiceAccountsPage } from "@/pages/iam/ServiceAccountsPage";
 import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
+import { AccessPage } from "@/pages/iam/AccessPage";
 import { AuthCallback } from "@/pages/auth/AuthCallback";
 import { SignupPage } from "@/pages/auth/SignupPage";
 import { LogoutPage } from "@/pages/auth/Logout";
@@ -528,6 +529,8 @@ export default function App() {
               <Route path="/iam/groups" element={<GroupsPage />} />
               <Route path="/iam/roles" element={<RolesPage />} />
               <Route path="/iam/access-bindings" element={<AccessBindingsPage />} />
+              {/* KAC-125: YC-style «Права доступа» с Cascader + invite. */}
+              <Route path="/iam/access" element={<AccessPage />} />
             </Route>
 
             {/* === Auth routes (OIDC callback + logout) ===

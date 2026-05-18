@@ -44,17 +44,31 @@ export interface ProjectList {
   next_page_token?: string;
 }
 
-// ====== User ======
+// ====== User (KAC-125: per-Account + invite-status) ======
+export type InviteStatus = "PENDING" | "ACTIVE" | "BLOCKED";
+
 export interface User {
   id: string;
   external_id?: string;
   email?: string;
   display_name?: string;
   created_at?: string;
+  // KAC-125 — User per-Account; nullable для backward compat.
+  account_id?: string;
+  invite_status?: InviteStatus;
+  invited_by?: string;
 }
 export interface UserList {
   users: User[];
   next_page_token?: string;
+}
+
+export interface InviteUserRequest {
+  account_id: string;
+  email: string;
+  display_name?: string;
+  project_id?: string;
+  role_id?: string;
 }
 
 // ====== ServiceAccount ======
@@ -146,6 +160,9 @@ export const iamApi = {
   listProjects: (q?: Record<string, string>) =>
     api.list<ProjectList>(IAM.projects, q),
   // Users
+  // KAC-125: Invite user by email (admin OR editor permission on account).
+  inviteUser: (req: InviteUserRequest) =>
+    api.post<{ id?: string; metadata?: { user_id?: string; account_id?: string; magic_link_url?: string }; response?: User; error?: { code: number; message: string } }>(`${IAM.users}:invite`, req),
   listUsers: (q?: Record<string, string>) =>
     api.list<UserList>(IAM.users, q),
   // SAs
