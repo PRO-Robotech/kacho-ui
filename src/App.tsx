@@ -36,6 +36,11 @@ import { AccessPage } from "@/pages/iam/AccessPage";
 import { AuthCallback } from "@/pages/auth/AuthCallback";
 import { SignupPage } from "@/pages/auth/SignupPage";
 import { LogoutPage } from "@/pages/auth/Logout";
+import { LoginPage } from "@/pages/auth/Login";
+import { RegisterPage } from "@/pages/auth/Register";
+import { RecoveryPage } from "@/pages/auth/Recovery";
+import { SettingsPage } from "@/pages/auth/Settings";
+import { StepUpModal } from "@/components/auth/StepUpModal";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient({
@@ -174,9 +179,16 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
         <AuthProvider>
+        <StepUpModal />
         <Routes>
           {/* Public signup/login pages (без Layout — full-screen) */}
           <Route path="/signup" element={<SignupPage />} />
+
+          {/* KAC-127 (Phase 2): Passkey/WebAuthn auth pages — без Layout. */}
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/registration" element={<RegisterPage />} />
+          <Route path="/auth/recovery" element={<RecoveryPage />} />
+          <Route path="/auth/settings" element={<SettingsPage />} />
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />

@@ -1,15 +1,20 @@
-// AuthContext — React-контекст для текущего user'а (из OIDC-сессии).
+// AuthContext — централизованный auth state для kacho-ui (KAC-127 Phase 2).
 //
-// На mount делает `GET /iam/v1/auth/me` (с credentials: 'include' для httpOnly
-// session cookie). 200 → `user`, 401 / network-fail → `user=null` (не залогинен).
+// Что внутри:
+//   - user / session (из api-gateway /iam/v1/auth/me + Kratos /sessions/whoami)
+//   - access-token (in-memory только; никогда не в localStorage)
+//   - mfaFreshUntil (timestamp) — для step-up RequireMFAFresh-guard
+//   - login() / logout() / refresh() — высокоуровневые actions
 //
-// API:
-//   const { user, loading, login, logout, refresh } = useAuth();
-//   if (loading) return <Spinner/>;
-//   if (!user) return <LoginButton/>;
+// Подключает `apiClient` (см. lib/api-client.ts) — настраивает callbacks для:
+//   - getAccessToken — отдаёт текущий in-memory token
+//   - onTokenExpired — refresh через Kratos whoami (session cookie) +
+//     Hydra refresh-token (httpOnly cookie). На E2 — single-source-of-truth.
+//   - onStepUpRequired — открывает StepUpModal и ждёт success
 //
-// На E0 (Zitadel не задеплоен) endpoint /iam/v1/auth/me вернёт 401 / 404 —
-// UI грациозно отрисует state «не залогинен» (показ Login-кнопки) без поломок.
+// Backward-compat для KAC-115 (Logout, HeaderAuth, LoginButton, UserMenu) —
+// `useAuth` экспозит те же поля `user / loading / login / logout / refresh /
+// hasPermission` плюс новые расширения. Старые consumers продолжают работать.
 
 import {
   createContext,
@@ -17,54 +22,159 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { authApi, hasPermission as checkPerm, type AuthUser } from "@/api/auth";
+import { kratos, type KratosSession } from "@/lib/kratos";
+import { apiClient } from "@/lib/api-client";
+import { clearDpopKeyPair, ensureDpopKeyPair } from "@/lib/dpop";
+import { config } from "@/lib/config";
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: AuthUser | null;
+  session: KratosSession | null;
   loading: boolean;
-  /** Старт OIDC-flow (full-page redirect). */
-  login: () => void;
-  /** Очистить session cookie + сбросить state. */
-  logout: () => void;
-  /** Принудительно перезапросить /me (после callback). */
+  accessToken: string | null;
+  /** Unix-seconds timestamp, до которого MFA «свежий». */
+  mfaFreshUntil: number;
+
+  /** Старт self-service login flow (Kratos browser redirect). */
+  login: (returnTo?: string) => void;
+  /** Logout: Kratos token-flow + Hydra BCL + clear DPoP key. */
+  logout: () => Promise<void>;
+  /** Перезапросить /me + whoami. */
   refresh: () => Promise<void>;
-  /** Хелпер: проверить permission у текущего user'а. */
+  /** Установить access-token (после Hydra token-exchange). */
+  setAccessToken: (token: string | null) => void;
+  /** Установить mfa-fresh timestamp (после успешного step-up). */
+  markMfaFresh: (ttlSec?: number) => void;
+  /** Проверка permission (admin `*` wildcard). */
   hasPermission: (perm: string) => boolean;
+  /** Зарегистрировать step-up handler — обычно StepUpModal. */
+  setStepUpHandler: (handler: ((acr?: string) => Promise<void>) | null) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<KratosSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [mfaFreshUntil, setMfaFreshUntil] = useState<number>(0);
+
+  // Refs для apiClient callbacks (mutable без re-render-ов).
+  const tokenRef = useRef<string | null>(null);
+  const stepUpHandlerRef = useRef<((acr?: string) => Promise<void>) | null>(null);
+
+  tokenRef.current = accessToken;
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
-      const resp = await authApi.me();
-      setUser(resp.user ?? null);
-    } catch {
-      // 401 / network — нормальный «не залогинен», не пугаем consoles.
-      setUser(null);
+      const [meResp, whoamiResp] = await Promise.allSettled([
+        authApi.me(),
+        kratos.whoami(),
+      ]);
+      if (meResp.status === "fulfilled") {
+        setUser(meResp.value.user ?? null);
+      } else {
+        setUser(null);
+      }
+      if (whoamiResp.status === "fulfilled") {
+        setSession(whoamiResp.value);
+        // Kratos AAL2 → considered MFA-fresh; user_verification флаг — на бэке.
+        if (whoamiResp.value?.authenticator_assurance_level === "aal2") {
+          const lastAuth =
+            new Date(whoamiResp.value.authenticated_at).getTime() / 1000;
+          setMfaFreshUntil(lastAuth + config.mfaFreshTtlMin * 60);
+        }
+      } else {
+        setSession(null);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
+  // Init: keypair + initial refresh + apiClient hookup.
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    (async () => {
+      try {
+        await ensureDpopKeyPair();
+      } catch {
+        // WebCrypto / IDB недоступны (private window?) — продолжаем без DPoP.
+      }
+      apiClient.configure({
+        getAccessToken: () => tokenRef.current,
+        onTokenExpired: async () => {
+          // Стратегия: re-fetch /me — Kratos session cookie должна выписать
+          // новый access-token через Hydra refresh-flow (api-gateway middleware).
+          // Если /me возвращает 401 — token не обновился, user должен залогиниться.
+          try {
+            const resp = await authApi.me();
+            if (resp?.user) {
+              await refresh();
+              return tokenRef.current;
+            }
+          } catch {
+            // fallthrough
+          }
+          return null;
+        },
+        onStepUpRequired: async (acr?: string) => {
+          const handler = stepUpHandlerRef.current;
+          if (!handler) {
+            window.location.assign(
+              kratos.loginUrl(window.location.pathname + window.location.search),
+            );
+            return;
+          }
+          await handler(acr);
+        },
+      });
+      if (!cancelled) await refresh();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
-  const login = useCallback(() => {
-    authApi.login();
+  const login = useCallback((returnTo?: string) => {
+    window.location.assign(kratos.loginUrl(returnTo));
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      const { logout_token } = await kratos.initLogout();
+      await kratos.submitLogout(logout_token);
+    } catch {
+      // Session уже истекла — игнорируем.
+    }
+    await clearDpopKeyPair();
     setUser(null);
-    // Full-page navigation на Kratos logout flow — он сам сбросит cookie + редирект.
-    authApi.logout();
+    setSession(null);
+    setAccessTokenState(null);
+    tokenRef.current = null;
+    setMfaFreshUntil(0);
+    try {
+      authApi.logout();
+    } catch {
+      window.location.assign("/");
+    }
+  }, []);
+
+  const setAccessToken = useCallback((token: string | null) => {
+    setAccessTokenState(token);
+    tokenRef.current = token;
+  }, []);
+
+  const markMfaFresh = useCallback((ttlSec?: number) => {
+    const ttl = ttlSec ?? config.mfaFreshTtlMin * 60;
+    setMfaFreshUntil(Math.floor(Date.now() / 1000) + ttl);
   }, []);
 
   const hasPermission = useCallback(
@@ -72,19 +182,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   );
 
+  const setStepUpHandler = useCallback(
+    (handler: ((acr?: string) => Promise<void>) | null) => {
+      stepUpHandlerRef.current = handler;
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, login, logout, refresh, hasPermission }),
-    [user, loading, login, logout, refresh, hasPermission],
+    () => ({
+      user,
+      session,
+      loading,
+      accessToken,
+      mfaFreshUntil,
+      login,
+      logout,
+      refresh,
+      setAccessToken,
+      markMfaFresh,
+      hasPermission,
+      setStepUpHandler,
+    }),
+    [
+      user,
+      session,
+      loading,
+      accessToken,
+      mfaFreshUntil,
+      login,
+      logout,
+      refresh,
+      setAccessToken,
+      markMfaFresh,
+      hasPermission,
+      setStepUpHandler,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/** Hook для доступа к auth state. Выбрасывает, если вызван вне AuthProvider. */
+/** Hook для доступа к auth state. Throws вне AuthProvider. */
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within <AuthProvider>");
   }
   return ctx;
+}
+
+/** True если MFA свежий (для RequireMFAFresh guard). */
+export function isMfaFresh(value: { mfaFreshUntil: number }): boolean {
+  return value.mfaFreshUntil > Math.floor(Date.now() / 1000);
 }

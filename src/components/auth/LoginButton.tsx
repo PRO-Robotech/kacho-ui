@@ -14,7 +14,7 @@ export function LoginButton() {
       type="primary"
       size="small"
       icon={<LoginOutlined />}
-      onClick={login}
+      onClick={() => login()}
       loading={loading}
     >
       Войти
