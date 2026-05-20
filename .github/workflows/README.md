@@ -41,8 +41,10 @@ gh secret set DOCKERHUB_TOKEN    --body "<value>" --repo PRO-Robotech/kacho-ui
 `kacho-ui` — self-contained: `Dockerfile` копирует только собственные файлы репо.
 Build context = `.`, sibling-чекаут не нужен.
 
-### self-hosted runner
+### arm64 runner (GitHub-hosted)
 
-Job `docker-build-arm64` требует `runs-on: self-hosted` arm64-раннер. Если
-arm64-раннер недоступен — образ соберётся только под amd64 (job arm64 + manifest
-push зафейлятся; amd64-тег при этом валиден).
+Job `docker-build-arm64` гоняется на GitHub-hosted native ARM64-раннере
+`runs-on: ubuntu-24.04-arm` (KAC-127). Раньше использовался `self-hosted`
+раннер — при offline/busy он вешал job в `pending` бесконечно и `build arm64`
+check никогда не зеленел. Hosted ARM64-раннер native — QEMU-эмуляция для
+`linux/arm64` не нужна (шаг `Enable QEMU emulation` в arm64-job убран).
