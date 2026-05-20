@@ -1,9 +1,8 @@
 // GlobalResourceFormModal — глобальный mount-point для Create/Edit модалок.
 // Mountится один раз в Layout, читает URL (любого вида:
-// /folders/.../vpc/..., /folders/.../compute/..., /organizations/...,
-// /clouds/..., /system/...) и определяет «активный контейнер» (folder /
-// cloud / organization / system) — пробрасывает его как `containerId`
-// в ResourceFormModal.
+// /projects/.../vpc/..., /projects/.../compute/..., /iam/..., /system/...)
+// и определяет «активный контейнер» (project / iam / system) — пробрасывает
+// его как `containerId` в ResourceFormModal.
 //
 // Это позволяет любой странице ставить `?modal=<spec.id>-create` и не
 // заботиться о mount'е — модалка работает автоматически.
@@ -15,18 +14,13 @@ export function GlobalResourceFormModal() {
   const location = useLocation();
 
   // Парсим из pathname id активного контейнера.
-  // /folders/<id>/...        → projectId
-  // /clouds/<id>/...         → cloudId  (Cloud-scoped resources)
-  // /organizations/<id>/...  → orgId    (Org-scoped resources)
-  // /system/...              → "system" (admin cluster-scoped ресурсы,
-  //                            не требуют конкретного container id).
+  // /projects/<id>/...   → projectId
+  // /iam/...             → "iam"     (global IAM resources, не требуют id).
+  // /system/...          → "system"  (admin cluster-scoped ресурсы).
   const containerId = (() => {
-    const folder = location.pathname.match(/^\/folders\/([^/]+)/);
-    if (folder) return folder[1];
-    const cloud = location.pathname.match(/^\/clouds\/([^/]+)/);
-    if (cloud) return cloud[1];
-    const org = location.pathname.match(/^\/organizations\/([^/]+)/);
-    if (org) return org[1];
+    const project = location.pathname.match(/^\/projects\/([^/]+)/);
+    if (project) return project[1];
+    if (location.pathname.startsWith("/iam")) return "iam";
     if (location.pathname.startsWith("/system/")) return "system";
     return null;
   })();

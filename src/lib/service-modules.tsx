@@ -80,7 +80,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <ApartmentOutlined />,
     color: "#3D8DF5",
     description: "Облачные сети, подсети, группы безопасности, публичные IP, таблицы маршрутизации.",
-    landing: (f, c) => (f ? `/projects/${f}/vpc/networks` : c ? `/clouds/${c}/folders` : "/organizations"),
+    landing: (f) => (f ? `/projects/${f}/vpc/networks` : "/iam/projects"),
     stats: [
       { key: "networks", label: "Сетей", listPath: "/vpc/v1/networks", payloadKey: "networks" },
       { key: "subnets", label: "Подсетей", listPath: "/vpc/v1/subnets", payloadKey: "subnets" },
@@ -147,9 +147,13 @@ export const SERVICE_MODULES: ServiceModule[] = [
   },
 ];
 
-/** Активный модуль по URL — `/folders/:fid/<segment>/...` → ServiceModule | null. */
+/** Активный модуль по URL — `/projects/:projectId/<segment>/...` → ServiceModule | null.
+ *  Также матчит `/iam/...` → IAM module (которому проектный контекст не нужен). */
 export function moduleFromPathname(pathname: string): ServiceModule | null {
-  const m = pathname.match(/^\/folders\/[^/]+\/([^/]+)/);
+  if (pathname.startsWith("/iam")) {
+    return SERVICE_MODULES.find((mod) => mod.segment === "iam") ?? null;
+  }
+  const m = pathname.match(/^\/projects\/[^/]+\/([^/]+)/);
   if (!m) return null;
   return SERVICE_MODULES.find((mod) => mod.segment === m[1]) ?? null;
 }
@@ -161,7 +165,7 @@ export const COMMON_TOP: NavLeaf[] = [
     icon: <HomeOutlined />,
     label: "Все сервисы",
     to: (f) => (f ? `/projects/${f}/dashboard` : "/dashboard"),
-    matches: (p) => p === "/dashboard" || /^\/folders\/[^/]+\/dashboard$/.test(p),
+    matches: (p) => p === "/dashboard" || /^\/projects\/[^/]+\/dashboard$/.test(p),
   },
   {
     key: "search",

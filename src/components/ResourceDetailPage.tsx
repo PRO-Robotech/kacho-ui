@@ -199,16 +199,10 @@ export function ResourceDetailPage({
     if (backHrefOverride) return backHrefOverride;
     const projectId = params.projectId;
     if (projectId) return `/projects/${projectId}/${spec.route}`;
-    if (spec.id === "clouds" && data) {
-      const orgId = getByPath<string>(data, "organization_id");
-      return orgId ? `/organizations/${orgId}/clouds` : "/organizations";
-    }
-    if (spec.id === "folders" && data) {
-      const cloudId = getByPath<string>(data, "cloud_id");
-      return cloudId ? `/clouds/${cloudId}/folders` : "/organizations";
-    }
-    return "/organizations";
-  }, [params.projectId, spec.id, spec.route, data, backHrefOverride]);
+    // KAC-124: Resource Manager (Organization/Cloud/Folder) удалён — заменён на
+    // IAM (Account/Project). Fallback ведёт в IAM Projects list.
+    return "/iam/projects";
+  }, [params.projectId, spec.route, backHrefOverride]);
 
   const segments = useMemo(
     () =>

@@ -17,14 +17,7 @@ const config: UserConfig & { test?: Record<string, unknown> } = {
     proxy: {
       // dev: проксируем domain-prefixed paths на api-gateway (port-forward на 8080).
       // URL-ы verbatim из proto google.api.http annotations.
-      "/organization-manager": {
-        target: process.env.KACHO_API_BASE || "http://localhost:8080",
-        changeOrigin: true,
-      },
-      "/resource-manager": {
-        target: process.env.KACHO_API_BASE || "http://localhost:8080",
-        changeOrigin: true,
-      },
+      // KAC-124: /organization-manager и /resource-manager удалены — заменены /iam.
       "/vpc": {
         target: process.env.KACHO_API_BASE || "http://localhost:8080",
         changeOrigin: true,

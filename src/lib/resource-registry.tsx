@@ -56,8 +56,16 @@ export interface ResourceSpec {
   // Если задан — кнопка в строке ведёт сюда вместо DetailPage. Используется
   // для иерархического drill-flow Org → Clouds → Folders → VPC.
   childRoute?: string;
-  // skeleton-объект для Create-формы
-  template: (ctx: { projectId?: string; cloudId?: string; organizationId?: string }) => unknown;
+  // skeleton-объект для Create-формы.
+  // accountId — preferred (kacho.cloud.iam.v1.Project.account_id).
+  // cloudId / organizationId — backward-compat alias через context-store
+  //   (FolderRef.cloudId / organizationId оба mapped в Account.id).
+  template: (ctx: {
+    projectId?: string;
+    accountId?: string;
+    cloudId?: string;
+    organizationId?: string;
+  }) => unknown;
   // Опциональная нормализация payload перед отправкой на API.
   // Используется для конвертации form-internal представления (wrapper-объекты, toggle-поля)
   // в wire format (plain arrays, oneof etc.).
@@ -100,7 +108,7 @@ const COL_ID: ResourceColumn = {
   format: "uid-short",
 };
 
-// Strict — для resource-manager/organization-manager (Cloud, Folder, Organization).
+// Strict — для IAM (Account, Project).
 // Совпадает с backend validate.Name (verbatim YC `/[a-z]([-a-z0-9]{0,61}[a-z0-9])?/`).
 const FIELD_NAME: FormField = {
   name: "name",
@@ -160,111 +168,66 @@ const FIELD_LABELS: FormField = {
 };
 
 export const REGISTRY: Record<string, ResourceSpec> = {
-  // ====== organization-manager ======
-  // proto: GET /organization-manager/v1/organizations
+  // ====== iam (KAC-124: заменил organization-manager + resource-manager) ======
+  // proto: kacho.cloud.iam.v1.AccountService / ProjectService.
 
-  organizations: {
-    id: "organizations",
-    route: "organizations",
-    apiPath: "/organization-manager/v1/organizations",
-    payloadKey: "organizations",
-    singular: "Organization",
-    plural: "Organizations",
-    serviceTitle: "Resource Manager",
+  accounts: {
+    id: "accounts",
+    route: "accounts",
+    apiPath: "/iam/v1/accounts",
+    payloadKey: "accounts",
+    singular: "Account",
+    plural: "Accounts",
+    serviceTitle: "IAM",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Title", path: "title", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
     fields: [
       FIELD_NAME,
-      { name: "title", label: "Title", type: "string", placeholder: "My Organization" },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
-    childRoute: "/organizations/:id/clouds",
-    template: () => ({ name: "", title: "", description: "" }),
+    template: () => ({ name: "", description: "" }),
   },
 
-  // ====== resource-manager ======
-  // proto: GET /resource-manager/v1/clouds
-
-  clouds: {
-    id: "clouds",
-    route: "clouds",
-    apiPath: "/resource-manager/v1/clouds",
-    payloadKey: "clouds",
-    singular: "Cloud",
-    plural: "Clouds",
-    serviceTitle: "Resource Manager",
+  projects: {
+    id: "projects",
+    route: "projects",
+    apiPath: "/iam/v1/projects",
+    payloadKey: "projects",
+    singular: "Project",
+    plural: "Projects",
+    serviceTitle: "IAM",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Org", path: "organization_id", format: "uid-short" },
+      { header: "Account", path: "account_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
     fields: [
       FIELD_NAME,
       {
-        name: "organization_id",
-        label: "Organization",
+        name: "account_id",
+        label: "Account",
         type: "ref",
-        refResource: "organizations",
+        refResource: "accounts",
         required: true,
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
-    childRoute: "/clouds/:id/folders",
-    template: ({ organizationId }) => ({
+    // Project drill-down → /projects/:id; FolderDefaultRedirect перебрасывает
+    // дальше на /projects/:id/dashboard.
+    childRoute: "/projects/:id",
+    template: ({ accountId, cloudId, organizationId }) => ({
       name: "",
-      organization_id: organizationId ?? "",
-      description: "",
-    }),
-  },
-
-  // proto: GET /resource-manager/v1/folders
-
-  folders: {
-    id: "folders",
-    route: "folders",
-    apiPath: "/resource-manager/v1/folders",
-    payloadKey: "folders",
-    singular: "Folder",
-    plural: "Folders",
-    serviceTitle: "Resource Manager",
-    scope: "global",
-    ops: { create: true, update: true, delete: true },
-    columns: [
-      COL_NAME,
-      { header: "Cloud", path: "cloud_id", format: "uid-short" },
-      { header: "Status", path: "status", format: "status" },
-      COL_CREATED,
-      COL_ID,
-    ],
-    fields: [
-      FIELD_NAME,
-      {
-        name: "cloud_id",
-        label: "Cloud",
-        type: "ref",
-        refResource: "clouds",
-        required: true,
-      },
-      FIELD_LABELS,
-      FIELD_DESCRIPTION,
-    ],
-    // Folder drill-down → /folders/:id; FolderDefaultRedirect там перебрасывает
-    // дальше на /folders/:id/networks (первый VPC-ресурс).
-    childRoute: "/folders/:id",
-    template: ({ cloudId }) => ({
-      name: "",
-      cloud_id: cloudId ?? "",
+      account_id: accountId ?? cloudId ?? organizationId ?? "",
       description: "",
     }),
   },

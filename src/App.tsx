@@ -199,61 +199,10 @@ export default function App() {
             {/* KAC-117: legacy redirect /folders/<id>/* → /projects/<id>/* */}
             <Route path="/folders/*" element={<FoldersLegacyRedirect />} />
 
-            {/* === Resource Manager hierarchy (через path) === */}
-
-            {/* /organizations — список org (cluster-scoped) */}
-            <Route
-              path="/organizations"
-              element={<ResourceListPage spec={REGISTRY.organizations} />}
-            />
-            <Route
-              path="/organizations/create"
-              element={<ResourceCreatePage spec={REGISTRY.organizations} />}
-            />
-
-            {/* /organizations/:orgId/clouds — список clouds в orgId */}
-            <Route
-              path="/organizations/:orgId/clouds"
-              element={
-                <ResourceListPage
-                  spec={REGISTRY.clouds}
-                  parentField="organization_id"
-                  parentParam="orgId"
-                />
-              }
-            />
-            <Route
-              path="/organizations/:orgId/clouds/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.clouds}
-                  parentField="organization_id"
-                  parentParam="orgId"
-                />
-              }
-            />
-
-            {/* /clouds/:cloudId/folders — список folders в cloudId */}
-            <Route
-              path="/clouds/:cloudId/folders"
-              element={
-                <ResourceListPage
-                  spec={REGISTRY.folders}
-                  parentField="cloud_id"
-                  parentParam="cloudId"
-                />
-              }
-            />
-            <Route
-              path="/clouds/:cloudId/folders/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.folders}
-                  parentField="cloud_id"
-                  parentParam="cloudId"
-                />
-              }
-            />
+            {/* === IAM hierarchy (KAC-124: заменил Resource Manager) ===
+                Account / Project — flat ресурсы под /iam/accounts и /iam/projects;
+                рендерятся в IAM-section ниже (AccountsPage / ProjectsPage). Legacy
+                /organizations, /clouds, /clouds/:id/folders routes удалены. */}
 
             {/* === Folder-scoped VPC ресурсы === */}
             {/* /projects/:projectId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
@@ -484,28 +433,10 @@ export default function App() {
               path="/projects/:projectId"
               element={<FolderDefaultRedirect />}
             />
-            {/* Edit folder — full-page форма */}
+            {/* Edit project — full-page форма (KAC-124: folder → project). */}
             <Route
               path="/projects/:projectId/edit"
-              element={<ResourceEditPage spec={REGISTRY.folders} paramKey="projectId" />}
-            />
-
-            {/* Detail-страницы для Resource Manager */}
-            <Route
-              path="/organizations/:orgId"
-              element={<ResourceDetailPage spec={REGISTRY.organizations} paramKey="orgId" />}
-            />
-            <Route
-              path="/organizations/:orgId/edit"
-              element={<ResourceEditPage spec={REGISTRY.organizations} paramKey="orgId" />}
-            />
-            <Route
-              path="/clouds/:cloudId"
-              element={<ResourceDetailPage spec={REGISTRY.clouds} paramKey="cloudId" />}
-            />
-            <Route
-              path="/clouds/:cloudId/edit"
-              element={<ResourceEditPage spec={REGISTRY.clouds} paramKey="cloudId" />}
+              element={<ResourceEditPage spec={REGISTRY.projects} paramKey="projectId" />}
             />
 
             {/* === System (admin-only, kacho-only) === */}

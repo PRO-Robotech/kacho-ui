@@ -13,23 +13,22 @@ interface Hit {
   id: string;
   name: string;
   folder_id?: string;
-  cloud_id?: string;
-  organization_id?: string;
+  account_id?: string;
   link: string;
   extras?: Record<string, string>;
 }
 
 const DOMAINS = [
-  { resource: "organizations", path: "/organization-manager/v1/organizations", key: "organizations", linkBase: "/organizations/:id" },
-  { resource: "clouds",        path: "/resource-manager/v1/clouds",            key: "clouds",        linkBase: "/clouds/:id" },
-  { resource: "folders",       path: "/resource-manager/v1/folders",           key: "folders",       linkBase: "/folders/:id" },
-  { resource: "networks",      path: "/vpc/v1/networks",                       key: "networks",      linkBase: "/folders/:folder_id/networks/:id" },
-  { resource: "subnets",       path: "/vpc/v1/subnets",                        key: "subnets",       linkBase: "/folders/:folder_id/subnets/:id" },
-  { resource: "addresses",     path: "/vpc/v1/addresses",                      key: "addresses",     linkBase: "/folders/:folder_id/addresses/:id" },
-  { resource: "network-interfaces", path: "/vpc/v1/networkInterfaces",         key: "network_interfaces", linkBase: "/folders/:folder_id/network-interfaces/:id" },
-  { resource: "address-pools", path: "/vpc/v1/addressPools",                   key: "pools",         linkBase: "/system/address-pools/:id" },
-  { resource: "regions",       path: "/compute/v1/regions",                        key: "regions",       linkBase: "/system/regions/:id" },
-  { resource: "zones",         path: "/compute/v1/zones",                          key: "zones",         linkBase: "/system/zones/:id" },
+  // KAC-124: Resource Manager (orgs/clouds/folders) → IAM (accounts/projects).
+  { resource: "accounts",      path: "/iam/v1/accounts",                  key: "accounts",      linkBase: "/iam/accounts" },
+  { resource: "projects",      path: "/iam/v1/projects",                  key: "projects",      linkBase: "/projects/:id" },
+  { resource: "networks",      path: "/vpc/v1/networks",                  key: "networks",      linkBase: "/projects/:folder_id/vpc/networks/:id" },
+  { resource: "subnets",       path: "/vpc/v1/subnets",                   key: "subnets",       linkBase: "/projects/:folder_id/vpc/subnets/:id" },
+  { resource: "addresses",     path: "/vpc/v1/addresses",                 key: "addresses",     linkBase: "/projects/:folder_id/vpc/addresses/:id" },
+  { resource: "network-interfaces", path: "/vpc/v1/networkInterfaces",    key: "network_interfaces", linkBase: "/projects/:folder_id/vpc/network-interfaces/:id" },
+  { resource: "address-pools", path: "/vpc/v1/addressPools",              key: "pools",         linkBase: "/system/address-pools/:id" },
+  { resource: "regions",       path: "/compute/v1/regions",               key: "regions",       linkBase: "/system/regions/:id" },
+  { resource: "zones",         path: "/compute/v1/zones",                 key: "zones",         linkBase: "/system/zones/:id" },
 ];
 
 // ВАЖНО: VPC list endpoints (networks/subnets/addresses) обычно требуют projectId,
@@ -67,8 +66,7 @@ export function SystemSearchPage() {
           id,
           name,
           folder_id: r.folder_id as string | undefined,
-          cloud_id: r.cloud_id as string | undefined,
-          organization_id: r.organization_id as string | undefined,
+          account_id: r.account_id as string | undefined,
           link: d.linkBase
             .replace(":folder_id", String(r.folder_id ?? ""))
             .replace(":id", id),
@@ -86,7 +84,7 @@ export function SystemSearchPage() {
       <div>
         <h1 className="text-xl font-semibold">System Search</h1>
         <p className="text-sm text-muted-foreground">
-          Cross-resource поиск по ID и имени. Включает all org/cloud/folder и vpc-ресурсы (admin).
+          Cross-resource поиск по ID и имени. Включает IAM accounts/projects и vpc-ресурсы (admin).
         </p>
       </div>
 
@@ -113,7 +111,7 @@ export function SystemSearchPage() {
               <tr>
                 <th className="text-left px-3 py-2">Resource</th>
                 <th className="text-left px-3 py-2">Name / ID</th>
-                <th className="text-left px-3 py-2">Folder / Cloud / Org</th>
+                <th className="text-left px-3 py-2">Project / Account</th>
                 <th className="text-left px-3 py-2">Extra</th>
               </tr>
             </thead>
@@ -128,10 +126,9 @@ export function SystemSearchPage() {
                     <div className="text-[10px] font-mono text-muted-foreground">{h.id}</div>
                   </td>
                   <td className="px-3 py-2 text-xs font-mono">
-                    {h.folder_id && <div>F: {h.folder_id.slice(0, 12)}…</div>}
-                    {h.cloud_id && <div>C: {h.cloud_id.slice(0, 12)}…</div>}
-                    {h.organization_id && <div>O: {h.organization_id.slice(0, 12)}…</div>}
-                    {!h.folder_id && !h.cloud_id && !h.organization_id && <span className="text-muted-foreground">—</span>}
+                    {h.folder_id && <div>P: {h.folder_id.slice(0, 12)}…</div>}
+                    {h.account_id && <div>A: {h.account_id.slice(0, 12)}…</div>}
+                    {!h.folder_id && !h.account_id && <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-3 py-2 text-xs">
                     {Object.entries(h.extras ?? {}).map(([k, v]) => (
