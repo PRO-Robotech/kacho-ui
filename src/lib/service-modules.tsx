@@ -4,8 +4,8 @@
 //   • плашку на дашборде (label / icon / color / description / список stat-метрик);
 //   • собственный набор ссылок сайдбара (items) — рендерится, когда активен этот модуль.
 //
-// Модуль считается «активным», если текущий URL начинается с `/folders/:fid/<segment>/...`
-// (см. moduleFromPathname). Дашборд / Resource Manager / System — вне модулей; сайдбар
+// Модуль считается «активным», если текущий URL начинается с `/projects/:projectId/<segment>/...`
+// (см. moduleFromPathname). Дашборд / IAM / System — вне модулей; сайдбар
 // в этом случае показывает лаунчеры модулей (COMMON_TOP → лаунчеры → COMMON_BOTTOM).
 
 import type { ReactNode } from "react";
@@ -37,10 +37,10 @@ export interface NavLeaf {
   label: string;
   to: (projectId: string | null) => string;
   matches: (pathname: string) => boolean;
-  requiresFolder?: boolean;
+  requiresProject?: boolean;
 }
 
-/** Stat-метрика плашки: считается через GET `${listPath}?folder_id=…&pageSize=1000` → `resp[payloadKey].length`. */
+/** Stat-метрика плашки: считается через GET `${listPath}?project_id=…&pageSize=1000` → `resp[payloadKey].length`. */
 export interface ModuleStat {
   key: string;
   label: string;
@@ -51,7 +51,7 @@ export interface ModuleStat {
 export interface ServiceModule {
   /** Стабильный ключ модуля (`vpc` | `compute`). */
   key: string;
-  /** URL-сегмент под `/folders/:fid/`. */
+  /** URL-сегмент под `/projects/:projectId/`. */
   segment: string;
   /** Полное имя для плашки. */
   label: string;
@@ -60,14 +60,14 @@ export interface ServiceModule {
   icon: ReactNode;
   color: string;
   description: string;
-  /** Куда вести при клике по плашке / лаунчеру — с учётом наличия folder/cloud. */
-  landing: (projectId: string | null, cloudId: string | null) => string;
+  /** Куда вести при клике по плашке / лаунчеру — с учётом наличия project/account. */
+  landing: (projectId: string | null, accountId: string | null) => string;
   stats: ModuleStat[];
   items: NavLeaf[];
 }
 
 const seg = (f: string | null, path: string) => (f ? `/projects/${f}/${path}` : "/dashboard");
-const folderRe = (path: string) => new RegExp(`^/projects/[^/]+/${path.replace(/\//g, "\\/")}`);
+const projectRe = (path: string) => new RegExp(`^/projects/[^/]+/${path.replace(/\//g, "\\/")}`);
 const iamSeg = (path: string) => `/iam/${path}`;
 const iamRe = (path: string) => new RegExp(`^/iam/${path.replace(/\//g, "\\/")}`);
 
@@ -87,14 +87,14 @@ export const SERVICE_MODULES: ServiceModule[] = [
       { key: "sgs", label: "Групп безопасности", listPath: "/vpc/v1/securityGroups", payloadKey: "security_groups" },
     ],
     items: [
-      { key: "networks", icon: <ApartmentOutlined />, label: "Облачные сети", to: (f) => seg(f, "vpc/networks"), matches: (p) => folderRe("vpc/networks").test(p), requiresFolder: true },
-      { key: "subnets", icon: <ClusterOutlined />, label: "Подсети", to: (f) => seg(f, "vpc/subnets"), matches: (p) => folderRe("vpc/subnets").test(p), requiresFolder: true },
-      { key: "addresses", icon: <GlobalOutlined />, label: "Публичные IP-адреса", to: (f) => seg(f, "vpc/addresses"), matches: (p) => folderRe("vpc/addresses").test(p), requiresFolder: true },
-      { key: "route-tables", icon: <NodeIndexOutlined />, label: "Таблицы маршрутизации", to: (f) => seg(f, "vpc/route-tables"), matches: (p) => folderRe("vpc/route-tables").test(p), requiresFolder: true },
-      { key: "security-groups", icon: <SafetyOutlined />, label: "Группы безопасности", to: (f) => seg(f, "vpc/security-groups"), matches: (p) => folderRe("vpc/security-groups").test(p), requiresFolder: true },
-      { key: "network-interfaces", icon: <ApiOutlined />, label: "Сетевые интерфейсы", to: (f) => seg(f, "vpc/network-interfaces"), matches: (p) => folderRe("vpc/network-interfaces").test(p), requiresFolder: true },
-      { key: "gateways", icon: <GatewayOutlined />, label: "Шлюзы", to: (f) => seg(f, "vpc/gateways"), matches: (p) => folderRe("vpc/gateways").test(p), requiresFolder: true },
-      { key: "operations", icon: <HistoryOutlined />, label: "Операции", to: (f) => seg(f, "vpc/operations"), matches: (p) => folderRe("vpc/operations").test(p), requiresFolder: true },
+      { key: "networks", icon: <ApartmentOutlined />, label: "Облачные сети", to: (f) => seg(f, "vpc/networks"), matches: (p) => projectRe("vpc/networks").test(p), requiresProject: true },
+      { key: "subnets", icon: <ClusterOutlined />, label: "Подсети", to: (f) => seg(f, "vpc/subnets"), matches: (p) => projectRe("vpc/subnets").test(p), requiresProject: true },
+      { key: "addresses", icon: <GlobalOutlined />, label: "Публичные IP-адреса", to: (f) => seg(f, "vpc/addresses"), matches: (p) => projectRe("vpc/addresses").test(p), requiresProject: true },
+      { key: "route-tables", icon: <NodeIndexOutlined />, label: "Таблицы маршрутизации", to: (f) => seg(f, "vpc/route-tables"), matches: (p) => projectRe("vpc/route-tables").test(p), requiresProject: true },
+      { key: "security-groups", icon: <SafetyOutlined />, label: "Группы безопасности", to: (f) => seg(f, "vpc/security-groups"), matches: (p) => projectRe("vpc/security-groups").test(p), requiresProject: true },
+      { key: "network-interfaces", icon: <ApiOutlined />, label: "Сетевые интерфейсы", to: (f) => seg(f, "vpc/network-interfaces"), matches: (p) => projectRe("vpc/network-interfaces").test(p), requiresProject: true },
+      { key: "gateways", icon: <GatewayOutlined />, label: "Шлюзы", to: (f) => seg(f, "vpc/gateways"), matches: (p) => projectRe("vpc/gateways").test(p), requiresProject: true },
+      { key: "operations", icon: <HistoryOutlined />, label: "Операции", to: (f) => seg(f, "vpc/operations"), matches: (p) => projectRe("vpc/operations").test(p), requiresProject: true },
     ],
   },
   {
@@ -112,15 +112,15 @@ export const SERVICE_MODULES: ServiceModule[] = [
       { key: "images", label: "Образов", listPath: "/compute/v1/images", payloadKey: "images" },
     ],
     items: [
-      { key: "compute-instances", icon: <DesktopOutlined />, label: "Виртуальные машины", to: (f) => seg(f, "compute/instances"), matches: (p) => folderRe("compute/instances").test(p), requiresFolder: true },
-      { key: "compute-disks", icon: <HddOutlined />, label: "Диски", to: (f) => seg(f, "compute/disks"), matches: (p) => folderRe("compute/disks").test(p), requiresFolder: true },
-      { key: "compute-images", icon: <FileImageOutlined />, label: "Образы", to: (f) => seg(f, "compute/images"), matches: (p) => folderRe("compute/images").test(p), requiresFolder: true },
-      { key: "compute-snapshots", icon: <CameraOutlined />, label: "Снимки дисков", to: (f) => seg(f, "compute/snapshots"), matches: (p) => folderRe("compute/snapshots").test(p), requiresFolder: true },
+      { key: "compute-instances", icon: <DesktopOutlined />, label: "Виртуальные машины", to: (f) => seg(f, "compute/instances"), matches: (p) => projectRe("compute/instances").test(p), requiresProject: true },
+      { key: "compute-disks", icon: <HddOutlined />, label: "Диски", to: (f) => seg(f, "compute/disks"), matches: (p) => projectRe("compute/disks").test(p), requiresProject: true },
+      { key: "compute-images", icon: <FileImageOutlined />, label: "Образы", to: (f) => seg(f, "compute/images"), matches: (p) => projectRe("compute/images").test(p), requiresProject: true },
+      { key: "compute-snapshots", icon: <CameraOutlined />, label: "Снимки дисков", to: (f) => seg(f, "compute/snapshots"), matches: (p) => projectRe("compute/snapshots").test(p), requiresProject: true },
     ],
   },
   // KAC-117/120: IAM — отдельный module-block, параллельно VPC/Compute.
   // IAM ресурсы: Account, Project, User, ServiceAccount, Group, Role, AccessBinding.
-  // Не требует folder/project context (живёт на уровне /iam/*).
+  // Не требует project context (живёт на уровне /iam/*).
   {
     key: "iam",
     segment: "iam",

@@ -16,7 +16,7 @@ import type { AccountSummaryList, ProjectSummaryList } from "@/api/types";
 
 interface PoolAddrEntry {
   id: string;
-  folder_id: string;
+  project_id: string;
   name: string;
   ipv4: string;
   zone_id: string;
@@ -55,8 +55,7 @@ export function AddressPoolDetailPage() {
   });
 
   // KAC-124: IAM Account + Project заменили Resource-Manager Organization+Cloud+Folder.
-  // VPC резервирует addresses под `folder_id` (на уровне backend это project_id —
-  // proto-поле всё ещё называется `folder_id` для backward-compat).
+  // VPC резервирует addresses под `project_id`.
   const { data: projects } = useQuery({
     queryKey: ["iam-projects-all"],
     queryFn: () => api.list<ProjectSummaryList>("/iam/v1/projects"),
@@ -126,13 +125,13 @@ export function AddressPoolDetailPage() {
                   </thead>
                   <tbody>
                     {(addresses?.addresses ?? []).map((a) => {
-                      const lk = reverseLookup(a.folder_id);
+                      const lk = reverseLookup(a.project_id);
                       return (
                         <tr key={a.id} className="border-t border-border hover:bg-muted/20">
                           <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
                           <td className="px-3 py-2">
                             <Link
-                              to={`/projects/${a.folder_id}/vpc/addresses/${a.id}`}
+                              to={`/projects/${a.project_id}/vpc/addresses/${a.id}`}
                               className="text-blue-400 hover:underline"
                             >
                               {a.name || a.id.slice(0, 12) + "…"}
@@ -141,8 +140,8 @@ export function AddressPoolDetailPage() {
                           </td>
                           <td className="px-3 py-2 font-mono text-xs">{a.zone_id}</td>
                           <td className="px-3 py-2 text-xs">
-                            <Link to={`/projects/${a.folder_id}`} className="hover:underline">
-                              {lk.project ?? a.folder_id.slice(0, 8) + "…"}
+                            <Link to={`/projects/${a.project_id}`} className="hover:underline">
+                              {lk.project ?? a.project_id.slice(0, 8) + "…"}
                             </Link>
                           </td>
                           <td className="px-3 py-2 text-xs">{lk.account ?? "—"}</td>

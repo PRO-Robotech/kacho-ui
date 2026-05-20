@@ -1,7 +1,7 @@
 // RefSelect — выбор ресурса по ID из выпадающего списка.
-// Загружает список через GET <apiPath>?folder_id=<uid> (+ опц. динамический
+// Загружает список через GET <apiPath>?project_id=<id> (+ опц. динамический
 // query-параметр от другого поля формы, напр. ?subnet_id=<form.subnet_id>).
-// apiPath уже содержит полный путь (e.g. "/resource-manager/v1/organizations"),
+// apiPath уже содержит полный путь (e.g. "/iam/v1/projects"),
 // никакого "/v1/" префикса не добавляем.
 // Flat API: ресурсы имеют поля id и name.
 //
@@ -15,15 +15,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Modal } from "antd";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
-import { useFolderStore } from "@/lib/folder-store";
-import { useContext } from "@/lib/context-store";
+import { useProjectStore } from "@/lib/context-store";
 import { CopyableId } from "@/components/CopyableId";
 import { ErrorResult } from "@/components/ErrorResult";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 
 interface Props {
   refResource: string;
-  refFolderScoped?: boolean;
+  refProjectScoped?: boolean;
   value?: string;
   onChange: (uid: string) => void;
   placeholder?: string;
@@ -43,7 +42,7 @@ interface Props {
 
 export function RefSelect({
   refResource,
-  refFolderScoped,
+  refProjectScoped,
   value,
   onChange,
   placeholder,
@@ -56,9 +55,7 @@ export function RefSelect({
   createPresetFields,
   createTitle,
 }: Props) {
-  const folder = useFolderStore((s) => s.folder);
-  const cloud = useContext((s) => s.cloud);
-  const org = useContext((s) => s.org);
+  const project = useProjectStore((s) => s.project);
   const spec = getResource(refResource);
   const createSpec = createResource ? getResource(createResource) : undefined;
 
@@ -73,19 +70,19 @@ export function RefSelect({
 
   const enabled =
     !!spec &&
-    (!refFolderScoped || !!folder) &&
+    (!refProjectScoped || !!project) &&
     (!needsDynParam || !!dynParamValue);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       "ref",
       refResource,
-      refFolderScoped ? folder?.uid : null,
+      refProjectScoped ? project?.id : null,
       needsDynParam ? dynParamValue ?? null : null,
     ],
     queryFn: () => {
       const q: Record<string, string> = {};
-      if (refFolderScoped && folder) q["folder_id"] = folder.uid;
+      if (refProjectScoped && project) q["project_id"] = project.id;
       if (refQueryFromField && dynParamValue) q[refQueryFromField.param] = dynParamValue;
       return api.list<Record<string, Array<{ id: string; name: string } & Record<string, unknown>>>>(
         spec!.apiPath,
@@ -140,8 +137,8 @@ export function RefSelect({
         )}
       </select>
       {value && <CopyableId id={value} />}
-      {refFolderScoped && !folder && (
-        <p className="text-xs text-amber-600">Выберите folder в шапке для загрузки.</p>
+      {refProjectScoped && !project && (
+        <p className="text-xs text-amber-600">Выберите проект в шапке для загрузки.</p>
       )}
       {needsDynParam && !dynParamValue && (
         <p className="text-xs text-amber-600">
@@ -171,12 +168,11 @@ export function RefSelect({
           <InlineResourceCreateForm
             spec={createSpec}
             ctx={{
-              projectId: folder?.uid,
-              cloudId: cloud?.id,
-              organizationId: org?.id,
+              projectId: project?.id,
+              accountId: project?.accountId,
             }}
             presetFields={createPresetFields && formValue ? createPresetFields(formValue) : undefined}
-            folderUid={folder?.uid ?? null}
+            projectId={project?.id ?? null}
             title={createTitle}
             onCancel={() => setCreating(false)}
             onSuccess={() => {

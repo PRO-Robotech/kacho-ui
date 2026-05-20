@@ -172,7 +172,7 @@ export function ResourceFormModal({ projectId }: Props) {
             }}
             editablePresetFields={{ _address_kind: "internal" }}
             fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
-            folderUid={projectId}
+            projectId={projectId}
             title="Резервирование IP-адреса"
             onCancel={close}
             onSuccess={close}
@@ -186,7 +186,7 @@ export function ResourceFormModal({ projectId }: Props) {
           spec={spec}
           ctx={{ projectId }}
           presetFields={presetFields}
-          folderUid={projectId}
+          projectId={projectId}
           title={title}
           onCancel={close}
           onSuccess={close}
@@ -198,7 +198,7 @@ export function ResourceFormModal({ projectId }: Props) {
         <InlineResourceEditForm
           spec={spec}
           data={editData}
-          folderUid={projectId}
+          projectId={projectId}
           onCancel={close}
           onSuccess={close}
         />

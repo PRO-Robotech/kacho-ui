@@ -127,7 +127,7 @@ export function SecurityGroupDetailPage() {
   const renderInlineEdit = useCallback(
     (data: Record<string, unknown>, exitEdit: () => void) => {
       const id = (data.id as string | undefined) ?? "";
-      const fid = (data.folder_id as string | undefined) ?? projectId ?? "";
+      const fid = (data.project_id as string | undefined) ?? projectId ?? "";
       if (!id || !fid) return null;
       return (
         <InlineSecurityGroupEditForm

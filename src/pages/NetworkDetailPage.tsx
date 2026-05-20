@@ -73,7 +73,7 @@ export function NetworkDetailPage() {
     queryKey: ["subnets", "list", projectId],
     queryFn: () =>
       api.list<{ subnets: Array<Record<string, unknown>> }>(subnetSpec.apiPath, {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
@@ -84,7 +84,7 @@ export function NetworkDetailPage() {
     queryKey: ["route-tables", "list", projectId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
@@ -95,7 +95,7 @@ export function NetworkDetailPage() {
     queryKey: ["security-groups", "list", projectId],
     queryFn: () =>
       api.list<{ security_groups: Array<Record<string, unknown>> }>(sgSpec.apiPath, {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
@@ -266,7 +266,7 @@ export function NetworkDetailPage() {
 }
 
 // useChildColumns — buildSpecColumns + actions-колонка для child-tabs.
-// basePathOverride — если задан, используется вместо flat /folders/<f>/<route>;
+// basePathOverride — если задан, используется вместо flat /projects/<projectId>/<route>;
 // нужно для nested-контекстов (RT/SG/Subnet под network) чтобы edit/delete
 // links оставались под parent-путём.
 function useChildColumns(
@@ -287,7 +287,7 @@ function useChildColumns(
             spec={spec}
             row={row}
             basePath={basePath}
-            folderUid={projectId ?? null}
+            projectId={projectId ?? null}
           />
         ),
       });

@@ -1,5 +1,5 @@
 // Polling hook для получения списка ресурсов через REST GET.
-// spec.apiPath = полный path: /resource-manager/v1/clouds, /vpc/v1/networks и т.д.
+// spec.apiPath = полный path: /iam/v1/projects, /vpc/v1/networks и т.д.
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -8,8 +8,8 @@ import type { ResourceSpec } from "./resource-registry";
 /**
  * useResourceList — поллит GET <apiPath>?<filterField>=<filterValue> каждые 3 сек.
  *
- * filterField + filterValue — параметр родителя (organization_id / cloud_id / folder_id).
- * Если оба null — список без фильтра (для cluster-scoped, например /organizations).
+ * filterField + filterValue — параметр родителя (project_id / account_id).
+ * Если оба null — список без фильтра (для cluster-scoped ресурсов).
  */
 export function useResourceList<T = Record<string, unknown>>(
   spec: ResourceSpec,

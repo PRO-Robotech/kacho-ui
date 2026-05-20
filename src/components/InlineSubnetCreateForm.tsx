@@ -4,7 +4,7 @@
 // виджетами под CIDR, метки и DHCP-collapse.
 //
 // Wire-format submission ровно как у public AddressService.Create:
-//   { folder_id, network_id, zone_id, name, description?, labels?,
+//   { project_id, network_id, zone_id, name, description?, labels?,
 //     v4_cidr_blocks: [string], v6_cidr_blocks: [string], route_table_id?, dhcp_options? }
 //
 // v6_cidr_blocks (KAC-68): аналогично v4, но prefix-варианты /48..../128;
@@ -74,7 +74,7 @@ export function InlineSubnetCreateForm({
     queryKey: ["networks", "list", projectId],
     queryFn: () =>
       api.list<{ networks: Array<{ id: string; name?: string }> }>(networkSpec.apiPath, {
-        folder_id: projectId,
+        project_id: projectId,
         pageSize: "500",
       }),
     enabled: !networkLocked,
@@ -102,7 +102,7 @@ export function InlineSubnetCreateForm({
   const [dhcpDns, setDhcpDns] = useState<string[]>([]);
   const [dhcpNtp, setDhcpNtp] = useState<string[]>([]);
 
-  // Зоны: глобальный admin-ресурс, без folder_id.
+  // Зоны: глобальный admin-ресурс, без project_id.
   const { data: zoneData } = useQuery({
     queryKey: ["zones", "list"],
     queryFn: () =>
@@ -126,12 +126,12 @@ export function InlineSubnetCreateForm({
     }
   }, [zoneId, zoneOptions]);
 
-  // RouteTables: folder-scoped, ещё фильтруем по network.
+  // RouteTables: project-scoped, ещё фильтруем по network.
   const { data: rtData } = useQuery({
     queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: projectId,
+        project_id: projectId,
         pageSize: "500",
       }),
     staleTime: 30_000,
@@ -214,7 +214,7 @@ export function InlineSubnetCreateForm({
         : undefined;
 
     const payload: Record<string, unknown> = {
-      folder_id: projectId,
+      project_id: projectId,
       network_id: networkId,
       zone_id: zoneId,
       name,

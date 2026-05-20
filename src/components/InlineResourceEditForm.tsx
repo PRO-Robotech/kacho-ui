@@ -27,8 +27,8 @@ interface Props {
   spec: ResourceSpec;
   /** Текущий объект ресурса (уже загружен ResourceDetailPage). */
   data: Record<string, unknown>;
-  /** folder_id для invalidate + OperationBanner. */
-  folderUid: string | null;
+  /** project_id для invalidate + OperationBanner. */
+  projectId: string | null;
   onCancel: () => void;
   onSuccess?: () => void;
 }
@@ -36,7 +36,7 @@ interface Props {
 export function InlineResourceEditForm({
   spec,
   data,
-  folderUid,
+  projectId,
   onCancel,
   onSuccess,
 }: Props) {
@@ -73,7 +73,7 @@ export function InlineResourceEditForm({
       if (opId) {
         setPendingOpId(opId);
       } else {
-        invalidate(spec.id, folderUid);
+        invalidate(spec.id, projectId);
         onSuccess?.();
         onCancel();
       }
@@ -90,7 +90,7 @@ export function InlineResourceEditForm({
     if (op.error) {
       toast.error(`Сохранить ${spec.singular}: ${op.error.message ?? "ошибка"}`);
     } else {
-      invalidate(spec.id, folderUid);
+      invalidate(spec.id, projectId);
       toast.success(`${spec.singular} сохранён`);
       onSuccess?.();
     }

@@ -27,7 +27,7 @@ export interface ResourceSpec {
   // Полный URL-path для REST: /<domain>/v1/<plural>
   // Verbatim из proto google.api.http annotations.
   apiPath: string;
-  // ключ массива в List response: "networks", "organizations"
+  // ключ массива в List response: "networks", "projects"
   payloadKey: string;
   // singular label для UI
   singular: string;
@@ -35,10 +35,10 @@ export interface ResourceSpec {
   plural: string;
   description?: string;
   /** Service-domain заголовок (отображается в breadcrumb перед именем категории).
-   *  Примеры: "Virtual Private Cloud", "Resource Manager", "Администрирование". */
+   *  Примеры: "Virtual Private Cloud", "IAM", "Администрирование". */
   serviceTitle?: string;
-  // global = cluster-scoped, folder = только в выбранном folder
-  scope: "global" | "folder";
+  // global = cluster-scoped, project = только в выбранном Project
+  scope: "global" | "project";
   // поддерживаемые операции
   ops: {
     create: boolean;
@@ -54,17 +54,14 @@ export interface ResourceSpec {
   fields?: FormField[];
   // Path-template для drill-down link при клике на строку (плейсхолдер `:id`).
   // Если задан — кнопка в строке ведёт сюда вместо DetailPage. Используется
-  // для иерархического drill-flow Org → Clouds → Folders → VPC.
+  // для иерархического drill-flow Account → Projects → VPC.
   childRoute?: string;
   // skeleton-объект для Create-формы.
-  // accountId — preferred (kacho.cloud.iam.v1.Project.account_id).
-  // cloudId / organizationId — backward-compat alias через context-store
-  //   (FolderRef.cloudId / organizationId оба mapped в Account.id).
+  // projectId — выбранный Project (VPC/Compute scope).
+  // accountId — выбранный Account (kacho.cloud.iam.v1.Project.account_id).
   template: (ctx: {
     projectId?: string;
     accountId?: string;
-    cloudId?: string;
-    organizationId?: string;
   }) => unknown;
   // Опциональная нормализация payload перед отправкой на API.
   // Используется для конвертации form-internal представления (wrapper-объекты, toggle-поля)
@@ -151,10 +148,10 @@ const FIELD_DESCRIPTION: FormField = {
   placeholder: "Краткое описание ресурса (опционально)",
 };
 
-// Hidden поля для folder-context
-const FIELD_FOLDER_ID: FormField = {
-  name: "folder_id",
-  label: "Folder",
+// Hidden поле для project-context
+const FIELD_PROJECT_ID: FormField = {
+  name: "project_id",
+  label: "Project",
   type: "string",
   hidden: true,
 };
@@ -168,7 +165,7 @@ const FIELD_LABELS: FormField = {
 };
 
 export const REGISTRY: Record<string, ResourceSpec> = {
-  // ====== iam (KAC-124: заменил organization-manager + resource-manager) ======
+  // ====== iam ======
   // proto: kacho.cloud.iam.v1.AccountService / ProjectService.
 
   accounts: {
@@ -222,12 +219,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
-    // Project drill-down → /projects/:id; FolderDefaultRedirect перебрасывает
+    // Project drill-down → /projects/:id; ProjectDefaultRedirect перебрасывает
     // дальше на /projects/:id/dashboard.
     childRoute: "/projects/:id",
-    template: ({ accountId, cloudId, organizationId }) => ({
+    template: ({ accountId }) => ({
       name: "",
-      account_id: accountId ?? cloudId ?? organizationId ?? "",
+      account_id: accountId ?? "",
       description: "",
     }),
   },
@@ -244,7 +241,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Network",
     plural: "Облачные сети",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -290,10 +287,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_NAME_VPC,
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       description: "",
       labels: {},
@@ -310,7 +307,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Subnet",
     plural: "Подсети",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -376,7 +373,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Network",
         type: "ref",
         refResource: "networks",
-        refFolderScoped: true,
+        refProjectScoped: true,
         required: true,
         immutable: true, // backend: applySubnetMask immutable check
       },
@@ -437,16 +434,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Route Table",
         type: "ref",
         refResource: "route-tables",
-        refFolderScoped: true,
+        refProjectScoped: true,
         placeholder: "— без таблицы —",
         description: "Опционально. Если задано, маршрутизация подсети идёт через этот RT.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       network_id: "",
       zone_id: "",
@@ -501,7 +498,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Address",
     plural: "Публичные IP-адреса",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -673,7 +670,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Подсеть",
         type: "ref",
         refResource: "subnets",
-        refFolderScoped: true,
+        refProjectScoped: true,
         required: true,
         description:
           "Подсеть, из IPv4-CIDR которой выделяется внутренний адрес. Оставьте поле «Адрес» пустым для автоматического выделения.",
@@ -697,7 +694,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Подсеть",
         type: "ref",
         refResource: "subnets",
-        refFolderScoped: true,
+        refProjectScoped: true,
         required: true,
         description:
           "Подсеть, из IPv6-CIDR которой выделяется внутренний адрес. Оставьте поле «Адрес» пустым для автоматического выделения.",
@@ -724,10 +721,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       description: "",
       _address_kind: "external",
@@ -762,7 +759,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Route Table",
     plural: "Таблицы маршрутизации",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -834,14 +831,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Сеть",
         type: "ref",
         refResource: "networks",
-        refFolderScoped: true,
+        refProjectScoped: true,
         required: true,
         immutable: true,
         description: "Облачная сеть, в которой действуют эти маршруты.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
       // Static Routes — в самом низу формы (объёмный блок, не должен
       // мешать редактированию основных полей).
       //
@@ -880,7 +877,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       network_id: "",
       description: "",
@@ -904,7 +901,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Network Interface",
     plural: "Сетевые интерфейсы",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -1001,7 +998,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Подсеть",
         type: "ref",
         refResource: "subnets",
-        refFolderScoped: true,
+        refProjectScoped: true,
         required: true,
         immutable: true,
         description: "Subnet, в которой создаётся интерфейс. Менять нельзя после создания.",
@@ -1032,11 +1029,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             type: "ref",
             refResource: "addresses",
             required: true,
-            // `addresses` ресурс folder-scoped — ListAddressesRequest.folder_id
-            // (required). RefSelect авто-добавляет ?folder_id=<folder-context>;
+            // `addresses` ресурс project-scoped — ListAddressesRequest.project_id
+            // (required). RefSelect авто-добавляет ?project_id=<project-context>;
             // refQueryFromField докидывает &subnet_id=<form.subnet_id> сверху.
-            // Итог: GET /vpc/v1/addresses?folder_id=<folder>&subnet_id=<subnet>.
-            refFolderScoped: true,
+            // Итог: GET /vpc/v1/addresses?project_id=<project>&subnet_id=<subnet>.
+            refProjectScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
             // Только внутренние IPv4-адреса (у которых выставлен
             // internal_ipv4_address) — отсекаем external / IPv6-only.
@@ -1066,8 +1063,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             type: "ref",
             refResource: "addresses",
             required: true,
-            // см. комментарий у v4_address_ids — folder-scoped + subnet_id-фильтр.
-            refFolderScoped: true,
+            // см. комментарий у v4_address_ids — project-scoped + subnet_id-фильтр.
+            refProjectScoped: true,
             refQueryFromField: { param: "subnet_id", field: "subnet_id" },
             // Только внутренние IPv6-адреса (у которых выставлен
             // internal_ipv6_address).
@@ -1102,7 +1099,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             label: "Security Group",
             type: "ref",
             refResource: "security-groups",
-            refFolderScoped: true,
+            refProjectScoped: true,
             required: true,
             createResource: "security-groups",
             createTitle: "Создать группу безопасности",
@@ -1111,10 +1108,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       subnet_id: "",
       v4_address_ids: [],
@@ -1168,7 +1165,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Security Group",
     plural: "Группы безопасности",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
@@ -1194,7 +1191,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Network",
         type: "ref",
         refResource: "networks",
-        refFolderScoped: true,
+        refProjectScoped: true,
         // Опционально: SG можно создать без привязки к сети (kacho-vpc).
         placeholder: "— без сети —",
         description: "Опционально. Если не задано — группа безопасности не привязана к сети.",
@@ -1211,10 +1208,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // UpdateRule на отдельной вкладке.
         editHidden: true,
       },
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       network_id: "",
       description: "",
@@ -1244,7 +1241,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Gateway",
     plural: "Шлюзы",
     serviceTitle: "Virtual Private Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -1280,10 +1277,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       // отвергает с InvalidArgument "Illegal argument gateway" если oneof
       // пустой или поле названо иначе (например прежнее shared_egress_gateway
       // от response-сообщения Gateway, а не запроса). См. kacho-vpc gateway.go:91.
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       description: "",
       shared_egress_gateway_spec: {},
@@ -1342,7 +1339,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Disk",
     plural: "Диски",
     serviceTitle: "Compute Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -1403,16 +1400,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
         editHidden: true,
       },
-      { name: "image_id", label: "Образ", type: "ref", refResource: "compute-images", refFolderScoped: true,
+      { name: "image_id", label: "Образ", type: "ref", refResource: "compute-images", refProjectScoped: true,
         visibleWhen: { field: "_disk_source", equals: "image" }, editHidden: true },
-      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refFolderScoped: true,
+      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refProjectScoped: true,
         visibleWhen: { field: "_disk_source", equals: "snapshot" }, editHidden: true },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       zone_id: "",
       type_id: "",
@@ -1444,7 +1441,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Image",
     plural: "Образы",
     serviceTitle: "Compute Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -1490,21 +1487,21 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         ],
         editHidden: true,
       },
-      { name: "disk_id", label: "Диск", type: "ref", refResource: "compute-disks", refFolderScoped: true,
+      { name: "disk_id", label: "Диск", type: "ref", refResource: "compute-disks", refProjectScoped: true,
         visibleWhen: { field: "_image_source", equals: "disk" }, editHidden: true },
-      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refFolderScoped: true,
+      { name: "snapshot_id", label: "Снимок", type: "ref", refResource: "compute-snapshots", refProjectScoped: true,
         visibleWhen: { field: "_image_source", equals: "snapshot" }, editHidden: true },
-      { name: "image_id", label: "Исходный образ", type: "ref", refResource: "compute-images", refFolderScoped: true,
+      { name: "image_id", label: "Исходный образ", type: "ref", refResource: "compute-images", refProjectScoped: true,
         visibleWhen: { field: "_image_source", equals: "image" }, editHidden: true },
       { name: "uri", label: "URI", type: "string", placeholder: "https://...", visibleWhen: { field: "_image_source", equals: "uri" }, editHidden: true },
       { name: "min_disk_size", label: "Мин. размер диска (ГиБ)", type: "int", min: 4,
         description: "Опционально. Если задано — диски из образа не могут быть меньше.", immutable: true },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       _image_source: "disk",
       description: "",
@@ -1538,7 +1535,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Snapshot",
     plural: "Снимки дисков",
     serviceTitle: "Compute Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       {
@@ -1567,14 +1564,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ],
     fields: [
       FIELD_NAME_COMPUTE,
-      { name: "disk_id", label: "Исходный диск", type: "ref", refResource: "compute-disks", refFolderScoped: true,
+      { name: "disk_id", label: "Исходный диск", type: "ref", refResource: "compute-disks", refProjectScoped: true,
         required: true, immutable: true },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       disk_id: "",
       description: "",
@@ -1590,7 +1587,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Instance",
     plural: "Виртуальные машины",
     serviceTitle: "Compute Cloud",
-    scope: "folder",
+    scope: "project",
     ops: { create: true, update: true, delete: true, start: true, stop: true, restart: true },
     columns: [
       {
@@ -1671,7 +1668,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         editHidden: true,
       },
       { name: "boot_disk_spec.disk_spec.image_id", label: "Образ для загрузочного диска", type: "ref",
-        refResource: "compute-images", refFolderScoped: true,
+        refResource: "compute-images", refProjectScoped: true,
         visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
       { name: "boot_disk_spec.disk_spec.size_gib", label: "Размер загрузочного диска (ГиБ)", type: "int", default: 10, min: 4,
         visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
@@ -1679,7 +1676,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         refResource: "disk-types", placeholder: "network-ssd (по умолчанию)",
         visibleWhen: { field: "_boot_source", equals: "image" }, editHidden: true },
       { name: "boot_disk_spec.disk_id", label: "Существующий диск", type: "ref", refResource: "compute-disks",
-        refFolderScoped: true, visibleWhen: { field: "_boot_source", equals: "disk" }, editHidden: true },
+        refProjectScoped: true, visibleWhen: { field: "_boot_source", equals: "disk" }, editHidden: true },
       { name: "boot_disk_spec.auto_delete", label: "Удалять загрузочный диск вместе с ВМ", type: "bool", default: true, editHidden: true },
       {
         name: "network_interface_specs", label: "Сетевые интерфейсы", type: "array", itemLabel: "интерфейс",
@@ -1709,7 +1706,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             newItem: () => ({ value: "" }),
             itemFields: [
               {
-                name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refFolderScoped: true, required: true,
+                name: "value", label: "Security Group", type: "ref", refResource: "security-groups", refProjectScoped: true, required: true,
                 createResource: "security-groups", createTitle: "Создать группу безопасности",
               },
             ],
@@ -1721,10 +1718,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       { name: "service_account_id", label: "Service Account ID", type: "string", placeholder: "(опционально)" },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
-      FIELD_FOLDER_ID,
+      FIELD_PROJECT_ID,
     ],
     template: ({ projectId }) => ({
-      folder_id: projectId ?? "",
+      project_id: projectId ?? "",
       name: "",
       zone_id: "",
       platform_id: "standard-v3",

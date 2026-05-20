@@ -28,25 +28,25 @@ export function NetworkInterfaceDetailPage() {
   const navigate = useNavigate();
   const spec = REGISTRY["network-interfaces"];
 
-  // Загружаем все Address-ресурсы folder'а — потом client-side filter
+  // Загружаем все Address-ресурсы проекта — потом client-side filter
   // по v4_address_ids ∪ v6_address_ids текущего NIC.
   const { data: addrList } = useQuery({
     queryKey: ["addresses", "list-for-nic", projectId],
     queryFn: () =>
       api.list<{ addresses: Address[] }>("/vpc/v1/addresses", {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 10000,
     enabled: !!projectId,
   });
 
-  // Аналогично — все SG folder'а для resolve security_group_ids.
+  // Аналогично — все SG проекта для resolve security_group_ids.
   const { data: sgList } = useQuery({
     queryKey: ["security-groups", "list-for-nic", projectId],
     queryFn: () =>
       api.list<{ security_groups: SG[] }>("/vpc/v1/securityGroups", {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 10000,

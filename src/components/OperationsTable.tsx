@@ -1,7 +1,7 @@
 // OperationsTable — generic вид списка LRO-операций.
 // Используется в:
 //   • OperationsTab (per-resource detail-page)
-//   • OperationsPage (global folder-level)
+//   • OperationsPage (global project-level)
 //
 // Колонки: Идентификатор / Статус (icon+string) / Пользователь (string) /
 //          Операция / Дата начала / Дата изменения / Сообщение об ошибке /

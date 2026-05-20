@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
 import ruRU from "antd/locale/ru_RU";
@@ -53,42 +53,15 @@ const queryClient = new QueryClient({
   },
 });
 
-// Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
-const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "network-interfaces", "gateways"]
+// Project-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
+const PROJECT_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "network-interfaces", "gateways"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 
-// Folder-scoped Compute ресурсы (Disk/Image/Snapshot/Instance). URL-сегмент — `compute`.
+// Project-scoped Compute ресурсы (Disk/Image/Snapshot/Instance). URL-сегмент — `compute`.
 const COMPUTE_SCOPED = ["compute-disks", "compute-images", "compute-snapshots", "compute-instances"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
-
-// LegacySegmentRedirect — редирект старых flat-URL `/projects/<id>/<route>/...`
-// на новые `/projects/<id>/<segment>/<route>/...` (segment = "vpc" | "compute").
-// KAC-117: model переименована Folder → Project.
-function LegacySegmentRedirect({ segment, route }: { segment: string; route: string }) {
-  const { projectId } = useParams();
-  const location = useLocation();
-  const prefix = `/projects/${projectId}/${route}`;
-  const tail = location.pathname.startsWith(prefix)
-    ? location.pathname.slice(prefix.length)
-    : "";
-  return (
-    <Navigate
-      to={`/projects/${projectId}/${segment}/${route}${tail}${location.search}`}
-      replace
-    />
-  );
-}
-
-// FoldersLegacyRedirect — KAC-117: SPA continue работает на старых URL
-// `/folders/<id>/...` (RefNameLinks из прошлых сессий / закладки browser) —
-// редирект в `/projects/<id>/...` (сохраняя хвост + query).
-function FoldersLegacyRedirect() {
-  const location = useLocation();
-  const newPath = location.pathname.replace(/^\/folders\//, "/projects/");
-  return <Navigate to={`${newPath}${location.search}`} replace />;
-}
 
 export default function App() {
   return (
@@ -196,17 +169,13 @@ export default function App() {
             {/* Dashboard with project context in URL. */}
             <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
 
-            {/* KAC-117: legacy redirect /folders/<id>/* → /projects/<id>/* */}
-            <Route path="/folders/*" element={<FoldersLegacyRedirect />} />
-
             {/* === IAM hierarchy (KAC-124: заменил Resource Manager) ===
                 Account / Project — flat ресурсы под /iam/accounts и /iam/projects;
-                рендерятся в IAM-section ниже (AccountsPage / ProjectsPage). Legacy
-                /organizations, /clouds, /clouds/:id/folders routes удалены. */}
+                рендерятся в IAM-section ниже (AccountsPage / ProjectsPage). */}
 
-            {/* === Folder-scoped VPC ресурсы === */}
+            {/* === Project-scoped VPC ресурсы === */}
             {/* /projects/:projectId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
-            {FOLDER_SCOPED.map((spec) => (
+            {PROJECT_SCOPED.map((spec) => (
               <Route key={spec.id}>
                 <Route
                   path={`/projects/:projectId/vpc/${spec.route}`}
@@ -270,16 +239,10 @@ export default function App() {
                             : <VpcDetailShell spec={spec} />
                   }
                 />
-                {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
-                    автоматически редиректятся на /folders/X/vpc/<resource>/... */}
-                <Route
-                  path={`/projects/:projectId/${spec.route}/*`}
-                  element={<LegacySegmentRedirect segment="vpc" route={spec.route} />}
-                />
               </Route>
             ))}
 
-            {/* === Folder-scoped Compute ресурсы === */}
+            {/* === Project-scoped Compute ресурсы === */}
             {/* /projects/:projectId/compute/{disks|images|snapshots|instances} */}
             {COMPUTE_SCOPED.map((spec) => (
               <Route key={spec.id}>
@@ -318,11 +281,6 @@ export default function App() {
                       ? <InstanceDetailPage />
                       : <ResourceDetailPage spec={spec} />
                   }
-                />
-                {/* Legacy/RefNameLink redirect: `/folders/X/<route>/...` → `/folders/X/compute/<route>/...` */}
-                <Route
-                  path={`/projects/:projectId/${spec.route}/*`}
-                  element={<LegacySegmentRedirect segment="compute" route={spec.route} />}
                 />
               </Route>
             ))}
@@ -375,7 +333,7 @@ export default function App() {
               }
             />
 
-            {/* === Global VPC Operations (folder-scoped) === */}
+            {/* === Global VPC Operations (project-scoped) === */}
             <Route
               path="/projects/:projectId/vpc/operations"
               element={<OperationsPage />}
@@ -431,9 +389,9 @@ export default function App() {
             {/* /projects/:projectId — редирект на dashboard */}
             <Route
               path="/projects/:projectId"
-              element={<FolderDefaultRedirect />}
+              element={<ProjectDefaultRedirect />}
             />
-            {/* Edit project — full-page форма (KAC-124: folder → project). */}
+            {/* Edit project — full-page форма (KAC-124). */}
             <Route
               path="/projects/:projectId/edit"
               element={<ResourceEditPage spec={REGISTRY.projects} paramKey="projectId" />}
@@ -495,7 +453,7 @@ export default function App() {
 }
 
 // ProjectDefaultRedirect: /projects/:projectId → /projects/:projectId/dashboard
-function FolderDefaultRedirect() {
+function ProjectDefaultRedirect() {
   const { projectId } = useParams();
   return <Navigate to={`/projects/${projectId}/dashboard`} replace />;
 }

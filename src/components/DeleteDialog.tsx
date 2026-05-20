@@ -23,8 +23,8 @@ interface Props {
   /** Verbose имя для UI. */
   resourceLabel: string;
   name: string;
-  /** Folder UID для invalidate соответствующих list-query (и для дерева связей). */
-  folderUid?: string | null;
+  /** Project ID для invalidate соответствующих list-query (и для дерева связей). */
+  projectId?: string | null;
   /** Callback после успешного запуска (navigate на list etc.). */
   onSuccess?: () => void;
   /** Если true — требуется ввести имя ресурса для подтверждения. */
@@ -38,7 +38,7 @@ export function DeleteDialog({
   resourceId,
   resourceLabel,
   name,
-  folderUid,
+  projectId,
   onSuccess,
   requireNameConfirm,
 }: Props) {
@@ -50,8 +50,8 @@ export function DeleteDialog({
   const resourceUid = useMemo(() => apiPath.split("/").filter(Boolean).pop() ?? "", [apiPath]);
   const showDeps = hasDependencyResolver(resourceId);
   const depsQuery = useQuery({
-    queryKey: ["delete-deps", resourceId, resourceUid, folderUid ?? ""],
-    queryFn: () => loadDependents(resourceId, { id: resourceUid, folder_id: folderUid ?? null }),
+    queryKey: ["delete-deps", resourceId, resourceUid, projectId ?? ""],
+    queryFn: () => loadDependents(resourceId, { id: resourceUid, project_id: projectId ?? null }),
     enabled: open && showDeps && !!resourceUid,
     staleTime: 0,
     gcTime: 0,
@@ -64,7 +64,7 @@ export function DeleteDialog({
       if (opId) {
         setPendingOpId(opId);
       } else {
-        invalidate(resourceId, folderUid ?? null);
+        invalidate(resourceId, projectId ?? null);
         onOpenChange(false);
         setConfirmText("");
         onSuccess?.();
@@ -81,7 +81,7 @@ export function DeleteDialog({
     if (op.error) {
       toast.error(`Удалить ${resourceLabel} ${name}: ${op.error.message ?? "ошибка"}`);
     } else {
-      invalidate(resourceId, folderUid ?? null);
+      invalidate(resourceId, projectId ?? null);
       toast.success(`${resourceLabel} ${name} удалён`);
       onSuccess?.();
     }

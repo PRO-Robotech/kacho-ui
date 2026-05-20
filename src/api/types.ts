@@ -59,7 +59,7 @@ export interface ProjectSummaryList {
 
 export interface Network {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -74,7 +74,7 @@ export interface NetworkList {
 
 export interface Subnet {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -103,7 +103,7 @@ export interface ResourceReference {
 
 export interface Address {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -131,7 +131,7 @@ export interface AddressList {
 
 export interface RouteTable {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -165,7 +165,7 @@ export interface SecurityGroupRule {
 
 export interface SecurityGroup {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -191,7 +191,7 @@ export interface SecurityGroupList {
 
 export interface Disk {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -213,7 +213,7 @@ export interface DiskList {
 
 export interface Image {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -234,7 +234,7 @@ export interface ImageList {
 
 export interface Snapshot {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -267,7 +267,7 @@ export interface AttachedDisk {
 
 export interface Instance {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;

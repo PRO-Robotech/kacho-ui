@@ -110,7 +110,7 @@ export function InlineSubnetEditForm({
     queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
       api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        folder_id: projectId,
+        project_id: projectId,
         pageSize: "500",
       }),
     enabled: !!projectId && !!networkId,

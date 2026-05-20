@@ -31,7 +31,7 @@ import { OperationDialog, extractOperationId } from "@/components/OperationDialo
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { api, ApiError } from "@/api/client";
-import { useFolderStore } from "@/lib/folder-store";
+import { useProjectStore } from "@/lib/context-store";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { useInvalidateResourceList } from "@/lib/use-operation";
@@ -68,7 +68,7 @@ interface Props {
    *  Полезно когда форма создания уже развёрнута через overviewReplace. */
   hideOverviewCreate?: boolean;
   /** Опциональный override URL для back-навигации и breadcrumb-ссылки на список.
-   *  По умолчанию вычисляется как `/folders/<projectId>/<spec.route>`. Используется
+   *  По умолчанию вычисляется как `/projects/<projectId>/<spec.route>`. Используется
    *  для nested-роутов (Subnet под Network → back к network detail). */
   backHrefOverride?: string;
   /** Опциональный override label для back-link breadcrumb (если задан). */
@@ -111,7 +111,7 @@ export function ResourceDetailPage({
   const uid = params[paramKey];
   const navigate = useNavigate();
   const location = useLocation();
-  const folder = useFolderStore((s) => s.folder);
+  const project = useProjectStore((s) => s.project);
   const invalidate = useInvalidateResourceList();
   const [searchParams] = useSearchParams();
 
@@ -168,8 +168,8 @@ export function ResourceDetailPage({
 
   const handleActionDone = useCallback(() => {
     setActionOpId(null);
-    invalidate(spec.id, folder?.uid);
-  }, [invalidate, spec.id, folder?.uid]);
+    invalidate(spec.id, project?.id);
+  }, [invalidate, spec.id, project?.id]);
 
   const actionMutation = useMutation({
     mutationFn: (verb: string) => api.action(`${spec.apiPath}/${uid}:${verb}`),
@@ -177,7 +177,7 @@ export function ResourceDetailPage({
       setActionErr(null);
       const id = extractOperationId(resp);
       if (id) setActionOpId(id);
-      else invalidate(spec.id, folder?.uid);
+      else invalidate(spec.id, project?.id);
     },
     onError: (e) => {
       setActionErr(e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message);
@@ -242,13 +242,12 @@ export function ResourceDetailPage({
   );
   useBreadcrumb(breadcrumb);
 
-  // Move-capable: те же ресурсы, что в RowActionsMenu (Org/Cloud/Folder/Region/Zone/AddressPool — нет).
+  // Move-capable: те же ресурсы, что в RowActionsMenu (Account/Project/Region/Zone/AddressPool — нет).
   const moveCapable = useMemo(
     () =>
       ![
-        "organizations",
-        "clouds",
-        "folders",
+        "accounts",
+        "projects",
         "regions",
         "zones",
         "address-pools",
@@ -412,17 +411,8 @@ export function ResourceDetailPage({
           value: new Date(getByPath<string>(data, "created_at")!).toLocaleString(),
         }
       : null,
-    getByPath<string>(data, "folder_id")
-      ? { label: "Folder", value: <CopyableId id={getByPath<string>(data, "folder_id")!} /> }
-      : null,
-    getByPath<string>(data, "cloud_id")
-      ? { label: "Cloud", value: <CopyableId id={getByPath<string>(data, "cloud_id")!} /> }
-      : null,
-    getByPath<string>(data, "organization_id")
-      ? {
-          label: "Organization",
-          value: <CopyableId id={getByPath<string>(data, "organization_id")!} />,
-        }
+    getByPath<string>(data, "project_id")
+      ? { label: "Проект", value: <CopyableId id={getByPath<string>(data, "project_id")!} /> }
       : null,
     getByPath<string>(data, "zone_id")
       ? {
@@ -575,7 +565,7 @@ export function ResourceDetailPage({
               <InlineResourceEditForm
                 spec={spec}
                 data={data}
-                folderUid={folder?.uid ?? null}
+                projectId={project?.id ?? null}
                 onCancel={exitEdit}
               />
             )
@@ -658,7 +648,7 @@ export function ResourceDetailPage({
           resourceId={spec.id}
           resourceLabel={spec.singular}
           name={name || resourceId}
-          folderUid={folder?.uid ?? null}
+          projectId={project?.id ?? null}
           onSuccess={() => navigate(backHref)}
         />
       )}
@@ -726,12 +716,12 @@ function JsonIntTab({ path, queryKey }: { path: string; queryKey: unknown[] }) {
 // {id}» в одном кликабельном <Link> (для известных referrer-типов) либо plain
 // (для unknown — forward-compat fallback), через общий ReferrerLink helper
 // (та же визуальная форма, что и в list-view used_by column). projectId берём
-// из data.folder_id, либо из URL-параметров (:projectId) как fallback. В отличие
+// из data.project_id, либо из URL-параметров (:projectId) как fallback. В отличие
 // от list-view, здесь все рефереры показаны полностью (нет "+N" — stack-вью).
 function UsedByBlock({ data }: { data: Record<string, unknown> }) {
   const params = useParams();
   const projectId =
-    (getByPath<string>(data, "folder_id") || null) ?? params.projectId ?? null;
+    (getByPath<string>(data, "project_id") || null) ?? params.projectId ?? null;
   const raw = getByPath<unknown>(data, "used_by");
   if (!Array.isArray(raw) || raw.length === 0) return null;
   const items = raw as Array<{

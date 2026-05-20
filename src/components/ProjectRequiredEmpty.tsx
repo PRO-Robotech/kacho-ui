@@ -1,6 +1,6 @@
 import { FolderOpen } from "lucide-react";
 
-export function FolderRequiredEmpty({ resource }: { resource: string }) {
+export function ProjectRequiredEmpty({ resource }: { resource: string }) {
   return (
     <div className="rounded-lg border border-dashed border-border p-12 text-center bg-muted/20">
       <FolderOpen className="h-10 w-10 mx-auto text-muted-foreground mb-3" />

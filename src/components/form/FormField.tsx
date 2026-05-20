@@ -167,7 +167,7 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hid
         <RefSelect
           id={id}
           refResource={field.refResource}
-          refFolderScoped={field.refFolderScoped}
+          refProjectScoped={field.refProjectScoped}
           value={cur as string | undefined}
           onChange={(uid) => set(uid || undefined)}
           placeholder={field.placeholder}

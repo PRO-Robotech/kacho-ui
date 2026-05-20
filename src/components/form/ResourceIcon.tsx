@@ -22,7 +22,7 @@ import {
 import type { ReactNode } from "react";
 
 const ICONS: Record<string, ReactNode> = {
-  // resource-manager
+  // iam
   organizations: <BankOutlined />,
   clouds: <CloudOutlined />,
   folders: <FolderOutlined />,

@@ -73,8 +73,8 @@ export interface RefField extends BaseField {
   type: "ref";
   // ID ресурса в registry откуда тянуть варианты
   refResource: string;
-  // Если true — фильтруем по выбранному folder (selector field=folder_id op=EQ values=[currentFolder])
-  refFolderScoped?: boolean;
+  // Если true — фильтруем по выбранному project (selector field=project_id op=EQ values=[currentProject])
+  refProjectScoped?: boolean;
   placeholder?: string;
   // Динамический query-параметр для candidate-list, ключённый по значению
   // другого поля той же формы. Пример: { param: "subnet_id", field: "subnet_id" }
@@ -83,7 +83,7 @@ export interface RefField extends BaseField {
   refQueryFromField?: { param: string; field: string };
   // Клиентский фильтр-предикат поверх загруженного candidate-list: остаются
   // только строки, для которых вернул true. Применяется ПОСЛЕ серверного
-  // запроса (refFolderScoped / refQueryFromField). Пример (NIC-форма):
+  // запроса (refProjectScoped / refQueryFromField). Пример (NIC-форма):
   // v4_address_ids → row => !!row.internal_ipv4_address (только внутренние IPv4).
   refFilter?: (row: Record<string, unknown>) => boolean;
   // ID ресурса в registry, который можно создать прямо из дропдауна

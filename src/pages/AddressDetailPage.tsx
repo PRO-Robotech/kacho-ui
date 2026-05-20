@@ -1,9 +1,9 @@
 // AddressDetailPage — обёртка над generic ResourceDetailPage,
 // собирающая nested-breadcrumb когда Address открыт под subnet detail
 // под network detail (URL
-// `/folders/<f>/networks/<n>/subnets/<s>/addresses/<id>`).
+// `/projects/<projectId>/networks/<n>/subnets/<s>/addresses/<id>`).
 //
-// Folder-level Address (внешний IP) использует flat-маршрут и обычный breadcrumb.
+// Project-level Address (внешний IP) использует flat-маршрут и обычный breadcrumb.
 
 import { useParams } from "react-router-dom";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";

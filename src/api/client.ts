@@ -3,8 +3,7 @@
 // В prod: same-origin, ingress рулит на api-gateway:8080.
 //
 // URL-ы verbatim из proto google.api.http annotations:
-//   organization-manager: /organization-manager/v1/organizations
-//   resource-manager:     /resource-manager/v1/clouds, /resource-manager/v1/folders
+//   iam: /iam/v1/accounts, /iam/v1/projects
 //   vpc:                  /vpc/v1/networks, /vpc/v1/subnets, /vpc/v1/addresses, /vpc/v1/route-tables
 //   operations:           /operations/{id}
 //

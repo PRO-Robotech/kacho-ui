@@ -8,7 +8,7 @@
 //
 // TODO(KAC-14/KAC-9): когда Instance.network_interfaces[] начнут нести `nic_id`
 // (ссылка на отдельный vpc NetworkInterface — отдельный тикет KAC-9), сделать
-// рендеринг NIC-блока с ссылкой на /folders/<fid>/vpc/network-interfaces/<nic_id>
+// рендеринг NIC-блока с ссылкой на /projects/<projectId>/vpc/network-interfaces/<nic_id>
 // (registry spec "network-interfaces"). Пока в proto/data этого поля нет — блок не
 // рендерим (generic ResourceDetailPage показывает network_interfaces как есть).
 
@@ -22,7 +22,7 @@ import { OperationDialog, extractOperationId } from "@/components/OperationDialo
 import { RefSelect } from "@/components/form/RefSelect";
 import { api, ApiError } from "@/api/client";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
-import { useFolderStore } from "@/lib/folder-store";
+import { useProjectStore } from "@/lib/context-store";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
@@ -30,7 +30,7 @@ const SPEC = REGISTRY["compute-instances"];
 
 export function InstanceDetailPage() {
   const { uid: instanceId } = useParams();
-  const folder = useFolderStore((s) => s.folder);
+  const project = useProjectStore((s) => s.project);
   const invalidate = useInvalidateResourceList();
 
   const [attachOpen, setAttachOpen] = useState(false);
@@ -43,9 +43,9 @@ export function InstanceDetailPage() {
 
   const onOpDone = useCallback(() => {
     setOpId(null);
-    invalidate("compute-instances", folder?.uid);
-    invalidate("compute-disks", folder?.uid);
-  }, [invalidate, folder?.uid]);
+    invalidate("compute-instances", project?.id);
+    invalidate("compute-disks", project?.id);
+  }, [invalidate, project?.id]);
 
   const attachMut = useMutation({
     mutationFn: () =>
@@ -56,7 +56,7 @@ export function InstanceDetailPage() {
       setAttachOpen(false);
       const id = extractOperationId(resp);
       if (id) { setOpTitle("Подключение диска"); setOpId(id); }
-      else { invalidate("compute-instances", folder?.uid); invalidate("compute-disks", folder?.uid); }
+      else { invalidate("compute-instances", project?.id); invalidate("compute-disks", project?.id); }
     },
     onError: (e) =>
       toast.error(`Подключить диск: ${e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message}`),
@@ -68,7 +68,7 @@ export function InstanceDetailPage() {
       setDetachOpen(false);
       const id = extractOperationId(resp);
       if (id) { setOpTitle("Отключение диска"); setOpId(id); }
-      else { invalidate("compute-instances", folder?.uid); invalidate("compute-disks", folder?.uid); }
+      else { invalidate("compute-instances", project?.id); invalidate("compute-disks", project?.id); }
     },
     onError: (e) =>
       toast.error(`Отключить диск: ${e instanceof ApiError ? `${e.code}: ${e.message}` : (e as Error).message}`),
@@ -118,7 +118,7 @@ export function InstanceDetailPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
             <Typography.Text>Диск</Typography.Text>
-            <RefSelect refResource="compute-disks" refFolderScoped value={attachDiskId} onChange={(v) => setAttachDiskId(v || undefined)} />
+            <RefSelect refResource="compute-disks" refProjectScoped value={attachDiskId} onChange={(v) => setAttachDiskId(v || undefined)} />
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
             <input type="checkbox" checked={autoDelete} onChange={(e) => setAutoDelete(e.target.checked)} />

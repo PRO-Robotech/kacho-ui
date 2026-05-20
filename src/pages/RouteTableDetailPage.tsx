@@ -1,6 +1,6 @@
 // RouteTableDetailPage — обёртка над generic ResourceDetailPage,
 // собирающая nested-breadcrumb когда RT открыт под network detail
-// (URL `/folders/<f>/networks/<n>/route-tables/<id>`).
+// (URL `/projects/<projectId>/networks/<n>/route-tables/<id>`).
 
 import { useParams } from "react-router-dom";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";

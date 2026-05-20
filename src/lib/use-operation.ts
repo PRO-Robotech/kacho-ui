@@ -27,7 +27,7 @@ export function useOperation(opId: string | null) {
 /**
  * invalidateResourceList — хелпер: инвалидирует кэш list-query после завершения операции.
  * Вызывать после done=true. Также инвалидирует breadcrumb-pill queries и
- * dashboard-queries — чтобы новые org/cloud/folder/network/etc. сразу
+ * dashboard-queries — чтобы новые account/project/network/etc. сразу
  * появлялись в pills и в счётчиках без ручного refresh.
  *
  * useResourceList queryKey = [spec.id, "list", filterField, filterValue].
@@ -36,18 +36,17 @@ export function useOperation(opId: string | null) {
  */
 export function useInvalidateResourceList() {
   const qc = useQueryClient();
-  return (resourceId: string, _folderUid?: string | null) => {
-    void _folderUid;
+  return (resourceId: string, _projectId?: string | null) => {
+    void _projectId;
     // Все list-варианты этого ресурса (любой parent-фильтр).
     qc.invalidateQueries({ queryKey: [resourceId, "list"] });
     // Detail этого ресурса (если открыт).
     qc.invalidateQueries({ queryKey: [resourceId, "detail"] });
     // RefNameLink lookup-кэш.
     qc.invalidateQueries({ queryKey: ["ref-name", resourceId] });
-    // Breadcrumb pills (Org/Cloud/Folder dropdowns).
-    qc.invalidateQueries({ queryKey: ["bc.orgs"] });
-    qc.invalidateQueries({ queryKey: ["bc.clouds"] });
-    qc.invalidateQueries({ queryKey: ["bc.folders"] });
+    // Breadcrumb pills (Account/Project dropdowns).
+    qc.invalidateQueries({ queryKey: ["accounts-crumb"] });
+    qc.invalidateQueries({ queryKey: ["projects-crumb"] });
     // Dashboard counts.
     qc.invalidateQueries({ queryKey: ["dash"] });
   };

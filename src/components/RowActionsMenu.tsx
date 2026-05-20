@@ -19,10 +19,10 @@ interface Props {
   spec: ResourceSpec;
   row: Record<string, unknown>;
   basePath: string;
-  folderUid: string | null;
+  projectId: string | null;
 }
 
-export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
+export function RowActionsMenu({ spec, row, basePath, projectId }: Props) {
   const navigate = useNavigate();
   const params = useParams();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -40,16 +40,15 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
   const showDelete = spec.ops.delete && !isDefaultSg;
 
   const moveCapable = ![
-    "organizations",
-    "clouds",
-    "folders",
+    "accounts",
+    "projects",
     "regions",
     "zones",
     "address-pools",
   ].includes(spec.id);
 
   const isNetwork = spec.id === "networks";
-  const currentFolderId = params.projectId ?? folderUid ?? null;
+  const currentProjectId = params.projectId ?? projectId ?? null;
 
   // antd Dropdown menu items рендерятся в portal, но React-event bubble идёт
   // через virtual-tree (а не DOM-tree). Без stopPropagation на domEvent клик по
@@ -72,7 +71,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
       label: drillIsChild ? "Открыть" : "Просмотр",
       onClick: stop(() => navigate(drillTarget)),
     },
-    isNetwork && currentFolderId
+    isNetwork && currentProjectId
       ? {
           key: "create-subnet",
           icon: <PlusOutlined />,
@@ -82,7 +81,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           // SubnetFormModal — модалка появляется над Network detail-страницей.
           onClick: stop(() =>
             navigate(
-              `/projects/${currentFolderId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
+              `/projects/${currentProjectId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
             ),
           ),
         }
@@ -139,7 +138,7 @@ export function RowActionsMenu({ spec, row, basePath, folderUid }: Props) {
           resourceId={spec.id}
           resourceLabel={spec.singular}
           name={name}
-          folderUid={folderUid}
+          projectId={projectId}
         />
       )}
 

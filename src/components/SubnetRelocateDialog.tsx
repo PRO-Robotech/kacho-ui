@@ -21,7 +21,7 @@ interface Props {
   subnetId: string;
   subnetName: string;
   currentZone: string;
-  folderUid?: string | null;
+  projectId?: string | null;
 }
 
 export function SubnetRelocateDialog({
@@ -30,7 +30,7 @@ export function SubnetRelocateDialog({
   subnetId,
   subnetName,
   currentZone,
-  folderUid,
+  projectId,
 }: Props) {
   const [targetZone, setTargetZone] = useState<string | undefined>();
   const [opId, setOpId] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function SubnetRelocateDialog({
       const id = extractOperationId(resp);
       if (id) setOpId(id);
       else {
-        invalidate("subnets", folderUid ?? null);
+        invalidate("subnets", projectId ?? null);
         onOpenChange(false);
       }
     },
@@ -123,7 +123,7 @@ export function SubnetRelocateDialog({
         title={`Перенос подсети ${subnetName}`}
         onDone={(success) => {
           setOpId(null);
-          invalidate("subnets", folderUid ?? null);
+          invalidate("subnets", projectId ?? null);
           if (success) onOpenChange(false);
         }}
       />
