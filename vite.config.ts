@@ -49,6 +49,9 @@ const config: UserConfig & { test?: Record<string, unknown> } = {
       "/.ory": {
         target: process.env.KACHO_KRATOS_BASE || "http://localhost:4433",
         changeOrigin: true,
+        // В prod ingress срезает префикс `/.ory/kratos/public` перед Kratos;
+        // в dev делаем то же самое — Kratos отдаёт flow на голом /self-service/*.
+        rewrite: (p) => p.replace(/^\/\.ory\/kratos\/public/, ""),
       },
       "/self-service": {
         target: process.env.KACHO_KRATOS_BASE || "http://localhost:4433",
