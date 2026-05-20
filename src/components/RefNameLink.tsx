@@ -1,5 +1,5 @@
-// RefNameLink — name+ссылка на detail для любого folder-scoped ресурса по id.
-// Заменяет SgNameById. Берёт spec из registry, делает один folder-scoped list-query
+// RefNameLink — name+ссылка на detail для любого project-scoped ресурса по id.
+// Заменяет SgNameById. Берёт spec из registry, делает один project-scoped list-query
 // (дедуплицируется TanStack по (specId, projectId)), находит row.name по id.
 // При клике stopPropagation чтобы не триггерить row-click таблицы-родителя.
 
@@ -7,7 +7,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Tag } from "antd";
 import { api } from "@/api/client";
-import { useFolderStore } from "@/lib/folder-store";
+import { useProjectStore } from "@/lib/context-store";
 import { REGISTRY } from "@/lib/resource-registry";
 
 interface Props {
@@ -20,17 +20,17 @@ interface Props {
   maxChars?: number;
 }
 
-export function RefNameLink({ specId, refId, projectId: folderOverride, asTag, maxChars }: Props) {
+export function RefNameLink({ specId, refId, projectId: projectOverride, asTag, maxChars }: Props) {
   const params = useParams();
-  const folder = useFolderStore((s) => s.folder);
-  const projectId = folderOverride ?? params.projectId ?? folder?.id ?? null;
+  const project = useProjectStore((s) => s.project);
+  const projectId = projectOverride ?? params.projectId ?? project?.id ?? null;
   const spec = REGISTRY[specId];
 
   const { data } = useQuery({
     queryKey: ["ref-name", specId, projectId],
     queryFn: () =>
       api.list<Record<string, Array<{ id: string; name?: string }>>>(spec!.apiPath, {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     enabled: !!spec && !!projectId && !!refId,

@@ -1,7 +1,7 @@
 // SubnetDetailPage — расширение generic ResourceDetailPage с utilization-баром
 // и tab "IP-адреса", который показывает Address-ресурсы привязанные к этому
 // subnet (через internal_ipv4_address.subnet_id), используя те же колонки,
-// что и /folders/X/addresses.
+// что и /projects/X/addresses.
 
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -54,12 +54,12 @@ export function SubnetDetailPage() {
         : `/projects/${projectId}/vpc/subnets/${subnetId}/addresses`
       : null;
 
-  // Address-ресурсы folder'а — будем фильтровать по subnet_id client-side.
+  // Address-ресурсы проекта — будем фильтровать по subnet_id client-side.
   const { data: addrList } = useQuery({
     queryKey: ["addresses", "list", projectId],
     queryFn: () =>
       api.list<{ addresses: Array<Record<string, unknown>> }>(addrSpec.apiPath, {
-        folder_id: projectId!,
+        project_id: projectId!,
         pageSize: "500",
       }),
     refetchInterval: 5000,
@@ -87,7 +87,7 @@ export function SubnetDetailPage() {
             spec={addrSpec}
             row={row}
             basePath={addressesBasePath}
-            folderUid={projectId ?? null}
+            projectId={projectId ?? null}
           />
         ),
       });

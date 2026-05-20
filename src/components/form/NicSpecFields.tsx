@@ -26,8 +26,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Cascader, Modal, Segmented, Select, Switch, Typography } from "antd";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
-import { useFolderStore } from "@/lib/folder-store";
-import { useContext } from "@/lib/context-store";
+import { useProjectStore } from "@/lib/context-store";
 import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 import { Label } from "@/components/ui/input";
 import { RefSelect } from "@/components/form/RefSelect";
@@ -55,9 +54,7 @@ const CASCADER_CREATE_PREFIX = "__create__:"; // value = "__create__:<subnetId>"
 const CASCADER_NOADDR_PREFIX = "__noaddr__:"; // value = "__noaddr__:<subnetId>"
 
 export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
-  const folder = useFolderStore((s) => s.folder);
-  const cloud = useContext((s) => s.cloud);
-  const org = useContext((s) => s.org);
+  const project = useProjectStore((s) => s.project);
   const addressesSpec = getResource("addresses");
 
   const get = (rel: string) => getByPath(value, `${pathPrefix}.${rel}`);
@@ -72,23 +69,23 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
   const extMode = (get("_ext_mode") as string | undefined) ?? "none";
   const extAddrId = get("_ext_addr_id") as string | undefined;
 
-  // ----- data: networks + subnets + internal IPv4 addresses (folder-scoped) -----
-  const enabled = !!folder;
+  // ----- data: networks + subnets + internal IPv4 addresses (project-scoped) -----
+  const enabled = !!project;
   const networksQ = useQuery({
-    queryKey: ["nic-cascader-networks", folder?.uid],
-    queryFn: () => api.list<{ networks: AnyRec[] }>("/vpc/v1/networks", { folder_id: folder!.uid, pageSize: "1000" }),
+    queryKey: ["nic-cascader-networks", project?.id],
+    queryFn: () => api.list<{ networks: AnyRec[] }>("/vpc/v1/networks", { project_id: project!.id, pageSize: "1000" }),
     enabled,
     staleTime: 30_000,
   });
   const subnetsQ = useQuery({
-    queryKey: ["nic-cascader-subnets", folder?.uid],
-    queryFn: () => api.list<{ subnets: AnyRec[] }>("/vpc/v1/subnets", { folder_id: folder!.uid, pageSize: "1000" }),
+    queryKey: ["nic-cascader-subnets", project?.id],
+    queryFn: () => api.list<{ subnets: AnyRec[] }>("/vpc/v1/subnets", { project_id: project!.id, pageSize: "1000" }),
     enabled,
     staleTime: 30_000,
   });
   const addressesQ = useQuery({
-    queryKey: ["nic-cascader-addresses", folder?.uid],
-    queryFn: () => api.list<{ addresses: AddressRec[] }>("/vpc/v1/addresses", { folder_id: folder!.uid, pageSize: "1000" }),
+    queryKey: ["nic-cascader-addresses", project?.id],
+    queryFn: () => api.list<{ addresses: AddressRec[] }>("/vpc/v1/addresses", { project_id: project!.id, pageSize: "1000" }),
     enabled,
     staleTime: 15_000,
   });
@@ -218,13 +215,13 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
         {useExisting && (
           <RefSelect
             refResource="network-interfaces"
-            refFolderScoped
+            refProjectScoped
             value={nicId}
             onChange={(uid) => set("nic_id", uid || undefined)}
             placeholder="— выбрать NetworkInterface —"
             createResource="network-interfaces"
             createTitle="Создать сетевой интерфейс"
-            createPresetFields={() => ({ folder_id: folder?.uid ?? "" })}
+            createPresetFields={() => ({ project_id: project?.id ?? "" })}
             formValue={value}
           />
         )}
@@ -246,7 +243,7 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
                 filter: (input, path) =>
                   path.some((o) => String(o.label ?? "").toLowerCase().includes(input.toLowerCase())),
               }}
-              placeholder={enabled ? "Выберите сеть → подсеть → адрес" : "Выберите folder в шапке"}
+              placeholder={enabled ? "Выберите сеть → подсеть → адрес" : "Выберите проект в шапке"}
               disabled={!enabled}
               changeOnSelect={false}
               expandTrigger="hover"
@@ -257,7 +254,7 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
                 {primaryAddr ? <div className="font-mono">Внутренний IPv4: {primaryAddr}</div> : <div className="italic">без внутреннего адреса</div>}
               </div>
             )}
-            {!enabled && <p className="text-xs text-amber-600">Выберите folder в шапке для загрузки сетей.</p>}
+            {!enabled && <p className="text-xs text-amber-600">Выберите проект в шапке для загрузки сетей.</p>}
             {(networksQ.isLoading || subnetsQ.isLoading || addressesQ.isLoading) && (
               <p className="text-xs text-muted-foreground">Загрузка сетей/подсетей/адресов…</p>
             )}
@@ -285,7 +282,7 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
                 <Select
                   style={{ width: "100%" }}
                   value={extAddrId}
-                  placeholder={enabled ? "Выберите публичный адрес" : "Выберите folder в шапке"}
+                  placeholder={enabled ? "Выберите публичный адрес" : "Выберите проект в шапке"}
                   disabled={!enabled}
                   showSearch
                   optionFilterProp="label"
@@ -324,12 +321,12 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
         <Modal open footer={null} onCancel={() => setCreateInternalSubnet(null)} width={640} destroyOnClose title="Выделить IPv4-адрес из подсети">
           <InlineResourceCreateForm
             spec={addressesSpec}
-            ctx={{ projectId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
+            ctx={{ projectId: project?.id, accountId: project?.accountId }}
             presetFields={{
               _address_kind: "internal",
               "internal_ipv4_address_spec.subnet_id": createInternalSubnet,
             }}
-            folderUid={folder?.uid ?? null}
+            projectId={project?.id ?? null}
             onCancel={() => setCreateInternalSubnet(null)}
             onSuccess={() => {
               const sid = createInternalSubnet;
@@ -352,9 +349,9 @@ export function NicSpecFields({ pathPrefix, value, onChange }: Props) {
         <Modal open footer={null} onCancel={() => setCreateExternal(false)} width={640} destroyOnClose title="Создать публичный IP-адрес">
           <InlineResourceCreateForm
             spec={addressesSpec}
-            ctx={{ projectId: folder?.uid, cloudId: cloud?.id, organizationId: org?.id }}
+            ctx={{ projectId: project?.id, accountId: project?.accountId }}
             presetFields={{ _address_kind: "external" }}
-            folderUid={folder?.uid ?? null}
+            projectId={project?.id ?? null}
             onCancel={() => setCreateExternal(false)}
             onSuccess={() => {
               const before = new Set(externalAddrs.map((a) => a.id));

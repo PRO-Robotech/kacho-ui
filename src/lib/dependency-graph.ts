@@ -30,9 +30,9 @@ export interface DepNode {
   resourceId: string;
   id: string;
   name: string;
-  /** folder id ресурса — для построения ссылки. */
+  /** project id ресурса — для построения ссылки. */
   projectId: string;
-  /** URL-сегмент под /folders/:fid/ (например "vpc/subnets"). */
+  /** URL-сегмент под /projects/:projectId/ (например "vpc/subnets"). */
   routeSegment: string;
   /** Блокирует удаление родителя? */
   blocks: boolean;
@@ -58,7 +58,7 @@ function mkNode(resourceId: string, r: AnyRec, blocks: boolean, children: DepNod
     resourceId,
     id: String(r.id),
     name: (r.name as string) || String(r.id),
-    projectId: (r.folder_id as string) || "",
+    projectId: (r.project_id as string) || "",
     routeSegment: routeSegmentFor(resourceId),
     blocks,
     children,
@@ -75,8 +75,8 @@ function nicAttachedInstanceId(ni: AnyRec): string {
 async function subnetChildren(subnetId: string, projectId: string): Promise<DepNode[]> {
   if (!projectId) return [];
   const [addrs, nics] = await Promise.all([
-    listAll("/vpc/v1/addresses", "addresses", { folder_id: projectId }),
-    listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: projectId }),
+    listAll("/vpc/v1/addresses", "addresses", { project_id: projectId }),
+    listAll("/vpc/v1/networkInterfaces", "network_interfaces", { project_id: projectId }),
   ]);
   const out: DepNode[] = [];
   for (const a of addrs) {
@@ -95,7 +95,7 @@ async function subnetChildren(subnetId: string, projectId: string): Promise<DepN
 /** NIC'и, ссылающиеся на адрес в v4_address_ids / v6_address_ids. */
 async function addressDependents(addressId: string, projectId: string): Promise<DepNode[]> {
   if (!projectId) return [];
-  const nics = await listAll("/vpc/v1/networkInterfaces", "network_interfaces", { folder_id: projectId });
+  const nics = await listAll("/vpc/v1/networkInterfaces", "network_interfaces", { project_id: projectId });
   const out: DepNode[] = [];
   for (const ni of nics) {
     const v4: string[] = ni.v4_address_ids ?? [];
@@ -115,12 +115,12 @@ export function hasDependencyResolver(resourceId: string): boolean {
   );
 }
 
-/** Собрать дерево зависимостей ресурса. `resource` — минимум {id, folder_id}. */
+/** Собрать дерево зависимостей ресурса. `resource` — минимум {id, project_id}. */
 export async function loadDependents(
   resourceId: string,
-  resource: { id: string; folder_id?: string | null },
+  resource: { id: string; project_id?: string | null },
 ): Promise<DepNode[]> {
-  const projectId = resource.folder_id ?? "";
+  const projectId = resource.project_id ?? "";
 
   if (resourceId === "networks") {
     const [subnets, routeTables, sgs] = await Promise.all([
@@ -130,7 +130,7 @@ export async function loadDependents(
     ]);
     const out: DepNode[] = [];
     for (const s of subnets) {
-      const kids = await subnetChildren(String(s.id), (s.folder_id as string) || projectId);
+      const kids = await subnetChildren(String(s.id), (s.project_id as string) || projectId);
       out.push(mkNode("subnets", s, true, kids));
     }
     for (const rt of routeTables) out.push(mkNode("route-tables", rt, true));
@@ -163,7 +163,7 @@ export async function loadDependents(
     return [
       mkNode(
         "compute-instances",
-        { id: instId, name: instId, folder_id: (ni?.folder_id as string) || projectId },
+        { id: instId, name: instId, project_id: (ni?.project_id as string) || projectId },
         true,
       ),
     ];

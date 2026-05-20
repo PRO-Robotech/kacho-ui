@@ -3,9 +3,8 @@
 // (сайдбар переключает набор ссылок на этот модуль, см. ServiceSidebar).
 //
 // Уровни контекста (выбираются pill'ами в шапке — BreadcrumbSelector):
-//   • folder выбран     → counts по folder + клик → landing модуля в этом folder
-//   • cloud выбран      → counts агрегированно по всем folder'ам облака + клик → выбор folder
-//   • ничего не выбрано → "—" + CTA «Перейти к Organizations»
+//   • project выбран    → counts по project + клик → landing модуля в этом project
+//   • ничего не выбрано → "—" + CTA «Перейти в IAM»
 
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -19,19 +18,19 @@ import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
 
 type CountMap = Record<string, number | null>;
 
-/** Counts по stat-метрикам модуля: folder-mode (один folder) или cloud-mode (сумма по folder'ам облака). */
-function useModuleCounts(module: ServiceModule, projectId: string | null, cloudFolderIds: string[] | null): CountMap {
-  const enabled = projectId != null || cloudFolderIds != null;
-  const targetFolders = projectId != null ? [projectId] : cloudFolderIds ?? [];
+/** Counts по stat-метрикам модуля для выбранного project. */
+function useModuleCounts(module: ServiceModule, projectId: string | null): CountMap {
+  const enabled = projectId != null;
+  const targetProjects = projectId != null ? [projectId] : [];
   const results = useQueries({
     queries: module.stats.map((stat) => ({
-      queryKey: ["dash", module.key, stat.key, projectId, cloudFolderIds],
+      queryKey: ["dash", module.key, stat.key, projectId],
       enabled,
       refetchInterval: 15_000,
       queryFn: async () => {
         const lists = await Promise.all(
-          targetFolders.map((fid) =>
-            api.list<Record<string, unknown[] | undefined>>(stat.listPath, { folder_id: fid, pageSize: "1000" }),
+          targetProjects.map((pid) =>
+            api.list<Record<string, unknown[] | undefined>>(stat.listPath, { project_id: pid, pageSize: "1000" }),
           ),
         );
         return lists.reduce((sum, l) => sum + (l[stat.payloadKey]?.length ?? 0), 0);
@@ -54,9 +53,9 @@ export function DashboardPage() {
 
   // Counts для каждого модуля. SERVICE_MODULES[0..2] = vpc/compute/iam.
   // IAM не требует projectId (его ресурсы — account-level), счётчики работают всегда.
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId, null);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId, null);
-  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*", null); // "*" — fake projectId чтобы хук активировался
+  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId);
+  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId);
+  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*"); // "*" — fake projectId чтобы хук активировался
   const countsByModule: Record<string, CountMap> = {
     [SERVICE_MODULES[0].key]: vpcCounts,
     [SERVICE_MODULES[1].key]: computeCounts,

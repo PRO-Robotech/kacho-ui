@@ -1,7 +1,7 @@
 // ResourceRefChips — controlled chip-list для array-of-ref полей (например
 // NIC.v4_address_ids / v6_address_ids / security_group_ids). Визуально как
 // SubnetCidrChips, но содержимое — id чужих ресурсов; чипы показывают
-// resolved name (загрузка через api.list для folder-scoped ресурсов).
+// resolved name (загрузка через api.list для project-scoped ресурсов).
 // Внизу — Select для добавления, Tag-close для удаления.
 
 import { useMemo, useState } from "react";
@@ -17,7 +17,7 @@ interface Props {
   title: string;
   /** ID ресурса в REGISTRY (например, "addresses", "security-groups"). */
   refResource: string;
-  /** folder_id для ListXxxRequest. */
+  /** project_id для ListXxxRequest. */
   projectId: string;
   /** Опц. client-side filter (например, только internal IPv4 Address'ы). */
   refFilter?: (row: Record<string, unknown>) => boolean;
@@ -58,17 +58,16 @@ export function ResourceRefChips({
 }: Props) {
   const spec = getResource(refResource);
   const createSpec = createResource ? getResource(createResource) : undefined;
-  const cloud = useContext((s) => s.cloud);
-  const org = useContext((s) => s.org);
+  const account = useContext((s) => s.account);
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [creating, setCreating] = useState(false);
 
-  // Загружаем список ресурсов folder'а для resolve id→name + dropdown options.
+  // Загружаем список ресурсов проекта для resolve id→name + dropdown options.
   const { data: listData, refetch } = useQuery({
     queryKey: [refResource, "list", projectId],
     queryFn: () =>
       api.list<Record<string, unknown>>(spec!.apiPath, {
-        folder_id: projectId,
+        project_id: projectId,
         pageSize: "500",
       }),
     enabled: !!spec,
@@ -212,10 +211,10 @@ export function ResourceRefChips({
         >
           <InlineResourceCreateForm
             spec={createSpec}
-            ctx={{ projectId, cloudId: cloud?.id, organizationId: org?.id }}
+            ctx={{ projectId, accountId: account?.id }}
             presetFields={createPresetFields}
             editablePresetFields={createEditablePresetFields}
-            folderUid={projectId}
+            projectId={projectId}
             title={createTitle}
             onCancel={() => setCreating(false)}
             onSuccess={() => {

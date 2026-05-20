@@ -35,7 +35,7 @@ export function OperationBanner() {
       }
     } else {
       if (entry.resourceId) {
-        invalidate(entry.resourceId, entry.folderUid ?? null);
+        invalidate(entry.resourceId, entry.projectId ?? null);
       }
       toast.success(`${entry.title} — готово`);
     }

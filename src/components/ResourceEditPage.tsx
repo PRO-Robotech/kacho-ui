@@ -16,7 +16,7 @@ import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
-import { useFolderStore } from "@/lib/folder-store";
+import { useProjectStore } from "@/lib/context-store";
 import { useNestedBreadcrumb } from "@/lib/use-nested-breadcrumb";
 
 interface Props {
@@ -28,7 +28,7 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const folder = useFolderStore((s) => s.folder);
+  const project = useProjectStore((s) => s.project);
   const invalidate = useInvalidateResourceList();
 
   const uid = params[paramKey];
@@ -119,7 +119,7 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
       if (opId) {
         setPendingOpId(opId);
       } else {
-        invalidate(spec.id, folder?.uid ?? null);
+        invalidate(spec.id, project?.id ?? null);
         navigate(backHref);
       }
     },
@@ -135,7 +135,7 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
       toast.error(`Сохранить ${spec.singular}: ${op.error.message ?? "ошибка"}`);
       setPendingOpId(null);
     } else {
-      invalidate(spec.id, folder?.uid ?? null);
+      invalidate(spec.id, project?.id ?? null);
       toast.success(`${spec.singular} сохранён`);
       setPendingOpId(null);
       navigate(backHref);

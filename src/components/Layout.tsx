@@ -142,7 +142,7 @@ function LayoutInner() {
             <Outlet />
           </div>
           {/* Глобальный mount модалок Create/Edit — для всех ресурсов
-              (vpc/compute/resource-manager). Модалка сама читает URL и
+              (vpc/compute/iam). Модалка сама читает URL и
               решает, открываться по `?modal=<spec.id>-create|edit`. */}
           <GlobalResourceFormModal />
         </Content>

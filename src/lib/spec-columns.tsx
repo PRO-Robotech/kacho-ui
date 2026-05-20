@@ -1,7 +1,7 @@
 // spec-columns — преобразование ResourceSpec.columns в Column<row> для ResourceTable.
 // Та же логика, что в ResourceListPage, вынесена для переиспользования
 // (например, на Subnet detail в tab "IP-адреса" мы рендерим Addresses-таблицу
-// с теми же колонками, что и /folders/X/addresses).
+// с теми же колонками, что и /projects/X/addresses).
 
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -13,7 +13,7 @@ import { getByPath, type ResourceColumn, type ResourceSpec } from "@/lib/resourc
 
 // Опции для рендеринга generic-форматов, которым нужен контекст вокруг ячейки.
 // Сейчас используется только `projectId` для построения SPA-ссылок в format:
-// "references" (used_by → /folders/<projectId>/compute/instances/<id> и т.п.).
+// "references" (used_by → /projects/<projectId>/compute/instances/<id> и т.п.).
 export interface FormatCellOpts {
   projectId?: string | null;
 }
@@ -185,7 +185,7 @@ export function formatCellByFormat(
         const first = v[0] as { referrer?: { type?: string; id?: string } } | undefined;
         const more = v.length > 1 ? v.length - 1 : 0;
         const projectId =
-          opts.projectId ?? (getByPath<string>(row, "folder_id") || null);
+          opts.projectId ?? (getByPath<string>(row, "project_id") || null);
         const restTitle = more
           ? (v.slice(1) as Array<{ referrer?: { type?: string; id?: string } }>)
               .map((r) => `${r.referrer?.type ?? "?"} ${r.referrer?.id ?? ""}`)

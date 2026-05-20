@@ -31,10 +31,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   const ctx = useMemo(
     () => ({
-      projectId: parentField === "folder_id" ? (filterValue ?? undefined) : undefined,
-      cloudId: parentField === "cloud_id" ? (filterValue ?? undefined) : undefined,
-      organizationId:
-        parentField === "organization_id" ? (filterValue ?? undefined) : undefined,
+      projectId: parentField === "project_id" ? (filterValue ?? undefined) : undefined,
     }),
     [parentField, filterValue],
   );
@@ -80,7 +77,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
     for (const [path, val] of Object.entries(presetFields)) {
       merged = setByPath(merged, path, val);
     }
-    // Auto-name: пустое name + UNIQUE на (folder_id, name) → ALREADY_EXISTS
+    // Auto-name: пустое name + UNIQUE на (project_id, name) → ALREADY_EXISTS
     // на повторе. Генерируем <route>-NNNNNN.
     if (
       spec.fields?.some((f) => f.name === "name") &&
@@ -98,8 +95,8 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   const lockedPathsRef = useRef(new Set(Object.keys(presetFields)));
 
   // Back = текущий path без /create суффикса. Для nested URL вида
-  //   /folders/X/vpc/networks/Y/route-tables/create
-  // полученный URL `/folders/X/vpc/networks/Y/route-tables` не существует —
+  //   /projects/X/vpc/networks/Y/route-tables/create
+  // полученный URL `/projects/X/vpc/networks/Y/route-tables` не существует —
   // вместо этого возвращаемся к parent detail (network detail с табом).
   const rawBack = location.pathname.replace(/\/create$/, "") || "/";
   const projectId = params.projectId as string | undefined;

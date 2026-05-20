@@ -21,7 +21,7 @@ import { toast } from "@/lib/toast";
 interface Props {
   spec: ResourceSpec;
   /** Контекст для ResourceSpec.template — передаётся в applyFieldDefaults. */
-  ctx: { projectId?: string; cloudId?: string; organizationId?: string };
+  ctx: { projectId?: string; accountId?: string };
   /** Поля, которые должны быть pre-filled и locked (immutable в форме).
    *  Ключи — paths (например "network_id" или "internal_ipv4_address_spec.subnet_id"). */
   presetFields?: Record<string, unknown>;
@@ -34,8 +34,8 @@ interface Props {
    *  не показываются. Пример: `{ _address_kind: ["internal", "internal_v6"] }` —
    *  в контексте подсети internal IPv4/IPv6, без `external`. */
   fieldOptionsFilter?: Record<string, string[]>;
-  /** folderUid для invalidate + OperationBanner. */
-  folderUid: string | null;
+  /** projectId для invalidate + OperationBanner. */
+  projectId: string | null;
   /** Title формы. По умолчанию — "Создать <singular>". */
   title?: string;
   onCancel: () => void;
@@ -49,7 +49,7 @@ export function InlineResourceCreateForm({
   presetFields,
   editablePresetFields,
   fieldOptionsFilter,
-  folderUid,
+  projectId,
   title,
   onCancel,
   onSuccess,
@@ -75,7 +75,7 @@ export function InlineResourceCreateForm({
       merged = setByPath(merged, path, val);
     }
     // Auto-name: если у ресурса есть поле name и оно пустое, генерируем
-    // <route>-NNNNNN — иначе backend (UNIQUE по folder_id+name) отвечает
+    // <route>-NNNNNN — иначе backend (UNIQUE по project_id+name) отвечает
     // ALREADY_EXISTS на повторный nameless ресурс.
     if (
       spec.fields?.some((f) => f.name === "name") &&
@@ -105,7 +105,7 @@ export function InlineResourceCreateForm({
         setPendingOpId(id);
       } else {
         // Sync-ответ (admin RPC без Operation envelope) — закрываем сразу.
-        invalidate(spec.id, folderUid);
+        invalidate(spec.id, projectId);
         onSuccess?.();
         onCancel();
       }
@@ -123,7 +123,7 @@ export function InlineResourceCreateForm({
       const msg = op.error.message ?? "ошибка";
       toast.error(`Создать ${spec.singular}: ${msg}`);
     } else {
-      invalidate(spec.id, folderUid);
+      invalidate(spec.id, projectId);
       toast.success(`${spec.singular} создан`);
       onSuccess?.();
     }

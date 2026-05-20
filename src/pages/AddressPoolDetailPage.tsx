@@ -1,7 +1,8 @@
-// AddressPoolDetailPage — admin страница AddressPool: utilization + cross-folder addresses.
+// AddressPoolDetailPage — admin страница AddressPool: utilization + cross-project addresses.
 //
-// Корневой системный тенант (нет org/cloud/folder для самого pool), но в табличке
-// addresses показываются клиентские folder/cloud/org (reverse-lookup).
+// Корневой системный тенант (нет account/project для самого pool), но в табличке
+// addresses показываются клиентские project / account (reverse-lookup) после
+// KAC-124: Organization/Cloud/Folder → Account/Project.
 
 import { Link, useParams } from "react-router-dom";
 import { useMemo } from "react";
@@ -11,10 +12,11 @@ import { IpamUtilizationBar, CIDRBreakdown } from "@/components/IpamUtilizationB
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import type { DetailTab } from "@/components/DetailShell";
+import type { AccountSummaryList, ProjectSummaryList } from "@/api/types";
 
 interface PoolAddrEntry {
   id: string;
-  folder_id: string;
+  project_id: string;
   name: string;
   ipv4: string;
   zone_id: string;
@@ -22,10 +24,6 @@ interface PoolAddrEntry {
   used: boolean;
   created_at: string;
 }
-
-interface Folder { id: string; name: string; cloud_id: string }
-interface Cloud  { id: string; name: string; organization_id: string }
-interface Organization { id: string; name: string }
 
 export function AddressPoolDetailPage() {
   const { uid: poolId } = useParams();
@@ -56,33 +54,29 @@ export function AddressPoolDetailPage() {
     enabled: !!poolId,
   });
 
-  const { data: folders } = useQuery({
-    queryKey: ["folders-all"],
-    queryFn: () => api.list<{ folders: Folder[] }>("/resource-manager/v1/folders"),
+  // KAC-124: IAM Account + Project заменили Resource-Manager Organization+Cloud+Folder.
+  // VPC резервирует addresses под `project_id`.
+  const { data: projects } = useQuery({
+    queryKey: ["iam-projects-all"],
+    queryFn: () => api.list<ProjectSummaryList>("/iam/v1/projects"),
     staleTime: 30_000,
   });
-  const { data: clouds } = useQuery({
-    queryKey: ["clouds-all"],
-    queryFn: () => api.list<{ clouds: Cloud[] }>("/resource-manager/v1/clouds"),
-    staleTime: 30_000,
-  });
-  const { data: orgs } = useQuery({
-    queryKey: ["orgs-all"],
-    queryFn: () =>
-      api.list<{ organizations: Organization[] }>("/organization-manager/v1/organizations"),
+  const { data: accounts } = useQuery({
+    queryKey: ["iam-accounts-all"],
+    queryFn: () => api.list<AccountSummaryList>("/iam/v1/accounts"),
     staleTime: 30_000,
   });
 
-  const folderMap = new Map((folders?.folders ?? []).map((f) => [f.id, f]));
-  const cloudMap = new Map((clouds?.clouds ?? []).map((c) => [c.id, c]));
-  const orgMap = new Map((orgs?.organizations ?? []).map((o) => [o.id, o]));
+  const projectMap = new Map((projects?.projects ?? []).map((p) => [p.id, p]));
+  const accountMap = new Map((accounts?.accounts ?? []).map((a) => [a.id, a]));
 
-  const reverseLookup = (projectId: string): { folder?: string; cloud?: string; org?: string } => {
-    const f = folderMap.get(projectId);
-    if (!f) return {};
-    const c = cloudMap.get(f.cloud_id);
-    const o = c ? orgMap.get(c.organization_id) : undefined;
-    return { folder: f.name, cloud: c?.name, org: o?.name };
+  const reverseLookup = (
+    projectId: string,
+  ): { project?: string; account?: string } => {
+    const p = projectMap.get(projectId);
+    if (!p) return {};
+    const a = p.account_id ? accountMap.get(p.account_id) : undefined;
+    return { project: p.name, account: a?.name };
   };
 
   const extraTabs = useMemo(
@@ -124,21 +118,20 @@ export function AddressPoolDetailPage() {
                       <th className="text-left px-3 py-2">IP</th>
                       <th className="text-left px-3 py-2">Адрес</th>
                       <th className="text-left px-3 py-2">Зона</th>
-                      <th className="text-left px-3 py-2">Folder</th>
-                      <th className="text-left px-3 py-2">Cloud</th>
-                      <th className="text-left px-3 py-2">Org</th>
+                      <th className="text-left px-3 py-2">Project</th>
+                      <th className="text-left px-3 py-2">Account</th>
                       <th className="text-left px-3 py-2">Reserved/Used</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(addresses?.addresses ?? []).map((a) => {
-                      const lk = reverseLookup(a.folder_id);
+                      const lk = reverseLookup(a.project_id);
                       return (
                         <tr key={a.id} className="border-t border-border hover:bg-muted/20">
                           <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
                           <td className="px-3 py-2">
                             <Link
-                              to={`/projects/${a.folder_id}/vpc/addresses/${a.id}`}
+                              to={`/projects/${a.project_id}/vpc/addresses/${a.id}`}
                               className="text-blue-400 hover:underline"
                             >
                               {a.name || a.id.slice(0, 12) + "…"}
@@ -147,12 +140,11 @@ export function AddressPoolDetailPage() {
                           </td>
                           <td className="px-3 py-2 font-mono text-xs">{a.zone_id}</td>
                           <td className="px-3 py-2 text-xs">
-                            <Link to={`/projects/${a.folder_id}`} className="hover:underline">
-                              {lk.folder ?? a.folder_id.slice(0, 8) + "…"}
+                            <Link to={`/projects/${a.project_id}`} className="hover:underline">
+                              {lk.project ?? a.project_id.slice(0, 8) + "…"}
                             </Link>
                           </td>
-                          <td className="px-3 py-2 text-xs">{lk.cloud ?? "—"}</td>
-                          <td className="px-3 py-2 text-xs">{lk.org ?? "—"}</td>
+                          <td className="px-3 py-2 text-xs">{lk.account ?? "—"}</td>
                           <td className="px-3 py-2 text-xs">
                             {a.reserved && <span className="text-blue-400 mr-1">RES</span>}
                             {a.used && <span className="text-emerald-400">USED</span>}
@@ -162,7 +154,7 @@ export function AddressPoolDetailPage() {
                     })}
                     {(!addresses?.addresses || addresses.addresses.length === 0) && (
                       <tr>
-                        <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                        <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
                           Из этого пула адреса ещё не выделены
                         </td>
                       </tr>
@@ -174,10 +166,10 @@ export function AddressPoolDetailPage() {
           },
         ];
       },
-    // reverseLookup замыкает folderMap/cloudMap/orgMap из текущего рендера —
-    // OK: при смене любого из трёх запросов компонент перерендерится и tab'ы
-    // получат новый callback.
-    [util, addresses, folderMap, cloudMap, orgMap, reverseLookup],
+    // reverseLookup замыкает projectMap/accountMap из текущего рендера — OK:
+    // при смене любого запроса компонент перерендерится и tab'ы получат
+    // новый callback.
+    [util, addresses, projectMap, accountMap, reverseLookup],
   );
 
   return <ResourceDetailPage spec={spec} extraTabs={extraTabs} />;

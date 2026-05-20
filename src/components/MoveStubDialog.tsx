@@ -30,10 +30,10 @@ export function MoveStubDialog({ open, onOpenChange, resourceLabel, name, apiPat
           <Typography.Text strong>{name}</Typography.Text>
         </div>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          UI пока не имеет picker'а целевого Folder/Cloud. Используйте REST API:
+          UI пока не имеет picker'а целевого Project. Используйте REST API:
         </Typography.Text>
         <Typography.Text code copyable style={{ display: "block", whiteSpace: "pre-wrap" }}>
-          {`POST ${apiPath}:move\n{ "destination_folder_id": "<folder-id>" }`}
+          {`POST ${apiPath}:move\n{ "destination_project_id": "<project-id>" }`}
         </Typography.Text>
       </div>
     </Modal>

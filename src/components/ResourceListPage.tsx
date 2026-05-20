@@ -12,7 +12,7 @@ import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
-import { FolderRequiredEmpty } from "@/components/FolderRequiredEmpty";
+import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
 import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
@@ -22,13 +22,17 @@ interface Props {
   spec: ResourceSpec;
   parentField?: string;
   parentParam?: string;
+  /** Явное значение scope-фильтра (account-scoped IAM-ресурсы берут account
+   *  из context-store, а не из URL-параметра). Имеет приоритет над parentParam. */
+  parentValue?: string | null;
 }
 
-export function ResourceListPage({ spec, parentField, parentParam }: Props) {
+export function ResourceListPage({ spec, parentField, parentParam, parentValue }: Props) {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const filterValue = parentParam ? (params[parentParam] ?? null) : null;
+  const filterValue =
+    parentValue ?? (parentParam ? (params[parentParam] ?? null) : null);
   const [query, setQuery] = useState("");
 
   const { data, isLoading, isError, error } = useResourceList(
@@ -70,7 +74,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
 
   useHeaderRight(cta);
 
-  if (parentField && !filterValue) return <FolderRequiredEmpty resource={spec.plural} />;
+  if (parentField && !filterValue) return <ProjectRequiredEmpty resource={spec.plural} />;
 
   const basePath = location.pathname.endsWith("/")
     ? location.pathname.slice(0, -1)
@@ -136,9 +140,9 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, query, zone, hasZoneFilter, spec.id]);
 
-  // params.projectId доступен для folder-scoped listов (/folders/:projectId/...);
+  // params.projectId доступен для project-scoped listов (/projects/:projectId/...);
   // прокидываем в buildSpecColumns, чтобы format: "references" (used_by) мог
-  // отрендерить ссылку на /folders/<projectId>/compute/instances/<id> и т.п.
+  // отрендерить ссылку на /projects/<projectId>/compute/instances/<id> и т.п.
   const columns: Column<Record<string, unknown>>[] = buildSpecColumns(spec, {
     projectId: params.projectId,
   });
@@ -151,7 +155,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         spec={spec}
         row={row}
         basePath={basePath}
-        folderUid={filterValue ?? null}
+        projectId={filterValue ?? null}
       />
     ),
   });
@@ -198,7 +202,7 @@ export function ResourceListPage({ spec, parentField, parentParam }: Props) {
         onRowClick={(row) => {
           const id = getByPath<string>(row, "id");
           if (!id) return;
-          // childRoute шаблон: /folders/:id, /clouds/:id/folders, ...
+          // childRoute шаблон: /projects/:id, ...
           const target = spec.childRoute
             ? spec.childRoute.replace(":id", id)
             : `${basePath}/${id}`;

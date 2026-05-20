@@ -161,7 +161,7 @@ export function AccessPage() {
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <Space size={12} align="center">
-        <Typography.Title level={4} style={{ margin: 0 }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>
           Права доступа
         </Typography.Title>
       </Space>
@@ -373,7 +373,7 @@ function InviteModal({
       onOk={magicLink ? () => { onClose(); setMagicLink(null); } : handleSubmit}
       okText={magicLink ? "Готово" : "Сохранить"}
       cancelText="Отмена"
-      width={680}
+      width={860}
       destroyOnClose
     >
       <Form form={form} layout="vertical">

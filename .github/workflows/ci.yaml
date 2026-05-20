@@ -31,3 +31,35 @@ jobs:
         env:
           # vite build не требует runtime-env, но safe default чтобы не падать на NODE_ENV mismatch
           NODE_ENV: production
+
+  e2e:
+    # Backend-free Playwright e2e (e2e/ci/*) — REST мокается через page.route,
+    # UI обслуживается `vite preview`. Стенд / авторизация не нужны.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser (chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e (mocked, CI)
+        run: npm run e2e:ci
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

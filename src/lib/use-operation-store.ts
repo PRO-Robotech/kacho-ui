@@ -17,7 +17,7 @@ export interface OpEntry {
   status: OpStatus;
   errorMessage?: string;
   resourceId?: string;    // resource id для invalidate (например spec.id)
-  folderUid?: string | null;
+  projectId?: string | null;
   startedAt: number;
 }
 
@@ -30,13 +30,13 @@ function emit() {
 
 export const operationStore = {
   /** Запустить новую операцию. Перезаписывает текущую (queue=1). */
-  start(entry: { id: string; title: string; resourceId?: string; folderUid?: string | null }) {
+  start(entry: { id: string; title: string; resourceId?: string; projectId?: string | null }) {
     current = {
       id: entry.id,
       title: entry.title,
       status: "pending",
       resourceId: entry.resourceId,
-      folderUid: entry.folderUid ?? null,
+      projectId: entry.projectId ?? null,
       startedAt: Date.now(),
     };
     emit();

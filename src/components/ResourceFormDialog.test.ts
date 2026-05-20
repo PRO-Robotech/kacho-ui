@@ -36,9 +36,9 @@ const fRouteTable: FormField = {
   type: "ref",
   refResource: "route-tables",
 };
-const fFolderId: FormField = {
-  name: "folder_id",
-  label: "Folder",
+const fProjectId: FormField = {
+  name: "project_id",
+  label: "Проект",
   type: "string",
   hidden: true,
 };
@@ -72,10 +72,10 @@ describe("computeUpdateMask — regression: ссылки не должны по�
       .toEqual(["route_table_id"]);
   });
 
-  it("excludes hidden fields (folder_id и т.п. — они immutable от user perspective)", () => {
-    const orig = { folder_id: "F-1", name: "n" };
-    const cur = { folder_id: "F-2", name: "n2" };
-    expect(computeUpdateMask(orig, cur, [fFolderId, fName])).toEqual(["name"]);
+  it("excludes hidden fields (project_id и т.п. — они immutable от user perspective)", () => {
+    const orig = { project_id: "F-1", name: "n" };
+    const cur = { project_id: "F-2", name: "n2" };
+    expect(computeUpdateMask(orig, cur, [fProjectId, fName])).toEqual(["name"]);
   });
 
   it("excludes immutable fields — backend rejects их с InvalidArgument в любом случае", () => {

@@ -154,7 +154,7 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
                 ? `Сохранение группы безопасности ${name}`
                 : `Сохранение правил группы безопасности ${name}`,
             resourceId: sgSpec.id,
-            folderUid: projectId,
+            projectId: projectId,
           });
         }
       });

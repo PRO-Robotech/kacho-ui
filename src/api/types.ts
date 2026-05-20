@@ -21,51 +21,37 @@ export interface OperationList {
   next_page_token?: string;
 }
 
-// ====== organization-manager ======
+// ====== IAM (KAC-124: заменил organization-manager + resource-manager) ======
+//
+// Organization / Cloud / Folder упразднены в KAC-124 → заменены на Account / Project
+// (kacho.cloud.iam.v1). Public types для tabular представления / breadcrumbs живут
+// в api/iam.ts; здесь — минимальные интерфейсы под reverse-lookup в admin UI.
 
-export interface Organization {
+export interface AccountSummary {
   id: string;
   created_at?: string;
   name: string;
   description?: string;
   labels?: Record<string, string>;
-  language?: string;
-  title?: string;
+  owner_user_id?: string;
 }
 
-export interface OrganizationList {
-  organizations: Organization[];
+export interface AccountSummaryList {
+  accounts: AccountSummary[];
   next_page_token?: string;
 }
 
-// ====== resource-manager ======
-
-export interface Cloud {
+export interface ProjectSummary {
   id: string;
   created_at?: string;
   name: string;
   description?: string;
-  organization_id?: string;
+  account_id?: string;
   labels?: Record<string, string>;
 }
 
-export interface CloudList {
-  clouds: Cloud[];
-  next_page_token?: string;
-}
-
-export interface Folder {
-  id: string;
-  created_at?: string;
-  name: string;
-  description?: string;
-  cloud_id?: string;
-  labels?: Record<string, string>;
-  status?: "STATUS_UNSPECIFIED" | "CREATING" | "ACTIVE" | "DELETING" | string;
-}
-
-export interface FolderList {
-  folders: Folder[];
+export interface ProjectSummaryList {
+  projects: ProjectSummary[];
   next_page_token?: string;
 }
 
@@ -73,7 +59,7 @@ export interface FolderList {
 
 export interface Network {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -88,7 +74,7 @@ export interface NetworkList {
 
 export interface Subnet {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -117,7 +103,7 @@ export interface ResourceReference {
 
 export interface Address {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -145,7 +131,7 @@ export interface AddressList {
 
 export interface RouteTable {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -179,7 +165,7 @@ export interface SecurityGroupRule {
 
 export interface SecurityGroup {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -205,7 +191,7 @@ export interface SecurityGroupList {
 
 export interface Disk {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -227,7 +213,7 @@ export interface DiskList {
 
 export interface Image {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -248,7 +234,7 @@ export interface ImageList {
 
 export interface Snapshot {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;
@@ -281,7 +267,7 @@ export interface AttachedDisk {
 
 export interface Instance {
   id: string;
-  folder_id?: string;
+  project_id?: string;
   created_at?: string;
   name: string;
   description?: string;

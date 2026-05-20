@@ -1,37 +1,19 @@
 // Per-resource API helpers. Обёртки над api/client.api.list/get.
-// Используются FolderSelector, DashboardPage и другими компонентами,
+// Используются ProjectSelector, DashboardPage и другими компонентами,
 // которые не могут пользоваться generic registry.
 // URL-ы verbatim из proto google.api.http annotations.
+//
+// KAC-124: organization-manager + resource-manager упразднены, заменены на
+// kacho.cloud.iam.v1 (Account / Project). Helpers под IAM лежат в api/iam.ts
+// (iamApi.listAccounts / listProjects).
 
 import { api } from "./client";
 import type {
-  CloudList,
-  FolderList,
   NetworkList,
-  OrganizationList,
   SubnetList,
   AddressList,
   RouteTableList,
 } from "./types";
-
-// ====== organization-manager ======
-
-export const orgsApi = {
-  list: (q?: Record<string, string>) =>
-    api.list<OrganizationList>("/organization-manager/v1/organizations", q),
-};
-
-// ====== resource-manager ======
-
-export const cloudsApi = {
-  list: (q?: Record<string, string>) =>
-    api.list<CloudList>("/resource-manager/v1/clouds", q),
-};
-
-export const foldersApi = {
-  list: (q?: Record<string, string>) =>
-    api.list<FolderList>("/resource-manager/v1/folders", q),
-};
 
 // ====== vpc ======
 

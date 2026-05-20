@@ -77,7 +77,7 @@ export function InlineNetworkInterfaceCreateForm({
     queryKey: ["subnets", "list", projectId],
     queryFn: () =>
       api.list<{ subnets: Array<{ id: string; name?: string }> }>(subnetSpec.apiPath, {
-        folder_id: projectId,
+        project_id: projectId,
         pageSize: "500",
       }),
     enabled: !subnetLocked,
@@ -135,7 +135,7 @@ export function InlineNetworkInterfaceCreateForm({
       return;
     }
     mutation.mutate({
-      folder_id: projectId,
+      project_id: projectId,
       subnet_id: subnetId,
       name,
       description: description || undefined,

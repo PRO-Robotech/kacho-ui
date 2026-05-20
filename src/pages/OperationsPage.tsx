@@ -1,6 +1,6 @@
-// OperationsPage — folder-scoped global список LRO операций по всем VPC ресурсам.
+// OperationsPage — project-scoped global список LRO операций по всем VPC ресурсам.
 // Aggregation client-side: для каждого VPC-resource type списком собираются
-// ресурсы folder'а, затем по каждому делается ListOperations. Все операции
+// ресурсы проекта, затем по каждому делается ListOperations. Все операции
 // объединяются и сортируются по created_at desc.
 //
 // Фильтры: id / Статус / Тип ресурса.
@@ -18,7 +18,7 @@ import {
   statusOf,
   type OperationStatus,
 } from "@/components/OperationsTable";
-import { useFolderStore } from "@/lib/folder-store";
+import { useProjectStore } from "@/lib/context-store";
 import { REGISTRY } from "@/lib/resource-registry";
 
 // Список VPC-ресурсов, у которых есть per-resource ListOperations.
@@ -51,8 +51,8 @@ interface ResListResp {
 }
 
 export function OperationsPage() {
-  const folder = useFolderStore((s) => s.folder);
-  const projectId = folder?.uid ?? null;
+  const project = useProjectStore((s) => s.project);
+  const projectId = project?.id ?? null;
   const qc = useQueryClient();
 
   const headerRight = useMemo(
@@ -90,7 +90,7 @@ export function OperationsPage() {
   const [status, setStatus] = useState<OperationStatus | "all">("all");
   const [kind, setKind] = useState<string>("all");
 
-  // 1) для каждого VPC-resource type грузим список ресурсов folder'а.
+  // 1) для каждого VPC-resource type грузим список ресурсов проекта.
   const listQueries = useQueries({
     queries: VPC_RESOURCES.map((r) => {
       const spec = REGISTRY[r.id];
@@ -98,7 +98,7 @@ export function OperationsPage() {
         queryKey: [r.id, "list-for-ops", projectId],
         queryFn: () =>
           api.list<ResListResp>(spec.apiPath, {
-            folder_id: projectId!,
+            project_id: projectId!,
             pageSize: "200",
           }),
         enabled: !!projectId && !!spec,
@@ -173,8 +173,8 @@ export function OperationsPage() {
     return (
       <ErrorResult
         status="warning"
-        title="Выберите folder"
-        subTitle="Глобальные операции отображаются для текущего folder."
+        title="Выберите проект"
+        subTitle="Глобальные операции отображаются для текущего проекта."
       />
     );
   }
@@ -186,7 +186,7 @@ export function OperationsPage() {
           Операции
         </Typography.Title>
         <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-          Все операции (LRO) по VPC-ресурсам в текущем folder.
+          Все операции (LRO) по VPC-ресурсам в текущем проекте.
         </Typography.Text>
       </div>
 

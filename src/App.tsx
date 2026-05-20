@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
 import ruRU from "antd/locale/ru_RU";
@@ -25,10 +25,8 @@ import { OperationsPage } from "@/pages/OperationsPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { IamLayout } from "@/components/iam/IamLayout";
-import { AccountsPage } from "@/pages/iam/AccountsPage";
-import { ProjectsPage } from "@/pages/iam/ProjectsPage";
+import { IamScopedListShell } from "@/components/iam/IamScopedListShell";
 import { UsersPage } from "@/pages/iam/UsersPage";
-import { ServiceAccountsPage } from "@/pages/iam/ServiceAccountsPage";
 import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
@@ -36,6 +34,11 @@ import { AccessPage } from "@/pages/iam/AccessPage";
 import { AuthCallback } from "@/pages/auth/AuthCallback";
 import { SignupPage } from "@/pages/auth/SignupPage";
 import { LogoutPage } from "@/pages/auth/Logout";
+import { LoginPage } from "@/pages/auth/Login";
+import { RegisterPage } from "@/pages/auth/Register";
+import { RecoveryPage } from "@/pages/auth/Recovery";
+import { SettingsPage } from "@/pages/auth/Settings";
+import { StepUpModal } from "@/components/auth/StepUpModal";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient({
@@ -48,42 +51,15 @@ const queryClient = new QueryClient({
   },
 });
 
-// Folder-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
-const FOLDER_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "network-interfaces", "gateways"]
+// Project-scoped VPC ресурсы — берём имена из registry без захардкоженного списка.
+const PROJECT_SCOPED = ["networks", "subnets", "addresses", "route-tables", "security-groups", "network-interfaces", "gateways"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 
-// Folder-scoped Compute ресурсы (Disk/Image/Snapshot/Instance). URL-сегмент — `compute`.
+// Project-scoped Compute ресурсы (Disk/Image/Snapshot/Instance). URL-сегмент — `compute`.
 const COMPUTE_SCOPED = ["compute-disks", "compute-images", "compute-snapshots", "compute-instances"]
   .map((id) => REGISTRY[id])
   .filter(Boolean);
-
-// LegacySegmentRedirect — редирект старых flat-URL `/projects/<id>/<route>/...`
-// на новые `/projects/<id>/<segment>/<route>/...` (segment = "vpc" | "compute").
-// KAC-117: model переименована Folder → Project.
-function LegacySegmentRedirect({ segment, route }: { segment: string; route: string }) {
-  const { projectId } = useParams();
-  const location = useLocation();
-  const prefix = `/projects/${projectId}/${route}`;
-  const tail = location.pathname.startsWith(prefix)
-    ? location.pathname.slice(prefix.length)
-    : "";
-  return (
-    <Navigate
-      to={`/projects/${projectId}/${segment}/${route}${tail}${location.search}`}
-      replace
-    />
-  );
-}
-
-// FoldersLegacyRedirect — KAC-117: SPA continue работает на старых URL
-// `/folders/<id>/...` (RefNameLinks из прошлых сессий / закладки browser) —
-// редирект в `/projects/<id>/...` (сохраняя хвост + query).
-function FoldersLegacyRedirect() {
-  const location = useLocation();
-  const newPath = location.pathname.replace(/^\/folders\//, "/projects/");
-  return <Navigate to={`${newPath}${location.search}`} replace />;
-}
 
 export default function App() {
   return (
@@ -174,9 +150,16 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
         <AuthProvider>
+        <StepUpModal />
         <Routes>
           {/* Public signup/login pages (без Layout — full-screen) */}
           <Route path="/signup" element={<SignupPage />} />
+
+          {/* KAC-127 (Phase 2): Passkey/WebAuthn auth pages — без Layout. */}
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/registration" element={<RegisterPage />} />
+          <Route path="/auth/recovery" element={<RecoveryPage />} />
+          <Route path="/auth/settings" element={<SettingsPage />} />
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />
@@ -184,68 +167,13 @@ export default function App() {
             {/* Dashboard with project context in URL. */}
             <Route path="/projects/:projectId/dashboard" element={<DashboardPage />} />
 
-            {/* KAC-117: legacy redirect /folders/<id>/* → /projects/<id>/* */}
-            <Route path="/folders/*" element={<FoldersLegacyRedirect />} />
+            {/* === IAM hierarchy (KAC-124: заменил Resource Manager) ===
+                Account / Project — flat ресурсы под /iam/accounts и /iam/projects;
+                рендерятся в IAM-section ниже (AccountsPage / ProjectsPage). */}
 
-            {/* === Resource Manager hierarchy (через path) === */}
-
-            {/* /organizations — список org (cluster-scoped) */}
-            <Route
-              path="/organizations"
-              element={<ResourceListPage spec={REGISTRY.organizations} />}
-            />
-            <Route
-              path="/organizations/create"
-              element={<ResourceCreatePage spec={REGISTRY.organizations} />}
-            />
-
-            {/* /organizations/:orgId/clouds — список clouds в orgId */}
-            <Route
-              path="/organizations/:orgId/clouds"
-              element={
-                <ResourceListPage
-                  spec={REGISTRY.clouds}
-                  parentField="organization_id"
-                  parentParam="orgId"
-                />
-              }
-            />
-            <Route
-              path="/organizations/:orgId/clouds/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.clouds}
-                  parentField="organization_id"
-                  parentParam="orgId"
-                />
-              }
-            />
-
-            {/* /clouds/:cloudId/folders — список folders в cloudId */}
-            <Route
-              path="/clouds/:cloudId/folders"
-              element={
-                <ResourceListPage
-                  spec={REGISTRY.folders}
-                  parentField="cloud_id"
-                  parentParam="cloudId"
-                />
-              }
-            />
-            <Route
-              path="/clouds/:cloudId/folders/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.folders}
-                  parentField="cloud_id"
-                  parentParam="cloudId"
-                />
-              }
-            />
-
-            {/* === Folder-scoped VPC ресурсы === */}
+            {/* === Project-scoped VPC ресурсы === */}
             {/* /projects/:projectId/vpc/{networks|subnets|addresses|route-tables|security-groups} */}
-            {FOLDER_SCOPED.map((spec) => (
+            {PROJECT_SCOPED.map((spec) => (
               <Route key={spec.id}>
                 <Route
                   path={`/projects/:projectId/vpc/${spec.route}`}
@@ -309,16 +237,10 @@ export default function App() {
                             : <VpcDetailShell spec={spec} />
                   }
                 />
-                {/* Legacy redirect: старые flat URL `/folders/X/<resource>/...`
-                    автоматически редиректятся на /folders/X/vpc/<resource>/... */}
-                <Route
-                  path={`/projects/:projectId/${spec.route}/*`}
-                  element={<LegacySegmentRedirect segment="vpc" route={spec.route} />}
-                />
               </Route>
             ))}
 
-            {/* === Folder-scoped Compute ресурсы === */}
+            {/* === Project-scoped Compute ресурсы === */}
             {/* /projects/:projectId/compute/{disks|images|snapshots|instances} */}
             {COMPUTE_SCOPED.map((spec) => (
               <Route key={spec.id}>
@@ -357,11 +279,6 @@ export default function App() {
                       ? <InstanceDetailPage />
                       : <ResourceDetailPage spec={spec} />
                   }
-                />
-                {/* Legacy/RefNameLink redirect: `/folders/X/<route>/...` → `/folders/X/compute/<route>/...` */}
-                <Route
-                  path={`/projects/:projectId/${spec.route}/*`}
-                  element={<LegacySegmentRedirect segment="compute" route={spec.route} />}
                 />
               </Route>
             ))}
@@ -414,7 +331,7 @@ export default function App() {
               }
             />
 
-            {/* === Global VPC Operations (folder-scoped) === */}
+            {/* === Global VPC Operations (project-scoped) === */}
             <Route
               path="/projects/:projectId/vpc/operations"
               element={<OperationsPage />}
@@ -470,30 +387,12 @@ export default function App() {
             {/* /projects/:projectId — редирект на dashboard */}
             <Route
               path="/projects/:projectId"
-              element={<FolderDefaultRedirect />}
+              element={<ProjectDefaultRedirect />}
             />
-            {/* Edit folder — full-page форма */}
+            {/* Edit project — full-page форма (KAC-124). */}
             <Route
               path="/projects/:projectId/edit"
-              element={<ResourceEditPage spec={REGISTRY.folders} paramKey="projectId" />}
-            />
-
-            {/* Detail-страницы для Resource Manager */}
-            <Route
-              path="/organizations/:orgId"
-              element={<ResourceDetailPage spec={REGISTRY.organizations} paramKey="orgId" />}
-            />
-            <Route
-              path="/organizations/:orgId/edit"
-              element={<ResourceEditPage spec={REGISTRY.organizations} paramKey="orgId" />}
-            />
-            <Route
-              path="/clouds/:cloudId"
-              element={<ResourceDetailPage spec={REGISTRY.clouds} paramKey="cloudId" />}
-            />
-            <Route
-              path="/clouds/:cloudId/edit"
-              element={<ResourceEditPage spec={REGISTRY.clouds} paramKey="cloudId" />}
+              element={<ResourceEditPage spec={REGISTRY.projects} paramKey="projectId" />}
             />
 
             {/* === System (admin-only, kacho-only) === */}
@@ -518,14 +417,19 @@ export default function App() {
             <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
 
-            {/* === IAM section (KAC-109, E0 UI block) ===
-                Все 7 IAM-страниц + auth-info banner в shared IamLayout. */}
+            {/* === IAM section ===
+                Account — global registry-driven (ResourceListPage + ?modal=).
+                Project / ServiceAccount — account-scoped (IamScopedListShell
+                фильтрует по выбранному в IAM-секции Account).
+                User / Group / AccessBinding / Access — кастомные страницы. */}
             <Route element={<IamLayout />}>
               <Route path="/iam" element={<Navigate to="/iam/accounts" replace />} />
-              <Route path="/iam/accounts" element={<AccountsPage />} />
-              <Route path="/iam/projects" element={<ProjectsPage />} />
+              <Route path="/iam/accounts" element={<ResourceListPage spec={REGISTRY.accounts} />} />
+              <Route path="/iam/accounts/:uid" element={<ResourceDetailPage spec={REGISTRY.accounts} />} />
+              <Route path="/iam/projects" element={<IamScopedListShell spec={REGISTRY.projects} />} />
+              <Route path="/iam/service-accounts" element={<IamScopedListShell spec={REGISTRY["service-accounts"]} />} />
+              <Route path="/iam/service-accounts/:uid" element={<ResourceDetailPage spec={REGISTRY["service-accounts"]} />} />
               <Route path="/iam/users" element={<UsersPage />} />
-              <Route path="/iam/service-accounts" element={<ServiceAccountsPage />} />
               <Route path="/iam/groups" element={<GroupsPage />} />
               <Route path="/iam/roles" element={<RolesPage />} />
               <Route path="/iam/access-bindings" element={<AccessBindingsPage />} />
@@ -552,7 +456,7 @@ export default function App() {
 }
 
 // ProjectDefaultRedirect: /projects/:projectId → /projects/:projectId/dashboard
-function FolderDefaultRedirect() {
+function ProjectDefaultRedirect() {
   const { projectId } = useParams();
   return <Navigate to={`/projects/${projectId}/dashboard`} replace />;
 }

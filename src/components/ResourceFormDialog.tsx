@@ -28,7 +28,7 @@ interface Props {
   resourceId: string;
   template: unknown;
   fields?: FormField[];
-  folderUid?: string | null;
+  projectId?: string | null;
   trigger?: React.ReactNode;
   controlledOpen?: { open: boolean; setOpen: (b: boolean) => void };
   onSuccess?: () => void;
@@ -43,7 +43,7 @@ export function ResourceFormDialog({
   resourceId,
   template,
   fields,
-  folderUid,
+  projectId,
   trigger,
   controlledOpen,
   onSuccess,
@@ -89,7 +89,7 @@ export function ResourceFormDialog({
       if (id) setOpId(id);
       else {
         setOpen(false);
-        invalidate(resourceId, folderUid ?? null);
+        invalidate(resourceId, projectId ?? null);
         onSuccess?.();
       }
     },
@@ -230,7 +230,7 @@ export function ResourceFormDialog({
         title={opTitle}
         onDone={(success) => {
           setOpId(null);
-          invalidate(resourceId, folderUid ?? null);
+          invalidate(resourceId, projectId ?? null);
           if (success) {
             setOpen(false);
             onSuccess?.();

@@ -143,7 +143,7 @@ import { sanitizeInstanceCreate } from "./resource-registry";
 
 describe("sanitizeInstanceCreate — network_interface_specs", () => {
   const base = {
-    folder_id: "f1",
+    project_id: "f1",
     name: "vm-1",
     zone_id: "ru-1-a",
     platform_id: "standard-v3",

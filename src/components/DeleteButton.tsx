@@ -26,7 +26,7 @@ interface Props {
   resourceId: string;
   name: string;
   resourceLabel: string;
-  folderUid?: string | null;
+  projectId?: string | null;
   triggerLabel?: string;
   /** После успешного удаления (например, navigate на список) */
   navigateTo?: () => void;
@@ -37,7 +37,7 @@ export function DeleteButton({
   resourceId,
   name,
   resourceLabel,
-  folderUid,
+  projectId,
   triggerLabel,
   navigateTo,
 }: Props) {
@@ -57,7 +57,7 @@ export function DeleteButton({
         setOpId(id);
       } else {
         // Без Operation — синхронный success
-        invalidate(resourceId, folderUid ?? null);
+        invalidate(resourceId, projectId ?? null);
         navigateTo?.();
       }
     },
@@ -71,10 +71,10 @@ export function DeleteButton({
   const handleOperationDone = useCallback(
     (success: boolean) => {
       setOpId(null);
-      invalidate(resourceId, folderUid ?? null);
+      invalidate(resourceId, projectId ?? null);
       if (success) navigateTo?.();
     },
-    [invalidate, resourceId, folderUid, navigateTo],
+    [invalidate, resourceId, projectId, navigateTo],
   );
 
   return (

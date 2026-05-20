@@ -8,13 +8,12 @@
 //   ─
 //   COMMON_BOTTOM         ⚙ Администрирование · 👤 Профиль
 //
-// Активный модуль определяется по URL (`/folders/:fid/<segment>/...`). Дашборд /
-// Resource Manager / System — вне модулей. requiresFolder-пункты disabled без folder.
+// Активный модуль определяется по URL (`/projects/:projectId/<segment>/...`). Дашборд /
+// IAM / System — вне модулей. requiresProject-пункты disabled без project.
 
 import { useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, theme } from "antd";
-import { useFolderStore } from "@/lib/folder-store";
 import { useContext } from "@/lib/context-store";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -28,8 +27,8 @@ import {
 export function ServiceSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const projectId = useFolderStore((s) => s.folder)?.id ?? null;
-  const cloudId = useContext((s) => s.cloud)?.id ?? null;
+  const projectId = useContext((s) => s.project)?.id ?? null;
+  const accountId = useContext((s) => s.account)?.id ?? null;
   const { user, loading: authLoading, hasPermission } = useAuth();
   const { token } = theme.useToken();
 
@@ -62,10 +61,10 @@ export function ServiceSidebar() {
         key: `mod-${m.key}`,
         icon: m.icon,
         label: m.label,
-        to: () => m.landing(projectId, cloudId),
+        to: () => m.landing(projectId, accountId),
         matches: () => false,
       })),
-    [projectId, cloudId],
+    [projectId, accountId],
   );
 
   const middle: NavLeaf[] = activeModule ? activeModule.items : moduleLaunchers;
@@ -75,7 +74,7 @@ export function ServiceSidebar() {
   }, [location.pathname, middle, bottomItems]);
 
   const renderLeaf = (leaf: NavLeaf) => {
-    const disabled = !!leaf.requiresFolder && !projectId;
+    const disabled = !!leaf.requiresProject && !projectId;
     const active = activeLeafKey === leaf.key;
     return (
       <SidebarButton
