@@ -11,7 +11,8 @@
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:ci": "playwright test --config playwright.ci.config.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.2.2",
