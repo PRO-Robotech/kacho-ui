@@ -6,26 +6,29 @@ import {
   ApartmentOutlined,
   ApiOutlined,
   AppstoreOutlined,
-  BankOutlined,
   CameraOutlined,
-  CloudOutlined,
   ClusterOutlined,
   DesktopOutlined,
   FileImageOutlined,
-  FolderOutlined,
   GatewayOutlined,
   GlobalOutlined,
   HddOutlined,
   NodeIndexOutlined,
   SafetyOutlined,
+  UserOutlined,
 } from "@ant-design/icons";
 import type { ReactNode } from "react";
 
 const ICONS: Record<string, ReactNode> = {
-  // iam
-  organizations: <BankOutlined />,
-  clouds: <CloudOutlined />,
-  folders: <FolderOutlined />,
+  // iam (сайдбар: ApartmentOutlined / ClusterOutlined / UserOutlined /
+  // ApiOutlined / NodeIndexOutlined / SafetyOutlined / GatewayOutlined)
+  accounts: <ApartmentOutlined />,
+  projects: <ClusterOutlined />,
+  users: <UserOutlined />,
+  "service-accounts": <ApiOutlined />,
+  groups: <NodeIndexOutlined />,
+  roles: <SafetyOutlined />,
+  "access-bindings": <GatewayOutlined />,
   // vpc (сайдбар: ApartmentOutlined / ClusterOutlined / GlobalOutlined /
   // NodeIndexOutlined / SafetyOutlined / ApiOutlined / GatewayOutlined)
   networks: <ApartmentOutlined />,

@@ -26,6 +26,7 @@ import { InlineAddressPoolEditForm } from "@/components/InlineAddressPoolEditFor
 import { InlineNetworkInterfaceEditForm } from "@/components/InlineNetworkInterfaceEditForm";
 import { InlineNetworkInterfaceCreateForm } from "@/components/InlineNetworkInterfaceCreateForm";
 import { REGISTRY } from "@/lib/resource-registry";
+import { useContext } from "@/lib/context-store";
 import { api } from "@/api/client";
 
 interface Props {
@@ -35,6 +36,9 @@ interface Props {
 export function ResourceFormModal({ projectId }: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const modal = searchParams.get("modal") ?? "";
+  // Account-scoped IAM-ресурсы (Project / ServiceAccount) берут account_id из
+  // выбранного в IAM-секции Account — пробрасываем в ctx.template.
+  const accountId = useContext((s) => s.account?.id);
 
   // Парсим `<spec-id>-(create|edit)`.
   const match = modal.match(/^([a-z-]+)-(create|edit)$/);
@@ -184,7 +188,7 @@ export function ResourceFormModal({ projectId }: Props) {
       return (
         <InlineResourceCreateForm
           spec={spec}
-          ctx={{ projectId }}
+          ctx={{ projectId, accountId }}
           presetFields={presetFields}
           projectId={projectId}
           title={title}

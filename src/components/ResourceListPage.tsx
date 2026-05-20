@@ -22,13 +22,17 @@ interface Props {
   spec: ResourceSpec;
   parentField?: string;
   parentParam?: string;
+  /** Явное значение scope-фильтра (account-scoped IAM-ресурсы берут account
+   *  из context-store, а не из URL-параметра). Имеет приоритет над parentParam. */
+  parentValue?: string | null;
 }
 
-export function ResourceListPage({ spec, parentField, parentParam }: Props) {
+export function ResourceListPage({ spec, parentField, parentParam, parentValue }: Props) {
   const params = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const filterValue = parentParam ? (params[parentParam] ?? null) : null;
+  const filterValue =
+    parentValue ?? (parentParam ? (params[parentParam] ?? null) : null);
   const [query, setQuery] = useState("");
 
   const { data, isLoading, isError, error } = useResourceList(

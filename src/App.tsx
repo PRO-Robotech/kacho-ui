@@ -25,10 +25,8 @@ import { OperationsPage } from "@/pages/OperationsPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { IamLayout } from "@/components/iam/IamLayout";
-import { AccountsPage } from "@/pages/iam/AccountsPage";
-import { ProjectsPage } from "@/pages/iam/ProjectsPage";
+import { IamScopedListShell } from "@/components/iam/IamScopedListShell";
 import { UsersPage } from "@/pages/iam/UsersPage";
-import { ServiceAccountsPage } from "@/pages/iam/ServiceAccountsPage";
 import { GroupsPage } from "@/pages/iam/GroupsPage";
 import { RolesPage } from "@/pages/iam/RolesPage";
 import { AccessBindingsPage } from "@/pages/iam/AccessBindingsPage";
@@ -419,14 +417,19 @@ export default function App() {
             <Route path="/system/address-pools/:uid/edit" element={<ResourceEditPage spec={REGISTRY["address-pools"]} />} />
             <Route path="/system/search" element={<SystemSearchPage />} />
 
-            {/* === IAM section (KAC-109, E0 UI block) ===
-                Все 7 IAM-страниц + auth-info banner в shared IamLayout. */}
+            {/* === IAM section ===
+                Account — global registry-driven (ResourceListPage + ?modal=).
+                Project / ServiceAccount — account-scoped (IamScopedListShell
+                фильтрует по выбранному в IAM-секции Account).
+                User / Group / AccessBinding / Access — кастомные страницы. */}
             <Route element={<IamLayout />}>
               <Route path="/iam" element={<Navigate to="/iam/accounts" replace />} />
-              <Route path="/iam/accounts" element={<AccountsPage />} />
-              <Route path="/iam/projects" element={<ProjectsPage />} />
+              <Route path="/iam/accounts" element={<ResourceListPage spec={REGISTRY.accounts} />} />
+              <Route path="/iam/accounts/:uid" element={<ResourceDetailPage spec={REGISTRY.accounts} />} />
+              <Route path="/iam/projects" element={<IamScopedListShell spec={REGISTRY.projects} />} />
+              <Route path="/iam/service-accounts" element={<IamScopedListShell spec={REGISTRY["service-accounts"]} />} />
+              <Route path="/iam/service-accounts/:uid" element={<ResourceDetailPage spec={REGISTRY["service-accounts"]} />} />
               <Route path="/iam/users" element={<UsersPage />} />
-              <Route path="/iam/service-accounts" element={<ServiceAccountsPage />} />
               <Route path="/iam/groups" element={<GroupsPage />} />
               <Route path="/iam/roles" element={<RolesPage />} />
               <Route path="/iam/access-bindings" element={<AccessBindingsPage />} />

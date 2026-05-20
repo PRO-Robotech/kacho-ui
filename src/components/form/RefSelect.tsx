@@ -100,7 +100,7 @@ export function RefSelect({
   );
   const options = candidates.map((it) => ({
     uid: it.id,
-    name: it.name,
+    name: headLabelFor(refResource, it as Record<string, unknown>),
     extra: extraInfoFor(refResource, it as Record<string, unknown>),
   }));
 
@@ -193,6 +193,20 @@ export function RefSelect({
       )}
     </div>
   );
+}
+
+// headLabelFor — основная подпись option. У большинства ресурсов это `name`,
+// но у User поля name нет — берём display_name / email.
+function headLabelFor(refResource: string, row: Record<string, unknown>): string {
+  if (refResource === "users") {
+    return (
+      (row.display_name as string) ||
+      (row.email as string) ||
+      (row.id as string) ||
+      ""
+    );
+  }
+  return (row.name as string) ?? "";
 }
 
 // extraInfoFor — формирует короткую полезную подпись для option в дропдауне.

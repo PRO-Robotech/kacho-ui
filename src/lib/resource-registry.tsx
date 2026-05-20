@@ -37,8 +37,8 @@ export interface ResourceSpec {
   /** Service-domain заголовок (отображается в breadcrumb перед именем категории).
    *  Примеры: "Virtual Private Cloud", "IAM", "Администрирование". */
   serviceTitle?: string;
-  // global = cluster-scoped, project = только в выбранном Project
-  scope: "global" | "project";
+  // global = cluster-scoped, project = в выбранном Project, account = в выбранном Account
+  scope: "global" | "project" | "account";
   // поддерживаемые операции
   ops: {
     create: boolean;
@@ -156,6 +156,14 @@ const FIELD_PROJECT_ID: FormField = {
   hidden: true,
 };
 
+// Hidden поле для account-context (IAM: Project / ServiceAccount scoped по Account).
+const FIELD_ACCOUNT_ID: FormField = {
+  name: "account_id",
+  label: "Account",
+  type: "string",
+  hidden: true,
+};
+
 // Generic labels editor — map<string,string> через LabelsEditor (key=value rows
 // + "Добавить метку"). Подключается ко всем VPC-ресурсам.
 const FIELD_LABELS: FormField = {
@@ -168,6 +176,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
   // ====== iam ======
   // proto: kacho.cloud.iam.v1.AccountService / ProjectService.
 
+  // Account — global-scoped (ListAccounts без обязательных полей).
   accounts: {
     id: "accounts",
     route: "accounts",
@@ -180,17 +189,30 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
+      { header: "Владелец", path: "owner_user_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
     fields: [
       FIELD_NAME,
+      {
+        name: "owner_user_id",
+        label: "Владелец",
+        type: "ref",
+        refResource: "users",
+        required: true,
+        editHidden: true,
+        description:
+          "Пользователь-владелец Account. Неизменяемо после создания.",
+      },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
-    template: () => ({ name: "", description: "" }),
+    template: () => ({ name: "", owner_user_id: "", description: "" }),
   },
 
+  // Project — account-scoped (ListProjects требует account_id). account_id
+  // приходит из выбранного Account (IAM Account-селектор), поле скрыто.
   projects: {
     id: "projects",
     route: "projects",
@@ -199,7 +221,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     singular: "Project",
     plural: "Projects",
     serviceTitle: "IAM",
-    scope: "global",
+    scope: "account",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
@@ -209,13 +231,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ],
     fields: [
       FIELD_NAME,
-      {
-        name: "account_id",
-        label: "Account",
-        type: "ref",
-        refResource: "accounts",
-        required: true,
-      },
+      FIELD_ACCOUNT_ID,
       FIELD_LABELS,
       FIELD_DESCRIPTION,
     ],
@@ -227,6 +243,57 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       account_id: accountId ?? "",
       description: "",
     }),
+  },
+
+  // ServiceAccount — account-scoped (ListServiceAccounts требует account_id).
+  "service-accounts": {
+    id: "service-accounts",
+    route: "service-accounts",
+    apiPath: "/iam/v1/serviceAccounts",
+    payloadKey: "service_accounts",
+    singular: "Service Account",
+    plural: "Service Accounts",
+    serviceTitle: "IAM",
+    scope: "account",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      COL_NAME,
+      { header: "Account", path: "account_id", format: "uid-short" },
+      COL_CREATED,
+      COL_ID,
+    ],
+    fields: [
+      FIELD_NAME,
+      FIELD_ACCOUNT_ID,
+      FIELD_DESCRIPTION,
+    ],
+    template: ({ accountId }) => ({
+      name: "",
+      account_id: accountId ?? "",
+      description: "",
+    }),
+  },
+
+  // User — read+delete only (создаётся через signup / InternalUserService).
+  // Registry-запись нужна для ref-резолва (Account.owner_user_id) и RefNameLink;
+  // отдельная generic-страница не используется — UI остаётся кастомным.
+  users: {
+    id: "users",
+    route: "users",
+    apiPath: "/iam/v1/users",
+    payloadKey: "users",
+    singular: "User",
+    plural: "Users",
+    serviceTitle: "IAM",
+    scope: "global",
+    ops: { create: false, update: false, delete: true },
+    columns: [
+      { header: "Имя", path: "display_name", format: "text" },
+      { header: "Email", path: "email", format: "text" },
+      COL_CREATED,
+      COL_ID,
+    ],
+    template: () => ({}),
   },
 
   // ====== vpc ======
