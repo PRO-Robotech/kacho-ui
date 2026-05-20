@@ -347,12 +347,15 @@ function RoleCreateModal({
           rules={[
             {
               required: true,
-              pattern: /^[a-z]([-a-z0-9_]{0,39}[a-z0-9])?$/,
-              message: "lowercase, цифры, дефисы, подчёркивания; 1-41 символ",
+              // Backend: custom-role name ^[a-z][a-z0-9_]{0,40}$ — БЕЗ дефиса
+              // (дефис только в system-ролях roles/<mod>.<name>). UI-regex
+              // обязан совпадать, иначе backend отвергает с INVALID_ARGUMENT.
+              pattern: /^[a-z][a-z0-9_]{0,40}$/,
+              message: "строчные латинские буквы, цифры, подчёркивания; начинается с буквы; до 41 символа",
             },
           ]}
         >
-          <Input placeholder="my-role" />
+          <Input placeholder="my_role" />
         </Form.Item>
         <Form.Item label="Описание" name="description">
           <Input.TextArea rows={2} />
