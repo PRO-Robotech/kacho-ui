@@ -115,7 +115,7 @@ export function GroupsPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+      <Typography.Title level={3} style={{ margin: 0 }}>
         Groups
       </Typography.Title>
 
@@ -202,7 +202,7 @@ function GroupCreateModal({
       open={open}
       onCancel={onClose}
       maskClosable
-      width={560}
+      width={860}
       destroyOnClose
       onOk={() => form.submit()}
       okText="Создать"
@@ -212,7 +212,7 @@ function GroupCreateModal({
       <Form
         form={form}
         layout="horizontal"
-        labelCol={{ flex: "160px" }}
+        labelCol={{ flex: "200px" }}
         wrapperCol={{ flex: "auto" }}
         labelAlign="left"
         colon={false}
@@ -273,7 +273,7 @@ function GroupEditModal({
       open={!!group}
       onCancel={onClose}
       maskClosable
-      width={560}
+      width={860}
       destroyOnClose
       onOk={() => form.submit()}
       okText="Сохранить"
@@ -283,7 +283,7 @@ function GroupEditModal({
       <Form
         form={form}
         layout="horizontal"
-        labelCol={{ flex: "160px" }}
+        labelCol={{ flex: "200px" }}
         wrapperCol={{ flex: "auto" }}
         labelAlign="left"
         colon={false}

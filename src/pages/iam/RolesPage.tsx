@@ -165,7 +165,7 @@ export function RolesPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+      <Typography.Title level={3} style={{ margin: 0 }}>
         Roles
       </Typography.Title>
 
@@ -288,7 +288,7 @@ function RoleCreateModal({
       open={open}
       onCancel={onClose}
       maskClosable
-      width={680}
+      width={860}
       destroyOnClose
       onOk={() => form.submit()}
       okText="Создать"
@@ -298,7 +298,7 @@ function RoleCreateModal({
       <Form
         form={form}
         layout="horizontal"
-        labelCol={{ flex: "160px" }}
+        labelCol={{ flex: "200px" }}
         wrapperCol={{ flex: "auto" }}
         labelAlign="left"
         colon={false}
@@ -400,7 +400,7 @@ function RoleEditModal({
       open={!!role}
       onCancel={onClose}
       maskClosable
-      width={680}
+      width={860}
       destroyOnClose
       onOk={() => form.submit()}
       okText="Сохранить"
@@ -410,7 +410,7 @@ function RoleEditModal({
       <Form
         form={form}
         layout="horizontal"
-        labelCol={{ flex: "160px" }}
+        labelCol={{ flex: "200px" }}
         wrapperCol={{ flex: "auto" }}
         labelAlign="left"
         colon={false}

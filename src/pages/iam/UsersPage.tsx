@@ -84,7 +84,7 @@ export function UsersPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+      <Typography.Title level={3} style={{ margin: 0 }}>
         Users
       </Typography.Title>
 

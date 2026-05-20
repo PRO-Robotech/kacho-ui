@@ -174,7 +174,7 @@ export function AccessBindingsPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
+      <Typography.Title level={3} style={{ margin: 0 }}>
         Access Bindings
       </Typography.Title>
 
@@ -445,7 +445,7 @@ function AccessBindingCreateModal({
       open={open}
       onCancel={onClose}
       maskClosable
-      width={620}
+      width={860}
       destroyOnClose
       onOk={() => form.submit()}
       okText="Создать"
