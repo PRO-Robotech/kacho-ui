@@ -162,18 +162,18 @@ test("раздел roles — system и custom роли визуально раз
   ).toBeVisible();
   await expect(page.locator(".ant-table")).toBeVisible();
 
-  // Все 3 роли из фикстуры: 2 системные (admin, viewer) + 1 кастомная.
-  for (const r of ROLES) {
+  // KAC-127: RolesPage разделён на табы «Системные»/«Кастомные». По умолчанию
+  // активен системный таб — видны 2 системные роли (admin, viewer).
+  for (const r of ROLES.filter((x) => x.is_system)) {
     await expect(
       page.locator(".ant-table-row", { hasText: r.name }),
     ).toBeVisible();
   }
-
-  // SystemTag различает system-vs-custom. Системные роли (is_system) помечены
-  // тегом «system», кастомные — «custom». Проверяем оба.
   const adminRow = page.locator(".ant-table-row", { hasText: "admin" });
   await expect(adminRow.locator(".ant-tag", { hasText: /system/i })).toBeVisible();
 
+  // Переключаемся на «Кастомные» — видна custom-vpc-editor с тегом custom.
+  await page.getByRole("tab", { name: /Кастомные/ }).click();
   const customRow = page.locator(".ant-table-row", {
     hasText: "custom-vpc-editor",
   });
