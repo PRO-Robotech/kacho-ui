@@ -30,13 +30,13 @@ import {
   type User,
   type ServiceAccount,
   type Group,
-  type Role,
   type Account,
 } from "@/api/iam";
 import {
   useIamMutation,
   fmtTs,
   CopyableMonoId,
+  groupedRoleOptions,
 } from "@/components/iam/IamCommon";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -118,6 +118,18 @@ export function AccessBindingsPage() {
     staleTime: 30_000,
   });
 
+  // KAC-127: resolve role_id → name в таблице bindings.
+  const rolesList = useQuery({
+    queryKey: ["iam", "roles", "list"],
+    queryFn: () => iamApi.listRoles({ pageSize: "1000" }),
+    staleTime: 30_000,
+  });
+  const roleNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const r of rolesList.data?.roles ?? []) m.set(r.id, r.name);
+    return m;
+  }, [rolesList.data]);
+
   const columns: ColumnsType<AccessBinding> = [
     {
       title: "Subject",
@@ -133,7 +145,15 @@ export function AccessBindingsPage() {
       title: "Role",
       dataIndex: "role_id",
       key: "role",
-      render: (v) => <CopyableMonoId id={v} />,
+      render: (v: string) => {
+        const name = roleNameById.get(v);
+        return (
+          <Space size={6}>
+            {name && <Typography.Text strong>{name}</Typography.Text>}
+            <CopyableMonoId id={v} />
+          </Space>
+        );
+      },
     },
     {
       title: "Resource",
@@ -506,10 +526,7 @@ function AccessBindingCreateModal({
         >
           <Select
             placeholder="Выберите Role"
-            options={(roles.data?.roles ?? []).map((r: Role) => ({
-              value: r.id,
-              label: `${r.name}${r.is_system ? " · system" : ""} · ${r.id}`,
-            }))}
+            options={groupedRoleOptions(roles.data?.roles ?? [])}
             showSearch
             optionFilterProp="label"
             loading={roles.isLoading}

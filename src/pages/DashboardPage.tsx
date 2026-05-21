@@ -9,8 +9,8 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
-import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert } from "antd";
-import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert, Tooltip } from "antd";
+import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined, LockOutlined } from "@ant-design/icons";
 import { useBreadcrumb, useHeaderRight, usePageTitle } from "@/components/PageHeaderSlot";
 import { api } from "@/api/client";
 import { useContext } from "@/lib/context-store";
@@ -66,7 +66,15 @@ export function DashboardPage() {
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, accountId));
+  // Плашка кликабельна только если landing вернул реальный route. Project-scoped
+  // модуль (VPC/Compute) без выбранного project → landing=null → disabled-плашка.
+  const tileDisabled = (m: ServiceModule) => m.landing(projectId, accountId) == null;
+
+  const openModule = (m: ServiceModule) => {
+    const target = m.landing(projectId, accountId);
+    if (target == null) return; // no-op для disabled-плашки
+    navigate(target);
+  };
 
   const caption = (() => {
     if (ctx.project) return `Проект: ${ctx.project.name || ctx.project.id}`;
@@ -112,24 +120,36 @@ export function DashboardPage() {
 
         {tilesVisible && (
           <Row gutter={[16, 16]}>
-            {SERVICE_MODULES.map((m) => (
-              <Col key={m.key} xs={24} sm={24} md={12} lg={12}>
+            {SERVICE_MODULES.map((m) => {
+              const disabled = tileDisabled(m);
+              const card = (
                 <Card
-                  hoverable
+                  hoverable={!disabled}
                   data-testid={`dashboard-tile-${m.key}`}
+                  data-disabled={disabled ? "true" : "false"}
                   onClick={() => openModule(m)}
                   styles={{ body: { padding: 16 } }}
+                  style={
+                    disabled
+                      ? { opacity: 0.55, cursor: "not-allowed" }
+                      : { cursor: "pointer" }
+                  }
                   title={
                     <Space>
                       <span style={{ color: m.color, fontSize: 16 }}>{m.icon}</span>
                       <span>{m.label}</span>
                     </Space>
                   }
-                  extra={<ArrowRightOutlined />}
+                  extra={disabled ? <LockOutlined /> : <ArrowRightOutlined />}
                 >
                   <Typography.Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 12 }}>
                     {m.description}
                   </Typography.Paragraph>
+                  {disabled && (
+                    <Typography.Text type="warning" style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
+                      Выберите проект в шапке, чтобы открыть ресурсы.
+                    </Typography.Text>
+                  )}
                   <Row gutter={16}>
                     {m.stats.map((s) => (
                       <Col key={s.key} span={Math.floor(24 / m.stats.length)}>
@@ -142,8 +162,17 @@ export function DashboardPage() {
                     ))}
                   </Row>
                 </Card>
-              </Col>
-            ))}
+              );
+              return (
+                <Col key={m.key} xs={24} sm={24} md={12} lg={12}>
+                  {disabled ? (
+                    <Tooltip title="Выберите проект в селекторе в шапке">{card}</Tooltip>
+                  ) : (
+                    card
+                  )}
+                </Col>
+              );
+            })}
           </Row>
         )}
 

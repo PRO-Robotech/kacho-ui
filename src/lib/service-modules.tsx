@@ -60,8 +60,13 @@ export interface ServiceModule {
   icon: ReactNode;
   color: string;
   description: string;
-  /** Куда вести при клике по плашке / лаунчеру — с учётом наличия project/account. */
-  landing: (projectId: string | null, accountId: string | null) => string;
+  /** `true` — модуль project-scoped (VPC/Compute): дашборд-плашка кликабельна
+   *  только когда выбран project; иначе — disabled-плашка с подсказкой. */
+  requiresProject?: boolean;
+  /** Реальный route для перехода. Возвращает `null`, если перейти нельзя
+   *  (project-scoped модуль без выбранного project) — DashboardPage делает
+   *  плашку disabled. */
+  landing: (projectId: string | null, accountId: string | null) => string | null;
   stats: ModuleStat[];
   items: NavLeaf[];
 }
@@ -80,7 +85,8 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <ApartmentOutlined />,
     color: "#3D8DF5",
     description: "Облачные сети, подсети, группы безопасности, публичные IP, таблицы маршрутизации.",
-    landing: (f) => (f ? `/projects/${f}/vpc/networks` : "/iam/projects"),
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/vpc/networks` : null),
     stats: [
       { key: "networks", label: "Сетей", listPath: "/vpc/v1/networks", payloadKey: "networks" },
       { key: "subnets", label: "Подсетей", listPath: "/vpc/v1/subnets", payloadKey: "subnets" },
@@ -105,7 +111,8 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <CloudServerOutlined />,
     color: "#36CFC9",
     description: "Виртуальные машины, диски, образы и снимки дисков.",
-    landing: (f) => (f ? `/projects/${f}/compute/instances` : "/dashboard"),
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/compute/instances` : null),
     stats: [
       { key: "instances", label: "Машин", listPath: "/compute/v1/instances", payloadKey: "instances" },
       { key: "disks", label: "Дисков", listPath: "/compute/v1/disks", payloadKey: "disks" },

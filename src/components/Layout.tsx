@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
 import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
-import { BreadcrumbSelector } from "@/components/BreadcrumbSelector";
+import { ContextCascader } from "@/components/ContextCascader";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
 import { ServiceSidebar } from "@/components/ServiceSidebar";
 import {
@@ -75,7 +75,7 @@ function LayoutInner() {
           </div>
         </NavLink>
 
-        <BreadcrumbSelector />
+        <ContextCascader />
 
         <Tooltip title="Все сервисы">
           <NavLink to="/dashboard" aria-label="Все сервисы">
