@@ -18,7 +18,7 @@ server {
     # NB: для /iam/ матчим только API-paths (/iam/v1/*), т.к. SPA-маршрутом
     # `/iam/accounts` мог бы фолбэк-уйти в api-gateway 404. UI-route'ы
     # `/iam/<resource>` обрабатывает SPA (см. fallback `location /` выше).
-    location ~ ^/(vpc|compute|operations)/ {
+    location ~ ^/(vpc|compute|operations|nlb)/ {
         # lazy resolve через переменную — nginx не падает если DNS slow на startup
         set $api_gw_upstream "api-gateway.kacho.svc.cluster.local:8080";
         proxy_pass http://$api_gw_upstream;
