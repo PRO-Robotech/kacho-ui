@@ -29,7 +29,7 @@ export function ServiceSidebar() {
   const location = useLocation();
   const projectId = useContext((s) => s.project)?.id ?? null;
   const accountId = useContext((s) => s.account)?.id ?? null;
-  const { user, loading: authLoading, hasPermission } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { token } = theme.useToken();
 
   // IAM-entry: показывать только если у user'а есть `iam.read` permission
@@ -39,18 +39,22 @@ export function ServiceSidebar() {
   const bottomItems = useMemo<NavLeaf[]>(() => {
     return COMMON_BOTTOM.filter((leaf) => {
       if (leaf.key === "system") {
-        // KAC-118: admin Administration (Regions/Zones/AddressPools) — только
-        // для admin (system principal либо * wildcard в permissions).
+        // KAC-178 follow-up: показываем "Администрирование" любому авторизованному
+        // user'у — server-side authz (api-gateway catalog + IAM Check) сам решит
+        // 200/403 при попытке CRUD на Region/Zone/AddressPool. Раньше client-side
+        // фильтр прятал sidebar entirely для user'ов без 'admin'/'*' permission
+        // в JWT, что неверно для cluster system_admin (per-FGA tuple, не в JWT).
+        // List endpoints для compute.Region/Zone — exempt в catalog (cluster.viewer
+        // cascade) → доступны всем; AddressPool — admin-only через FGA.
         if (authLoading) return false;
-        if (!user) return false;
-        return user.subject_type === "system" || hasPermission("*") || hasPermission("admin");
+        return !!user;
       }
       if (leaf.key === "profile") {
         return !!user;
       }
       return true;
     });
-  }, [authLoading, user, hasPermission]);
+  }, [authLoading, user]);
 
   const activeModule = useMemo(() => moduleFromPathname(location.pathname), [location.pathname]);
 
