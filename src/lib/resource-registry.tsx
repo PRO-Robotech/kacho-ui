@@ -1398,6 +1398,24 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     template: () => ({}),
   },
 
+  "compute-regions": {
+    id: "compute-regions",
+    route: "compute-regions",
+    apiPath: "/compute/v1/regions",
+    payloadKey: "regions",
+    singular: "Region",
+    plural: "Регионы (Compute)",
+    serviceTitle: "Compute Cloud",
+    scope: "global",
+    ops: { create: false, update: false, delete: false },
+    columns: [
+      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Название", path: "name", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+    ],
+    template: () => ({}),
+  },
+
   "compute-disks": {
     id: "compute-disks",
     route: "disks",
@@ -2088,9 +2106,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "region_id",
         label: "Регион",
-        type: "string",
+        type: "ref",
+        refResource: "compute-regions",
         required: true,
-        description: "Регион размещения балансировщика (например, ru-central1). Cross-service ref → compute.Region; verified на request-path.",
+        description: "Регион размещения балансировщика. Cross-service ref → compute.Region; verified на request-path.",
       },
       FIELD_LABELS,
       FIELD_PROJECT_ID,
@@ -2225,8 +2244,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "region_id",
         label: "Регион",
-        type: "string",
+        type: "ref",
+        refResource: "compute-regions",
         required: true,
+        immutable: true,
         description: "Регион размещения target-group (immutable после Create). Cross-service ref → compute.Region.",
       },
       {
