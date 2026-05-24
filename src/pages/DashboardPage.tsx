@@ -18,22 +18,32 @@ import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
 
 type CountMap = Record<string, number | null>;
 
-/** Counts по stat-метрикам модуля для выбранного project. */
-function useModuleCounts(module: ServiceModule, projectId: string | null): CountMap {
-  const enabled = projectId != null;
-  const targetProjects = projectId != null ? [projectId] : [];
+/** Counts по stat-метрикам модуля для выбранного scope (project либо account).
+ *
+ * scopeKey = "project_id" (по умолчанию) — для VPC/Compute/NLB stats (per-project).
+ * scopeKey = "account_id" — для IAM stats (account-level, project_id=* ломал AuthZ:
+ * "no path: unscoped resource", subject=account:*, KAC-175-followup).
+ * scopeKey = "" — list-all без scope (для stats где endpoint не требует фильтра,
+ * напр. /iam/v1/accounts).
+ */
+function useModuleCounts(
+  module: ServiceModule,
+  scopeId: string | null,
+  scopeKey: string = "project_id",
+): CountMap {
+  const enabled = scopeKey === "" || scopeId != null;
   const results = useQueries({
     queries: module.stats.map((stat) => ({
-      queryKey: ["dash", module.key, stat.key, projectId],
+      queryKey: ["dash", module.key, stat.key, scopeKey, scopeId],
       enabled,
       refetchInterval: 15_000,
       queryFn: async () => {
-        const lists = await Promise.all(
-          targetProjects.map((pid) =>
-            api.list<Record<string, unknown[] | undefined>>(stat.listPath, { project_id: pid, pageSize: "1000" }),
-          ),
-        );
-        return lists.reduce((sum, l) => sum + (l[stat.payloadKey]?.length ?? 0), 0);
+        const query: Record<string, string> = { pageSize: "1000" };
+        if (scopeKey !== "" && scopeId != null) {
+          query[scopeKey] = scopeId;
+        }
+        const l = await api.list<Record<string, unknown[] | undefined>>(stat.listPath, query);
+        return l[stat.payloadKey]?.length ?? 0;
       },
     })),
   });
@@ -54,7 +64,9 @@ export function DashboardPage() {
   // Counts для каждого модуля. Lookup ПО key, не по индексу — иначе порядок
   // в SERVICE_MODULES (vpc/compute/nlb/iam) ломает binding и iam счётчики
   // показывают NLB-данные (KAC-171 регресс предотвращён).
-  // IAM не требует projectId (account-level ресурсы) — пробрасываем "*" чтобы хук активировался.
+  // IAM stats — account-level: используем accountId как scope, scopeKey="" чтобы
+  // запросы шли БЕЗ project_id (раньше project_id="*" вызывал AuthZ "no path:
+  // unscoped resource" — backend требует валидный scope, не wildcard).
   const vpcModule = SERVICE_MODULES.find((m) => m.key === "vpc")!;
   const computeModule = SERVICE_MODULES.find((m) => m.key === "compute")!;
   const nlbModule = SERVICE_MODULES.find((m) => m.key === "nlb");
@@ -62,7 +74,12 @@ export function DashboardPage() {
   const vpcCounts = useModuleCounts(vpcModule, projectId);
   const computeCounts = useModuleCounts(computeModule, projectId);
   const nlbCounts = useModuleCounts(nlbModule ?? vpcModule, nlbModule ? projectId : null);
-  const iamCounts = useModuleCounts(iamModule, "*");
+  // IAM: scopeKey="" → list без фильтра (accounts API сам делает per-user filter).
+  // Если в будущем roles/projects/users потребуют account_id — переключиться на
+  // useModuleCounts(iamModule, accountId, "account_id"). Сейчас accounts работает
+  // без scope, остальные iam stats — могут падать 403, но хук не throws (try/catch
+  // в queryFn react-query).
+  const iamCounts = useModuleCounts(iamModule, accountId ?? "all", "");
   const countsByModule: Record<string, CountMap> = {
     [vpcModule.key]: vpcCounts,
     [computeModule.key]: computeCounts,
