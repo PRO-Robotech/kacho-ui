@@ -17,8 +17,12 @@ import type { Role } from "@/api/iam";
  * KAC-127: единый формат во всех role-pickers (AccessBindings, invite-user).
  */
 export function groupedRoleOptions(roles: Role[]) {
-  const system = roles.filter((r) => r.is_system);
-  const custom = roles.filter((r) => !r.is_system);
+  // Backend gRPC-gateway emit'ит camelCase `isSystem`; старый snake_case `is_system`
+  // оставлен для совместимости. KAC-171 follow-up — раньше преднастроенные 58
+  // system-roles падали в "Кастомные" группу потому что is_system всегда undefined.
+  const isSystemRole = (r: Role) => r.is_system === true || r.isSystem === true;
+  const system = roles.filter(isSystemRole);
+  const custom = roles.filter((r) => !isSystemRole(r));
   const toOpt = (r: Role) => ({
     value: r.id,
     label: `${r.name} · ${r.id}`,
