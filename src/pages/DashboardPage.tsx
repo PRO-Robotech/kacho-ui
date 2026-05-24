@@ -51,15 +51,23 @@ export function DashboardPage() {
   const projectId = ctx.project?.id ?? null;
   const accountId = ctx.account?.id ?? null;
 
-  // Counts для каждого модуля. SERVICE_MODULES[0..2] = vpc/compute/iam.
-  // IAM не требует projectId (его ресурсы — account-level), счётчики работают всегда.
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId);
-  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*"); // "*" — fake projectId чтобы хук активировался
+  // Counts для каждого модуля. Lookup ПО key, не по индексу — иначе порядок
+  // в SERVICE_MODULES (vpc/compute/nlb/iam) ломает binding и iam счётчики
+  // показывают NLB-данные (KAC-171 регресс предотвращён).
+  // IAM не требует projectId (account-level ресурсы) — пробрасываем "*" чтобы хук активировался.
+  const vpcModule = SERVICE_MODULES.find((m) => m.key === "vpc")!;
+  const computeModule = SERVICE_MODULES.find((m) => m.key === "compute")!;
+  const nlbModule = SERVICE_MODULES.find((m) => m.key === "nlb");
+  const iamModule = SERVICE_MODULES.find((m) => m.key === "iam")!;
+  const vpcCounts = useModuleCounts(vpcModule, projectId);
+  const computeCounts = useModuleCounts(computeModule, projectId);
+  const nlbCounts = useModuleCounts(nlbModule ?? vpcModule, nlbModule ? projectId : null);
+  const iamCounts = useModuleCounts(iamModule, "*");
   const countsByModule: Record<string, CountMap> = {
-    [SERVICE_MODULES[0].key]: vpcCounts,
-    [SERVICE_MODULES[1].key]: computeCounts,
-    [SERVICE_MODULES[2].key]: iamCounts,
+    [vpcModule.key]: vpcCounts,
+    [computeModule.key]: computeCounts,
+    [iamModule.key]: iamCounts,
+    ...(nlbModule ? { [nlbModule.key]: nlbCounts } : {}),
   };
 
   useBreadcrumb(useMemo(() => <Typography.Text strong>Все сервисы</Typography.Text>, []));
