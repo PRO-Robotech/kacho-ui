@@ -2067,13 +2067,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
 
   // ====== nlb (KAC-141: Network Load Balancer; KAC-171 UI integration) ======
   // proto: kacho.cloud.nlb.v1
-  // REST: /nlb/v1/loadBalancers, /nlb/v1/listeners, /nlb/v1/targetGroups
+  // REST: /nlb/v1/networkLoadBalancers, /nlb/v1/listeners, /nlb/v1/targetGroups
   // ID prefixes: nlb / lst / tgr
 
   "load-balancers": {
     id: "load-balancers",
     route: "load-balancers",
-    apiPath: "/nlb/v1/loadBalancers",
+    apiPath: "/nlb/v1/networkLoadBalancers",
     payloadKey: "load_balancers",
     singular: "Балансировщик нагрузки",
     plural: "Балансировщики нагрузки",

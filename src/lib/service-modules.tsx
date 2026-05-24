@@ -137,7 +137,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     requiresProject: true,
     landing: (f) => (f ? `/projects/${f}/nlb/load-balancers` : null),
     stats: [
-      { key: "load-balancers", label: "Балансировщиков", listPath: "/nlb/v1/loadBalancers", payloadKey: "load_balancers" },
+      { key: "load-balancers", label: "Балансировщиков", listPath: "/nlb/v1/networkLoadBalancers", payloadKey: "load_balancers" },
       { key: "listeners", label: "Listeners", listPath: "/nlb/v1/listeners", payloadKey: "listeners" },
       { key: "target-groups", label: "Target Groups", listPath: "/nlb/v1/targetGroups", payloadKey: "target_groups" },
     ],
