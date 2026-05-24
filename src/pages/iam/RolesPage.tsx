@@ -15,6 +15,7 @@ import {
   Select,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
   Alert,
@@ -44,6 +45,8 @@ const PERM_RE = /^[a-z_]+(\.[a-z_*]+){2}$/;
 export function RolesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Role | null>(null);
+  // KAC-127: разделение system / custom ролей табами.
+  const [roleKind, setRoleKind] = useState<"system" | "custom">("system");
 
   const { data, isLoading } = useQuery({
     queryKey: ["iam", "roles", "list"],
@@ -53,6 +56,9 @@ export function RolesPage() {
   });
 
   const roles = data?.roles ?? [];
+  const systemRoles = useMemo(() => roles.filter((r) => r.is_system), [roles]);
+  const customRoles = useMemo(() => roles.filter((r) => !r.is_system), [roles]);
+  const visibleRoles = roleKind === "system" ? systemRoles : customRoles;
 
   const del = useIamMutation({
     method: "DELETE",
@@ -180,14 +186,28 @@ export function RolesPage() {
         </Button>
       </Space>
 
+      <Tabs
+        activeKey={roleKind}
+        onChange={(k) => setRoleKind(k as "system" | "custom")}
+        size="middle"
+        items={[
+          { key: "system", label: `Системные (${systemRoles.length})` },
+          { key: "custom", label: `Кастомные (${customRoles.length})` },
+        ]}
+        style={{ marginBottom: 0 }}
+      />
+
       <Table<Role>
         rowKey="id"
         size="small"
         loading={isLoading}
-        dataSource={roles}
+        dataSource={visibleRoles}
         columns={columns}
         pagination={false}
-        locale={{ emptyText: "Roles нет." }}
+        locale={{
+          emptyText:
+            roleKind === "system" ? "Системных ролей нет." : "Кастомных ролей нет.",
+        }}
       />
 
       <RoleCreateModal open={createOpen} onClose={() => setCreateOpen(false)} />

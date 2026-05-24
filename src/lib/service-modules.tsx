@@ -60,8 +60,13 @@ export interface ServiceModule {
   icon: ReactNode;
   color: string;
   description: string;
-  /** Куда вести при клике по плашке / лаунчеру — с учётом наличия project/account. */
-  landing: (projectId: string | null, accountId: string | null) => string;
+  /** `true` — модуль project-scoped (VPC/Compute): дашборд-плашка кликабельна
+   *  только когда выбран project; иначе — disabled-плашка с подсказкой. */
+  requiresProject?: boolean;
+  /** Реальный route для перехода. Возвращает `null`, если перейти нельзя
+   *  (project-scoped модуль без выбранного project) — DashboardPage делает
+   *  плашку disabled. */
+  landing: (projectId: string | null, accountId: string | null) => string | null;
   stats: ModuleStat[];
   items: NavLeaf[];
 }
@@ -80,7 +85,8 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <ApartmentOutlined />,
     color: "#3D8DF5",
     description: "Облачные сети, подсети, группы безопасности, публичные IP, таблицы маршрутизации.",
-    landing: (f) => (f ? `/projects/${f}/vpc/networks` : "/iam/projects"),
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/vpc/networks` : null),
     stats: [
       { key: "networks", label: "Сетей", listPath: "/vpc/v1/networks", payloadKey: "networks" },
       { key: "subnets", label: "Подсетей", listPath: "/vpc/v1/subnets", payloadKey: "subnets" },
@@ -105,7 +111,8 @@ export const SERVICE_MODULES: ServiceModule[] = [
     icon: <CloudServerOutlined />,
     color: "#36CFC9",
     description: "Виртуальные машины, диски, образы и снимки дисков.",
-    landing: (f) => (f ? `/projects/${f}/compute/instances` : "/dashboard"),
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/compute/instances` : null),
     stats: [
       { key: "instances", label: "Машин", listPath: "/compute/v1/instances", payloadKey: "instances" },
       { key: "disks", label: "Дисков", listPath: "/compute/v1/disks", payloadKey: "disks" },
@@ -116,6 +123,29 @@ export const SERVICE_MODULES: ServiceModule[] = [
       { key: "compute-disks", icon: <HddOutlined />, label: "Диски", to: (f) => seg(f, "compute/disks"), matches: (p) => projectRe("compute/disks").test(p), requiresProject: true },
       { key: "compute-images", icon: <FileImageOutlined />, label: "Образы", to: (f) => seg(f, "compute/images"), matches: (p) => projectRe("compute/images").test(p), requiresProject: true },
       { key: "compute-snapshots", icon: <CameraOutlined />, label: "Снимки дисков", to: (f) => seg(f, "compute/snapshots"), matches: (p) => projectRe("compute/snapshots").test(p), requiresProject: true },
+    ],
+  },
+  // KAC-141 / KAC-171: NLB module — L4 Network Load Balancer.
+  {
+    key: "nlb",
+    segment: "nlb",
+    label: "Network Load Balancer",
+    short: "NLB",
+    icon: <NodeIndexOutlined />,
+    color: "#FA8C16",
+    description: "L4 балансировщики трафика TCP/UDP: LoadBalancer, Listener, Target Group.",
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/nlb/load-balancers` : null),
+    stats: [
+      { key: "load-balancers", label: "Балансировщиков", listPath: "/nlb/v1/loadBalancers", payloadKey: "load_balancers" },
+      { key: "listeners", label: "Listeners", listPath: "/nlb/v1/listeners", payloadKey: "listeners" },
+      { key: "target-groups", label: "Target Groups", listPath: "/nlb/v1/targetGroups", payloadKey: "target_groups" },
+    ],
+    items: [
+      { key: "load-balancers", icon: <ApartmentOutlined />, label: "Балансировщики", to: (f) => seg(f, "nlb/load-balancers"), matches: (p) => projectRe("nlb/load-balancers").test(p), requiresProject: true },
+      { key: "listeners", icon: <ApiOutlined />, label: "Listeners", to: (f) => seg(f, "nlb/listeners"), matches: (p) => projectRe("nlb/listeners").test(p), requiresProject: true },
+      { key: "target-groups", icon: <ClusterOutlined />, label: "Target Groups", to: (f) => seg(f, "nlb/target-groups"), matches: (p) => projectRe("nlb/target-groups").test(p), requiresProject: true },
+      { key: "nlb-operations", icon: <HistoryOutlined />, label: "Операции", to: (f) => seg(f, "nlb/operations"), matches: (p) => projectRe("nlb/operations").test(p), requiresProject: true },
     ],
   },
   // KAC-117/120: IAM — отдельный module-block, параллельно VPC/Compute.

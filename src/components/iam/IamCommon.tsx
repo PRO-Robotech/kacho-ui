@@ -9,6 +9,25 @@ import { api, ApiError } from "@/api/client";
 import { useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import type { Operation } from "@/api/types";
+import type { Role } from "@/api/iam";
+
+/**
+ * groupedRoleOptions — опции для role-picker `<Select>`, сгруппированные на
+ * "Системные" / "Кастомные" (AntD OptGroup-style nested options).
+ * KAC-127: единый формат во всех role-pickers (AccessBindings, invite-user).
+ */
+export function groupedRoleOptions(roles: Role[]) {
+  const system = roles.filter((r) => r.is_system);
+  const custom = roles.filter((r) => !r.is_system);
+  const toOpt = (r: Role) => ({
+    value: r.id,
+    label: `${r.name} · ${r.id}`,
+  });
+  const groups: { label: string; options: { value: string; label: string }[] }[] = [];
+  if (system.length > 0) groups.push({ label: "Системные", options: system.map(toOpt) });
+  if (custom.length > 0) groups.push({ label: "Кастомные", options: custom.map(toOpt) });
+  return groups;
+}
 
 export function fmtTs(ts?: string): string {
   if (!ts) return "—";

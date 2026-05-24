@@ -47,6 +47,10 @@ const ICONS: Record<string, ReactNode> = {
   "address-pools": <AppstoreOutlined />,
   regions: <AppstoreOutlined />,
   zones: <AppstoreOutlined />,
+  // nlb (сайдбар: ApartmentOutlined / ApiOutlined / ClusterOutlined)
+  "load-balancers": <ApartmentOutlined />,
+  listeners: <ApiOutlined />,
+  "target-groups": <ClusterOutlined />,
 };
 
 interface Props {

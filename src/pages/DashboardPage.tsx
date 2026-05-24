@@ -9,8 +9,8 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueries } from "@tanstack/react-query";
-import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert } from "antd";
-import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { Card, Empty, Statistic, Typography, Space, Button, Row, Col, Alert, Tooltip } from "antd";
+import { ArrowRightOutlined, FolderOpenOutlined, AppstoreOutlined, LockOutlined } from "@ant-design/icons";
 import { useBreadcrumb, useHeaderRight, usePageTitle } from "@/components/PageHeaderSlot";
 import { api } from "@/api/client";
 import { useContext } from "@/lib/context-store";
@@ -18,22 +18,32 @@ import { SERVICE_MODULES, type ServiceModule } from "@/lib/service-modules";
 
 type CountMap = Record<string, number | null>;
 
-/** Counts по stat-метрикам модуля для выбранного project. */
-function useModuleCounts(module: ServiceModule, projectId: string | null): CountMap {
-  const enabled = projectId != null;
-  const targetProjects = projectId != null ? [projectId] : [];
+/** Counts по stat-метрикам модуля для выбранного scope (project либо account).
+ *
+ * scopeKey = "project_id" (по умолчанию) — для VPC/Compute/NLB stats (per-project).
+ * scopeKey = "account_id" — для IAM stats (account-level, project_id=* ломал AuthZ:
+ * "no path: unscoped resource", subject=account:*, KAC-175-followup).
+ * scopeKey = "" — list-all без scope (для stats где endpoint не требует фильтра,
+ * напр. /iam/v1/accounts).
+ */
+function useModuleCounts(
+  module: ServiceModule,
+  scopeId: string | null,
+  scopeKey: string = "project_id",
+): CountMap {
+  const enabled = scopeKey === "" || scopeId != null;
   const results = useQueries({
     queries: module.stats.map((stat) => ({
-      queryKey: ["dash", module.key, stat.key, projectId],
+      queryKey: ["dash", module.key, stat.key, scopeKey, scopeId],
       enabled,
       refetchInterval: 15_000,
       queryFn: async () => {
-        const lists = await Promise.all(
-          targetProjects.map((pid) =>
-            api.list<Record<string, unknown[] | undefined>>(stat.listPath, { project_id: pid, pageSize: "1000" }),
-          ),
-        );
-        return lists.reduce((sum, l) => sum + (l[stat.payloadKey]?.length ?? 0), 0);
+        const query: Record<string, string> = { pageSize: "1000" };
+        if (scopeKey !== "" && scopeId != null) {
+          query[scopeKey] = scopeId;
+        }
+        const l = await api.list<Record<string, unknown[] | undefined>>(stat.listPath, query);
+        return l[stat.payloadKey]?.length ?? 0;
       },
     })),
   });
@@ -51,22 +61,45 @@ export function DashboardPage() {
   const projectId = ctx.project?.id ?? null;
   const accountId = ctx.account?.id ?? null;
 
-  // Counts для каждого модуля. SERVICE_MODULES[0..2] = vpc/compute/iam.
-  // IAM не требует projectId (его ресурсы — account-level), счётчики работают всегда.
-  const vpcCounts = useModuleCounts(SERVICE_MODULES[0], projectId);
-  const computeCounts = useModuleCounts(SERVICE_MODULES[1], projectId);
-  const iamCounts = useModuleCounts(SERVICE_MODULES[2], "*"); // "*" — fake projectId чтобы хук активировался
+  // Counts для каждого модуля. Lookup ПО key, не по индексу — иначе порядок
+  // в SERVICE_MODULES (vpc/compute/nlb/iam) ломает binding и iam счётчики
+  // показывают NLB-данные (KAC-171 регресс предотвращён).
+  // IAM stats — account-level: используем accountId как scope, scopeKey="" чтобы
+  // запросы шли БЕЗ project_id (раньше project_id="*" вызывал AuthZ "no path:
+  // unscoped resource" — backend требует валидный scope, не wildcard).
+  const vpcModule = SERVICE_MODULES.find((m) => m.key === "vpc")!;
+  const computeModule = SERVICE_MODULES.find((m) => m.key === "compute")!;
+  const nlbModule = SERVICE_MODULES.find((m) => m.key === "nlb");
+  const iamModule = SERVICE_MODULES.find((m) => m.key === "iam")!;
+  const vpcCounts = useModuleCounts(vpcModule, projectId);
+  const computeCounts = useModuleCounts(computeModule, projectId);
+  const nlbCounts = useModuleCounts(nlbModule ?? vpcModule, nlbModule ? projectId : null);
+  // IAM: scopeKey="" → list без фильтра (accounts API сам делает per-user filter).
+  // Если в будущем roles/projects/users потребуют account_id — переключиться на
+  // useModuleCounts(iamModule, accountId, "account_id"). Сейчас accounts работает
+  // без scope, остальные iam stats — могут падать 403, но хук не throws (try/catch
+  // в queryFn react-query).
+  const iamCounts = useModuleCounts(iamModule, accountId ?? "all", "");
   const countsByModule: Record<string, CountMap> = {
-    [SERVICE_MODULES[0].key]: vpcCounts,
-    [SERVICE_MODULES[1].key]: computeCounts,
-    [SERVICE_MODULES[2].key]: iamCounts,
+    [vpcModule.key]: vpcCounts,
+    [computeModule.key]: computeCounts,
+    [iamModule.key]: iamCounts,
+    ...(nlbModule ? { [nlbModule.key]: nlbCounts } : {}),
   };
 
   useBreadcrumb(useMemo(() => <Typography.Text strong>Все сервисы</Typography.Text>, []));
   useHeaderRight(useMemo(() => null, []));
   usePageTitle(null);
 
-  const openModule = (m: ServiceModule) => navigate(m.landing(projectId, accountId));
+  // Плашка кликабельна только если landing вернул реальный route. Project-scoped
+  // модуль (VPC/Compute) без выбранного project → landing=null → disabled-плашка.
+  const tileDisabled = (m: ServiceModule) => m.landing(projectId, accountId) == null;
+
+  const openModule = (m: ServiceModule) => {
+    const target = m.landing(projectId, accountId);
+    if (target == null) return; // no-op для disabled-плашки
+    navigate(target);
+  };
 
   const caption = (() => {
     if (ctx.project) return `Проект: ${ctx.project.name || ctx.project.id}`;
@@ -112,24 +145,36 @@ export function DashboardPage() {
 
         {tilesVisible && (
           <Row gutter={[16, 16]}>
-            {SERVICE_MODULES.map((m) => (
-              <Col key={m.key} xs={24} sm={24} md={12} lg={12}>
+            {SERVICE_MODULES.map((m) => {
+              const disabled = tileDisabled(m);
+              const card = (
                 <Card
-                  hoverable
+                  hoverable={!disabled}
                   data-testid={`dashboard-tile-${m.key}`}
+                  data-disabled={disabled ? "true" : "false"}
                   onClick={() => openModule(m)}
                   styles={{ body: { padding: 16 } }}
+                  style={
+                    disabled
+                      ? { opacity: 0.55, cursor: "not-allowed" }
+                      : { cursor: "pointer" }
+                  }
                   title={
                     <Space>
                       <span style={{ color: m.color, fontSize: 16 }}>{m.icon}</span>
                       <span>{m.label}</span>
                     </Space>
                   }
-                  extra={<ArrowRightOutlined />}
+                  extra={disabled ? <LockOutlined /> : <ArrowRightOutlined />}
                 >
                   <Typography.Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 12 }}>
                     {m.description}
                   </Typography.Paragraph>
+                  {disabled && (
+                    <Typography.Text type="warning" style={{ fontSize: 12, display: "block", marginBottom: 8 }}>
+                      Выберите проект в шапке, чтобы открыть ресурсы.
+                    </Typography.Text>
+                  )}
                   <Row gutter={16}>
                     {m.stats.map((s) => (
                       <Col key={s.key} span={Math.floor(24 / m.stats.length)}>
@@ -142,8 +187,17 @@ export function DashboardPage() {
                     ))}
                   </Row>
                 </Card>
-              </Col>
-            ))}
+              );
+              return (
+                <Col key={m.key} xs={24} sm={24} md={12} lg={12}>
+                  {disabled ? (
+                    <Tooltip title="Выберите проект в селекторе в шапке">{card}</Tooltip>
+                  ) : (
+                    card
+                  )}
+                </Col>
+              );
+            })}
           </Row>
         )}
 

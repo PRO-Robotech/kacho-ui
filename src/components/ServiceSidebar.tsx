@@ -61,8 +61,11 @@ export function ServiceSidebar() {
         key: `mod-${m.key}`,
         icon: m.icon,
         label: m.label,
-        to: () => m.landing(projectId, accountId),
+        // landing может вернуть null (project-scoped модуль без project) —
+        // тогда лаунчер disabled через requiresProject, to не вызывается.
+        to: () => m.landing(projectId, accountId) ?? "/dashboard",
         matches: () => false,
+        requiresProject: m.requiresProject,
       })),
     [projectId, accountId],
   );

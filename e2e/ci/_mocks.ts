@@ -116,6 +116,19 @@ export async function installIamMocks(page: Page): Promise<void> {
   await page.route("**/iam/v1/projects**", (r) => r.fulfill(json({ projects: PROJECTS })));
   await page.route("**/iam/v1/serviceAccounts**", (r) => r.fulfill(json({ service_accounts: SERVICE_ACCOUNTS })));
   await page.route("**/iam/v1/users**", (r) => r.fulfill(json({ users: USERS })));
+  // :invite POST — Playwright matches routes last-registered-first, поэтому этот
+  // более специфичный handler перехватит `POST /iam/v1/users:invite` раньше
+  // общего `users**` выше. Возвращаем metadata.magic_link_url (snake_case —
+  // как читает UsersPage: resp.metadata?.magic_link_url).
+  await page.route("**/iam/v1/users:invite", (r) => {
+    if (r.request().method() !== "POST") return r.fallback();
+    return r.fulfill(
+      json({
+        id: "usrtest0000000000099",
+        metadata: { user_id: "usrtest0000000000099", account_id: ACCOUNT.id, magic_link_url: "https://test/link" },
+      }),
+    );
+  });
   await page.route("**/iam/v1/groups**", (r) => r.fulfill(json({ groups: GROUPS })));
   await page.route("**/iam/v1/roles**", (r) => r.fulfill(json({ roles: ROLES })));
 
