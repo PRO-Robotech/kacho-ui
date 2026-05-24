@@ -2156,7 +2156,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         label: "Протокол",
         type: "enum",
         required: true,
-        options: ["TCP", "UDP"],
+        options: [
+          { value: "TCP", label: "TCP" },
+          { value: "UDP", label: "UDP" },
+        ],
         description: "L4 транспорт (immutable после Create).",
       },
       {
