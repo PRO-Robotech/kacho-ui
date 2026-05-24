@@ -2046,6 +2046,206 @@ export const REGISTRY: Record<string, ResourceSpec> = {
   // Hypervisor resource удалён (KAC-36/KAC-82, post-kube-ovn): kube-ovn управляет
   // инвентарём нод через k8s Node objects, наша таблица hypervisors / proto-сервис
   // больше не нужны. См. kacho-compute миграция 0006_drop_hypervisors.sql.
+
+  // ====== nlb (KAC-141: Network Load Balancer; KAC-171 UI integration) ======
+  // proto: kacho.cloud.nlb.v1
+  // REST: /nlb/v1/loadBalancers, /nlb/v1/listeners, /nlb/v1/targetGroups
+  // ID prefixes: nlb / lst / tgr
+
+  "load-balancers": {
+    id: "load-balancers",
+    route: "load-balancers",
+    apiPath: "/nlb/v1/loadBalancers",
+    payloadKey: "load_balancers",
+    singular: "Балансировщик нагрузки",
+    plural: "Балансировщики нагрузки",
+    serviceTitle: "Network Load Balancer",
+    scope: "project",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      { header: "Регион", path: "region_id", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE, // DNS-1123 — lowercase + цифры + дефисы (как у NLB regex)
+      FIELD_DESCRIPTION,
+      {
+        name: "region_id",
+        label: "Регион",
+        type: "string",
+        required: true,
+        description: "Регион размещения балансировщика (например, ru-central1). Cross-service ref → compute.Region; verified на request-path.",
+      },
+      FIELD_LABELS,
+      FIELD_PROJECT_ID,
+    ],
+    template: ({ projectId }) => ({
+      project_id: projectId ?? "",
+      name: "",
+      description: "",
+      region_id: "",
+      labels: {},
+    }),
+  },
+
+  listeners: {
+    id: "listeners",
+    route: "listeners",
+    apiPath: "/nlb/v1/listeners",
+    payloadKey: "listeners",
+    singular: "Listener",
+    plural: "Listeners",
+    serviceTitle: "Network Load Balancer",
+    scope: "project",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      {
+        header: "Балансировщик",
+        path: "load_balancer_id",
+        render: (row) => (
+          <RefNameLink
+            specId="load-balancers"
+            refId={row.load_balancer_id as string | undefined}
+            maxChars={36}
+          />
+        ),
+      },
+      { header: "Протокол", path: "protocol", format: "code" },
+      { header: "Порт", path: "port", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      FIELD_DESCRIPTION,
+      {
+        name: "load_balancer_id",
+        label: "Балансировщик",
+        type: "string",
+        required: true,
+        description: "ID балансировщика-родителя (immutable после Create). Within-service FK → load_balancers.",
+      },
+      {
+        name: "protocol",
+        label: "Протокол",
+        type: "enum",
+        required: true,
+        options: ["TCP", "UDP"],
+        description: "L4 транспорт (immutable после Create).",
+      },
+      {
+        name: "port",
+        label: "Порт",
+        type: "int",
+        required: true,
+        description: "Внешний порт 1..65535 (immutable после Create).",
+      },
+      {
+        name: "target_port",
+        label: "Порт на target",
+        type: "int",
+        required: false,
+        description: "Порт на target-е (1..65535). Если не задан — равен `port`.",
+      },
+      FIELD_LABELS,
+      FIELD_PROJECT_ID,
+    ],
+    template: ({ projectId }) => ({
+      project_id: projectId ?? "",
+      name: "",
+      description: "",
+      load_balancer_id: "",
+      protocol: "TCP",
+      port: 0,
+      labels: {},
+    }),
+  },
+
+  "target-groups": {
+    id: "target-groups",
+    route: "target-groups",
+    apiPath: "/nlb/v1/targetGroups",
+    payloadKey: "target_groups",
+    singular: "Target Group",
+    plural: "Target Groups",
+    serviceTitle: "Network Load Balancer",
+    scope: "project",
+    ops: { create: true, update: true, delete: true },
+    columns: [
+      {
+        header: "Имя",
+        path: "name",
+        render: (row) => <CopyableName name={(row.name as string) ?? ""} fallback={row.id as string} />,
+      },
+      {
+        header: "Идентификатор",
+        path: "id",
+        render: (row) => <CopyableId id={(row.id as string) ?? ""} />,
+      },
+      { header: "Регион", path: "region_id", format: "text" },
+      { header: "Дата создания", path: "created_at", format: "datetime" },
+      {
+        header: "Метки",
+        path: "labels",
+        render: (row) => <LabelsCell labels={row.labels as Record<string, string> | undefined} />,
+      },
+    ],
+    fields: [
+      FIELD_NAME_COMPUTE,
+      FIELD_DESCRIPTION,
+      {
+        name: "region_id",
+        label: "Регион",
+        type: "string",
+        required: true,
+        description: "Регион размещения target-group (immutable после Create). Cross-service ref → compute.Region.",
+      },
+      {
+        name: "deregistration_delay_seconds",
+        label: "Drain timeout (с)",
+        type: "int",
+        required: false,
+        default: 300,
+        description: "Сколько ждать прекращения трафика перед удалением target'а из активного набора (0..3600). По умолчанию 300.",
+      },
+      FIELD_LABELS,
+      FIELD_PROJECT_ID,
+    ],
+    template: ({ projectId }) => ({
+      project_id: projectId ?? "",
+      name: "",
+      description: "",
+      region_id: "",
+      deregistration_delay_seconds: 300,
+      labels: {},
+    }),
+  },
 };
 
 // Экспортирована для тестов.

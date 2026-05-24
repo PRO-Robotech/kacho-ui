@@ -61,6 +61,11 @@ const COMPUTE_SCOPED = ["compute-disks", "compute-images", "compute-snapshots", 
   .map((id) => REGISTRY[id])
   .filter(Boolean);
 
+// Project-scoped NLB ресурсы (KAC-141 / KAC-171). URL-сегмент — `nlb`.
+const NLB_SCOPED = ["load-balancers", "listeners", "target-groups"]
+  .map((id) => REGISTRY[id])
+  .filter(Boolean);
+
 export default function App() {
   return (
     <ConfigProvider
@@ -279,6 +284,41 @@ export default function App() {
                       ? <InstanceDetailPage />
                       : <ResourceDetailPage spec={spec} />
                   }
+                />
+              </Route>
+            ))}
+
+            {/* === Project-scoped NLB ресурсы (KAC-141 / KAC-171) === */}
+            {/* /projects/:projectId/nlb/{load-balancers|listeners|target-groups} */}
+            {NLB_SCOPED.map((spec) => (
+              <Route key={spec.id}>
+                <Route
+                  path={`/projects/:projectId/nlb/${spec.route}`}
+                  element={
+                    <ResourceListPage
+                      spec={spec}
+                      parentField="project_id"
+                      parentParam="projectId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/projects/:projectId/nlb/${spec.route}/create`}
+                  element={
+                    <ResourceCreatePage
+                      spec={spec}
+                      parentField="project_id"
+                      parentParam="projectId"
+                    />
+                  }
+                />
+                <Route
+                  path={`/projects/:projectId/nlb/${spec.route}/:uid`}
+                  element={<ResourceDetailPage spec={spec} />}
+                />
+                <Route
+                  path={`/projects/:projectId/nlb/${spec.route}/:uid/edit`}
+                  element={<ResourceDetailPage spec={spec} />}
                 />
               </Route>
             ))}

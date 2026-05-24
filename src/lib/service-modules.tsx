@@ -125,6 +125,29 @@ export const SERVICE_MODULES: ServiceModule[] = [
       { key: "compute-snapshots", icon: <CameraOutlined />, label: "Снимки дисков", to: (f) => seg(f, "compute/snapshots"), matches: (p) => projectRe("compute/snapshots").test(p), requiresProject: true },
     ],
   },
+  // KAC-141 / KAC-171: NLB module — L4 Network Load Balancer.
+  {
+    key: "nlb",
+    segment: "nlb",
+    label: "Network Load Balancer",
+    short: "NLB",
+    icon: <NodeIndexOutlined />,
+    color: "#FA8C16",
+    description: "L4 балансировщики трафика TCP/UDP: LoadBalancer, Listener, Target Group.",
+    requiresProject: true,
+    landing: (f) => (f ? `/projects/${f}/nlb/load-balancers` : null),
+    stats: [
+      { key: "load-balancers", label: "Балансировщиков", listPath: "/nlb/v1/loadBalancers", payloadKey: "load_balancers" },
+      { key: "listeners", label: "Listeners", listPath: "/nlb/v1/listeners", payloadKey: "listeners" },
+      { key: "target-groups", label: "Target Groups", listPath: "/nlb/v1/targetGroups", payloadKey: "target_groups" },
+    ],
+    items: [
+      { key: "load-balancers", icon: <ApartmentOutlined />, label: "Балансировщики", to: (f) => seg(f, "nlb/load-balancers"), matches: (p) => projectRe("nlb/load-balancers").test(p), requiresProject: true },
+      { key: "listeners", icon: <ApiOutlined />, label: "Listeners", to: (f) => seg(f, "nlb/listeners"), matches: (p) => projectRe("nlb/listeners").test(p), requiresProject: true },
+      { key: "target-groups", icon: <ClusterOutlined />, label: "Target Groups", to: (f) => seg(f, "nlb/target-groups"), matches: (p) => projectRe("nlb/target-groups").test(p), requiresProject: true },
+      { key: "nlb-operations", icon: <HistoryOutlined />, label: "Операции", to: (f) => seg(f, "nlb/operations"), matches: (p) => projectRe("nlb/operations").test(p), requiresProject: true },
+    ],
+  },
   // KAC-117/120: IAM — отдельный module-block, параллельно VPC/Compute.
   // IAM ресурсы: Account, Project, User, ServiceAccount, Group, Role, AccessBinding.
   // Не требует project context (живёт на уровне /iam/*).
