@@ -108,14 +108,22 @@ export interface GroupMemberList {
 }
 
 // ====== Role ======
+// Backend gRPC-gateway emit'ит JSON camelCase by default — поэтому в API ответе
+// будут `isSystem`/`accountId`/`createdAt`. Старые snake_case оставлены для
+// backwards-compat (некоторые endpoint'ы шлют их). KAC-171 follow-up: preset
+// system-roles были скрыты в AccessBindings dropdown потому что `is_system`
+// undefined → filter never matched.
 export interface Role {
   id: string;
   account_id?: string;
+  accountId?: string;
   name: string;
   description?: string;
   permissions?: string[];
   is_system?: boolean;
+  isSystem?: boolean;
   created_at?: string;
+  createdAt?: string;
 }
 export interface RoleList {
   roles: Role[];
