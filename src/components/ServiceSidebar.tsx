@@ -124,7 +124,7 @@ export function ServiceSidebar() {
 // {Профиль → /iam/users, Выйти}. Неавторизованный — LoginOutlined → /login.
 // Loading — Spin (чтобы не дёргать layout).
 function SidebarUserButton({ token }: { token: ReturnType<typeof theme.useToken>["token"] }) {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, login, logout } = useAuth();
   const navigate = useNavigate();
 
   if (loading) {
@@ -148,7 +148,12 @@ function SidebarUserButton({ token }: { token: ReturnType<typeof theme.useToken>
       <Tooltip title="Войти" placement="right" mouseEnterDelay={0.4}>
         <button
           type="button"
-          onClick={() => navigate("/login")}
+          // KAC-199: было navigate("/login") — такого SPA-route нет (только
+          // /auth/login). Вызываем login() из useAuth — он делает full-page
+          // assign на kratos.loginUrl() с return_to (тот же flow, что и в
+          // <LoginButton/>). Anonymous user из любой точки UI должен оказаться
+          // на Kratos self-service login.
+          onClick={() => login(window.location.pathname + window.location.search)}
           aria-label="Войти"
           style={{
             display: "inline-flex",
