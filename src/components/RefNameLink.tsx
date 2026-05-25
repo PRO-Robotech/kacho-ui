@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Tag } from "antd";
 import { api } from "@/api/client";
 import { useProjectStore } from "@/lib/context-store";
-import { REGISTRY } from "@/lib/resource-registry";
+import { REGISTRY, resourceProjectPath } from "@/lib/resource-registry";
 
 interface Props {
   specId: string;       // "networks" | "route-tables" | "security-groups" | ...
@@ -47,7 +47,10 @@ export function RefNameLink({ specId, refId, projectId: projectOverride, asTag, 
     maxChars && fullName.length > maxChars
       ? fullName.slice(0, maxChars) + "…"
       : fullName;
-  const href = projectId ? `/projects/${projectId}/${spec.route}/${refId}` : null;
+  // KAC-198: include service segment (vpc/compute/nlb) — без него detail-route
+  // в App.tsx не матчился → клик по ссылке шёл в SPA-fallback (blank/404).
+  const basePath = resourceProjectPath(specId, projectId);
+  const href = basePath ? `${basePath}/${refId}` : null;
 
   const inner = href ? (
     <Link

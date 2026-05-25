@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
 import ruRU from "antd/locale/ru_RU";
 import { Layout } from "@/components/Layout";
+import { RequireAuth } from "@/components/auth/RequireAuth";
 import { AdminLayout } from "@/components/AdminLayout";
 import { ResourceListPage } from "@/components/ResourceListPage";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
@@ -154,17 +155,47 @@ export default function App() {
       <AntdApp>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-        <AuthProvider>
-        <StepUpModal />
-        <Routes>
-          {/* Public signup/login pages (без Layout — full-screen) */}
-          <Route path="/signup" element={<SignupPage />} />
+            <AuthProvider>
+              <StepUpModal />
+              <AppRoutes />
+              <Toaster />
+            </AuthProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </AntdApp>
+    </ConfigProvider>
+  );
+}
 
-          {/* KAC-127 (Phase 2): Passkey/WebAuthn auth pages — без Layout. */}
+/**
+ * AppRoutes — экспорт-only routes-tree (без BrowserRouter/AuthProvider/
+ * QueryClient/ConfigProvider обёрток). Нужен для integration-тестов через
+ * `<MemoryRouter><AppRoutes/></MemoryRouter>` (см. App.routes.test.tsx,
+ * KAC-199). В runtime — рендерится App'ом выше.
+ */
+export function AppRoutes() {
+  return (
+        <Routes>
+          {/* === Public routes (без RequireAuth) ===
+              signup / login / registration / recovery / settings — Kratos
+              self-service страницы. /auth/callback и /logout — пост-OIDC
+              landing'и; user в этот момент ещё мог не дозагрузиться через
+              /me — если поставить под RequireAuth, словим бесконечный
+              redirect-loop callback↔login. */}
+          <Route path="/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/auth/registration" element={<RegisterPage />} />
           <Route path="/auth/recovery" element={<RecoveryPage />} />
           <Route path="/auth/settings" element={<SettingsPage />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/logout" element={<LogoutPage />} />
+
+          {/* === Protected routes (KAC-199 — требуют залогиненного user'а) ===
+              RequireAuth: loading → Spin; user=null → redirect на
+              /auth/login?return_to=<original>. Без неё anonymous user
+              мог гулять по dashboard / IAM / VPC / NLB / Compute и видеть
+              пустые таблицы (API возвращает 401). */}
+          <Route element={<RequireAuth />}>
           <Route element={<Layout />}>
             {/* Root → dashboard. */}
             <Route index element={<Navigate to="/dashboard" replace />} />
@@ -477,21 +508,15 @@ export default function App() {
               <Route path="/iam/access" element={<AccessPage />} />
             </Route>
 
-            {/* === Auth routes (OIDC callback + logout) ===
-                /auth/callback: api-gateway → UI redirect после OIDC-flow.
-                /logout: явный logout endpoint (используется UserMenu и прямым URL). */}
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/logout" element={<LogoutPage />} />
+            {/* KAC-199: /auth/callback и /logout вынесены наверх под public-
+                routes (Kratos session ещё не доступна в момент рендера
+                callback'а; RequireAuth-guard вокруг них создал бы
+                redirect-loop). */}
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
-          </Routes>
-        </AuthProvider>
-        </BrowserRouter>
-        <Toaster />
-      </QueryClientProvider>
-      </AntdApp>
-    </ConfigProvider>
+          </Route>
+        </Routes>
   );
 }
 

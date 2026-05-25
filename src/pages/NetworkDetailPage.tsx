@@ -16,7 +16,7 @@ import { ResourceTable, type Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { ResourceFormModal } from "@/components/ResourceFormModal";
 import { api } from "@/api/client";
-import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
+import { REGISTRY, getByPath, resourceProjectPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import type { DetailTab } from "@/components/DetailShell";
 
@@ -276,8 +276,10 @@ function useChildColumns(
 ): Column<Record<string, unknown>>[] {
   return useMemo(() => {
     const cols = buildSpecColumns(spec, { projectId });
+    // KAC-198: include service segment (vpc/compute/nlb) so Subnet/SG/RT
+    // child-table links под NetworkDetailPage ведут на actual route в App.tsx.
     const basePath =
-      basePathOverride ?? (projectId ? `/projects/${projectId}/${spec.route}` : null);
+      basePathOverride ?? resourceProjectPath(spec.id, projectId);
     if (basePath) {
       cols.push({
         header: "",

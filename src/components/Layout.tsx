@@ -10,7 +10,9 @@ import {
   PageHeaderSlotProvider,
 } from "@/components/PageHeaderSlot";
 import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
-import { HeaderAuth } from "@/components/auth/HeaderAuth";
+// KAC-198: HeaderAuth перенесён в ServiceSidebar (SidebarUserButton — avatar + email
+// + dropdown {Профиль, Выйти}). В шапке остаётся только HeaderRightSlot для
+// per-page виджетов.
 
 const { Header, Sider, Content } = AntLayout;
 
@@ -107,7 +109,6 @@ function LayoutInner() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <HeaderRightSlot />
-          <HeaderAuth />
         </div>
       </Header>
 
