@@ -2493,6 +2493,51 @@ export function getResource(id: string): ResourceSpec | undefined {
   return REGISTRY[id];
 }
 
+// resourceServicePrefix — service-segment под /projects/:projectId/ (или
+// /iam/ для IAM-scoped) per spec.id. Соответствует routes в App.tsx
+// (KAC-198 fix: некоторые компоненты строили `/projects/<pid>/<route>` без
+// этого сегмента — детальная страница 404'илась).
+export function resourceServicePrefix(specId: string): "vpc" | "compute" | "nlb" | "iam" {
+  if (specId.startsWith("compute-")) return "compute";
+  switch (specId) {
+    // NLB domain
+    case "network-load-balancers":
+    case "listeners":
+    case "target-groups":
+      return "nlb";
+    // IAM domain — пути под /iam/<route>, не под /projects/
+    case "accounts":
+    case "projects":
+    case "users":
+    case "service-accounts":
+    case "groups":
+    case "roles":
+    case "access-bindings":
+      return "iam";
+    // Compute admin (без compute- префикса)
+    case "regions":
+    case "zones":
+    case "address-pools":
+      return "compute";
+    default:
+      // VPC ресурсы: networks, subnets, addresses, route-tables,
+      // security-groups, network-interfaces, gateways
+      return "vpc";
+  }
+}
+
+// resourceProjectPath — полный SPA-путь до listing данного ресурса в
+// контексте project'а. Возвращает null для IAM-ресурсов (они не scoped to
+// project) и когда projectId не известен.
+export function resourceProjectPath(specId: string, projectId: string | null | undefined): string | null {
+  const prefix = resourceServicePrefix(specId);
+  if (prefix === "iam") return null;
+  if (!projectId) return null;
+  const spec = REGISTRY[specId];
+  if (!spec) return null;
+  return `/projects/${projectId}/${prefix}/${spec.route}`;
+}
+
 export function getByPath<T = unknown>(obj: unknown, path: string): T | undefined {
   return path.split(".").reduce<unknown>((acc, key) => {
     if (acc == null || typeof acc !== "object") return undefined;
