@@ -207,7 +207,10 @@ export const COMMON_TOP: NavLeaf[] = [
 ];
 
 /** Нижний общий блок сайдбара (всегда виден). KAC-120: IAM удалён отсюда —
- *  теперь регистрируется как module-block в SERVICE_MODULES (параллельно VPC/Compute). */
+ *  теперь регистрируется как module-block в SERVICE_MODULES (параллельно VPC/Compute).
+ *  KAC-198: `profile` leaf убран — user-menu (avatar + email + Профиль/Выйти dropdown)
+ *  теперь рендерится в `ServiceSidebar` как отдельный компонент `SidebarUserButton`
+ *  вместо обычного NavLeaf — для unauthenticated case он показывает LoginButton. */
 export const COMMON_BOTTOM: NavLeaf[] = [
   {
     key: "system",
@@ -215,12 +218,5 @@ export const COMMON_BOTTOM: NavLeaf[] = [
     label: "Администрирование",
     to: () => "/system/regions",
     matches: (p) => /^\/system\/(regions|zones|address-pools)/.test(p),
-  },
-  {
-    key: "profile",
-    icon: <UserOutlined />,
-    label: "Профиль",
-    to: () => "/system/search",
-    matches: () => false,
   },
 ];

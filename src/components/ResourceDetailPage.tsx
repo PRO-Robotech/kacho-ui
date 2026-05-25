@@ -32,7 +32,7 @@ import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { api, ApiError } from "@/api/client";
 import { useProjectStore } from "@/lib/context-store";
-import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { ResourceSpec, getByPath, resourceProjectPath } from "@/lib/resource-registry";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 
@@ -198,11 +198,15 @@ export function ResourceDetailPage({
   const backHref = useMemo(() => {
     if (backHrefOverride) return backHrefOverride;
     const projectId = params.projectId;
-    if (projectId) return `/projects/${projectId}/${spec.route}`;
+    // KAC-198: include service segment (vpc/compute/nlb) so back-button
+    // ведёт на actual listing route в App.tsx (раньше `/projects/<pid>/<route>`
+    // не матчился → SPA fallback на blank).
+    const listPath = resourceProjectPath(spec.id, projectId);
+    if (listPath) return listPath;
     // KAC-124: Resource Manager (Organization/Cloud/Folder) удалён — заменён на
     // IAM (Account/Project). Fallback ведёт в IAM Projects list.
     return "/iam/projects";
-  }, [params.projectId, spec.route, backHrefOverride]);
+  }, [params.projectId, spec.id, backHrefOverride]);
 
   const segments = useMemo(
     () =>
