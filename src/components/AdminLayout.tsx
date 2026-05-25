@@ -13,6 +13,8 @@ const TABS = [
   { key: "/system/regions", label: "Регионы" },
   { key: "/system/zones", label: "Зоны" },
   { key: "/system/address-pools", label: "Пулы адресов" },
+  // KAC-196: Cluster admins (Grant/Revoke /iam/v1/internal/cluster/admins).
+  { key: "/system/cluster/admins", label: "Cluster admins" },
 ];
 
 export function AdminLayout() {
