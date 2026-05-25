@@ -217,6 +217,9 @@ export const COMMON_BOTTOM: NavLeaf[] = [
     icon: <SettingOutlined />,
     label: "Администрирование",
     to: () => "/system/regions",
-    matches: (p) => /^\/system\/(regions|zones|address-pools)/.test(p),
+    // KAC-196: добавлен /system/cluster/admins (cluster RBAC management) под
+    // тем же admin-entry; AdminLayout-табы рендерят его как отдельный таб.
+    matches: (p) =>
+      /^\/system\/(regions|zones|address-pools|cluster\/admins)/.test(p),
   },
 ];

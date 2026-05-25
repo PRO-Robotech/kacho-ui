@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
@@ -41,6 +42,9 @@ import { RecoveryPage } from "@/pages/auth/Recovery";
 import { SettingsPage } from "@/pages/auth/Settings";
 import { StepUpModal } from "@/components/auth/StepUpModal";
 import { AuthProvider } from "@/contexts/AuthContext";
+
+// KAC-196: cluster admins UI — лениво подгружаемая страница.
+const ClusterAdminsPage = lazy(() => import("@/pages/system/ClusterAdminsPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -476,6 +480,17 @@ export function AppRoutes() {
               <Route path="/system/regions" element={<ResourceListPage spec={REGISTRY.regions} />} />
               <Route path="/system/zones" element={<ResourceListPage spec={REGISTRY.zones} />} />
               <Route path="/system/address-pools" element={<ResourceListPage spec={REGISTRY["address-pools"]} />} />
+              {/* KAC-196: Cluster admins (Grant/Revoke) — единственная admin-страница,
+                  не следующая ResourceListPage pattern: кастомная таблица с denorm
+                  ClusterAdminEntry + GrantAdminModal вместо ResourceFormModal. */}
+              <Route
+                path="/system/cluster/admins"
+                element={
+                  <Suspense fallback={null}>
+                    <ClusterAdminsPage />
+                  </Suspense>
+                }
+              />
             </Route>
             <Route path="/system/regions/create" element={<ResourceCreatePage spec={REGISTRY.regions} />} />
             <Route path="/system/regions/:uid" element={<ResourceDetailPage spec={REGISTRY.regions} />} />
