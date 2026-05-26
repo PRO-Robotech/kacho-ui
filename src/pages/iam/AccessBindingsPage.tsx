@@ -1,12 +1,18 @@
 // AccessBindingsPage — управление AccessBinding'ами.
-// Two view modes:
+// View modes:
 //   - "byResource" → list per (resource_type + resource_id);
 //   - "bySubject" → list per (subject_type + subject_id).
+//   - "byAccount" → KAC item #1: admin-wide list по AccountID (новый RPC
+//      AccessBindingService.ListByAccount, доступен только admin'у account'а).
 //
-// Create — отдельная модалка: subject_type/id + role + resource_type/id.
+// Create — отдельная модалка: subject_type/id + role + resource_type/id +
+// поддержка resource_type=cluster (KAC item #5) для unified cluster-admin grant.
+// На 409 ALREADY_EXISTS → inline Alert с verbatim message (KAC item #3).
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
+  Alert,
   Button,
   Card,
   Form,
@@ -21,12 +27,14 @@ import {
   Typography,
 } from "antd";
 import { PlusOutlined, DeleteOutlined } from "@ant-design/icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnsType } from "antd/es/table";
+import { api, ApiError } from "@/api/client";
 import {
   iamApi,
   IAM,
   type AccessBinding,
+  type AccessBindingList,
   type User,
   type ServiceAccount,
   type Group,
@@ -39,10 +47,23 @@ import {
   groupedRoleOptions,
 } from "@/components/iam/IamCommon";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  usePermissions,
+  isAlreadyExistsError,
+  mapApiErrorToMessage,
+} from "@/lib/permissions";
 
-type ViewMode = "byResource" | "bySubject";
+type ViewMode = "byResource" | "bySubject" | "byAccount";
 type SubjectType = "user" | "service_account" | "group";
-type ResourceType = "account" | "project" | "folder" | "organization" | "cloud";
+// KAC item #5: добавлен "cluster" — для unified cluster-admin grant
+// (resource_id = "cluster_kacho_root").
+type ResourceType =
+  | "account"
+  | "project"
+  | "folder"
+  | "organization"
+  | "cloud"
+  | "cluster";
 
 const SUBJECT_TYPES: SubjectType[] = ["user", "service_account", "group"];
 const RESOURCE_TYPES: ResourceType[] = [
@@ -51,12 +72,68 @@ const RESOURCE_TYPES: ResourceType[] = [
   "folder",
   "organization",
   "cloud",
+  "cluster",
 ];
+
+/** Cluster singleton id для resource_type="cluster" (KAC item #5). */
+export const CLUSTER_RESOURCE_ID = "cluster_kacho_root";
+
+/** Cluster admin role id (для preset'ов / quick-grant link'ов). */
+export const CLUSTER_ADMIN_ROLE_ID = "roles/admin";
 
 export function AccessBindingsPage() {
   const { user } = useAuth();
+  const perms = usePermissions();
+  // KAC item #5: ClusterAdminsPage "Выдать через AccessBinding" CTA редиректит
+  // сюда с query-параметрами `?modal=cluster-admin&resource_type=cluster&...`.
+  // Авто-открываем модалку с preset'ом.
+  const [searchParams] = useSearchParams();
+  const presetFromUrl: AccessBindingPreset | undefined = useMemo(() => {
+    if (searchParams.get("modal") !== "cluster-admin") return undefined;
+    return {
+      resource_type:
+        (searchParams.get("resource_type") as ResourceType | null) ?? "cluster",
+      resource_id: searchParams.get("resource_id") ?? CLUSTER_RESOURCE_ID,
+      role_id: searchParams.get("role_id") ?? CLUSTER_ADMIN_ROLE_ID,
+      subject_type:
+        (searchParams.get("subject_type") as SubjectType | null) ?? "user",
+      subject_id: searchParams.get("subject_id") ?? undefined,
+    };
+  }, [searchParams]);
+  // KAC item #1: для админа дефолтная вкладка — "byAccount" (admin видит ВСЕ
+  // bindings в account'е). Non-admin → "byResource" (старое поведение).
+  // Дефолтное значение оставляем "byResource" на первом render'е (perms ещё не
+  // загружены), а как только perms подгрузились — авто-переключаем на byAccount
+  // (admin). User может потом сменить вручную — это поведение покрыто
+  // `userTouchedModeRef`.
   const [mode, setMode] = useState<ViewMode>("byResource");
-  const [createOpen, setCreateOpen] = useState(false);
+  const userTouchedModeRef = useRef(false);
+  const [createOpen, setCreateOpen] = useState(!!presetFromUrl);
+  // KAC item #1: account-id для byAccount-режима. По умолчанию первый
+  // account из членства user'а.
+  const [accountIdForList, setAccountIdForList] = useState<string>("");
+  const [subjectTypeFilter, setSubjectTypeFilter] = useState<string>("");
+  const [includeRevoked, setIncludeRevoked] = useState(false);
+
+  // Авто-переключение на byAccount при первой загрузке perms для admin'а.
+  useEffect(() => {
+    if (!perms.loaded || userTouchedModeRef.current) return;
+    if (perms.isSystemAdmin) setMode("byAccount");
+    if (!accountIdForList && perms.accounts[0]?.account_id) {
+      setAccountIdForList(perms.accounts[0].account_id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perms.loaded, perms.isSystemAdmin, perms.accounts.length]);
+
+  const handleSetMode = (v: ViewMode) => {
+    userTouchedModeRef.current = true;
+    setMode(v);
+  };
+
+  // Если URL-preset изменился (новая навигация) — открываем модалку повторно.
+  useEffect(() => {
+    if (presetFromUrl) setCreateOpen(true);
+  }, [presetFromUrl]);
 
   // KAC-123: Мои AccessBinding'и — авто-вызов /iam/v1/accessBindings:listBySubject
   // для текущего user'а, показываем сверху страницы.
@@ -94,8 +171,34 @@ export function AccessBindingsPage() {
     staleTime: 0,
   });
 
-  const data = mode === "byResource" ? byResource : bySubject;
-  const bindings = data?.data?.access_bindings ?? [];
+  // KAC item #1: ListByAccount — admin видит ВСЕ bindings в account'е.
+  const byAccount = useQuery({
+    queryKey: [
+      "iam",
+      "access-bindings",
+      "by-account",
+      accountIdForList,
+      subjectTypeFilter,
+      includeRevoked,
+    ],
+    queryFn: () =>
+      iamApi.listAccessBindingsByAccount(accountIdForList, {
+        page_size: 200,
+        subject_type_filter: subjectTypeFilter || undefined,
+        include_revoked: includeRevoked,
+      }),
+    enabled: mode === "byAccount" && !!accountIdForList,
+    refetchInterval: 5_000,
+    staleTime: 0,
+  });
+
+  const data =
+    mode === "byResource"
+      ? byResource
+      : mode === "bySubject"
+      ? bySubject
+      : byAccount;
+  const bindings = (data?.data as AccessBindingList | undefined)?.access_bindings ?? [];
 
   const del = useIamMutation({
     method: "DELETE",
@@ -114,7 +217,9 @@ export function AccessBindingsPage() {
   const users = useQuery({
     queryKey: ["iam", "users", "list"],
     queryFn: () => iamApi.listUsers({ pageSize: "1000" }),
-    enabled: subjType === "user" || createOpen,
+    // KAC item #1: для byAccount-режима тоже нужен users lookup (Subject column
+    // должен показать email вместо просто id).
+    enabled: subjType === "user" || createOpen || mode === "byAccount",
     staleTime: 30_000,
   });
 
@@ -129,17 +234,31 @@ export function AccessBindingsPage() {
     for (const r of rolesList.data?.roles ?? []) m.set(r.id, r.name);
     return m;
   }, [rolesList.data]);
+  const userByIdLookup = useMemo(() => {
+    const m = new Map<string, User>();
+    for (const u of users.data?.users ?? []) m.set(u.id, u);
+    return m;
+  }, [users.data]);
 
   const columns: ColumnsType<AccessBinding> = [
     {
       title: "Subject",
       key: "subject",
-      render: (_v, row) => (
-        <Space size={6}>
-          <Tag color={subjectColor(row.subject_type)}>{row.subject_type}</Tag>
-          <CopyableMonoId id={row.subject_id} />
-        </Space>
-      ),
+      render: (_v, row) => {
+        const u = row.subject_type === "user" ? userByIdLookup.get(row.subject_id) : undefined;
+        const human = u?.email || u?.display_name;
+        return (
+          <Space size={6} wrap>
+            <Tag color={subjectColor(row.subject_type)}>{row.subject_type}</Tag>
+            {human && (
+              <Typography.Text strong style={{ fontSize: 12 }}>
+                {human}
+              </Typography.Text>
+            )}
+            <CopyableMonoId id={row.subject_id} />
+          </Space>
+        );
+      },
     },
     {
       title: "Role",
@@ -231,23 +350,29 @@ export function AccessBindingsPage() {
       <Space size={12} wrap>
         <Segmented
           value={mode}
-          onChange={(v) => setMode(v as ViewMode)}
+          onChange={(v) => handleSetMode(v as ViewMode)}
           options={[
+            // KAC item #1: "По account'у" (admin tab) — первый, если user — admin.
+            ...(perms.isSystemAdmin || perms.accounts.length > 0
+              ? [{ label: "По account'у (admin)", value: "byAccount" }]
+              : []),
             { label: "По ресурсу", value: "byResource" },
             { label: "По subject'у", value: "bySubject" },
           ]}
+          data-testid="access-bindings-mode"
         />
         <Button
           type="primary"
           size="small"
           icon={<PlusOutlined />}
           onClick={() => setCreateOpen(true)}
+          data-testid="access-bindings-create-btn"
         >
           Создать binding
         </Button>
       </Space>
 
-      {mode === "byResource" ? (
+      {mode === "byResource" && (
         <Space size={8} wrap>
           <Select
             value={resType}
@@ -262,7 +387,8 @@ export function AccessBindingsPage() {
             accountList={accounts.data?.accounts ?? []}
           />
         </Space>
-      ) : (
+      )}
+      {mode === "bySubject" && (
         <Space size={8} wrap>
           <Select
             value={subjType}
@@ -293,12 +419,44 @@ export function AccessBindingsPage() {
           )}
         </Space>
       )}
+      {mode === "byAccount" && (
+        <Space size={8} wrap>
+          <Select
+            placeholder="Account"
+            value={accountIdForList || undefined}
+            onChange={(v) => setAccountIdForList(v ?? "")}
+            options={(accounts.data?.accounts ?? []).map((a) => ({
+              value: a.id,
+              label: `${a.name} · ${a.id}`,
+            }))}
+            style={{ width: 360 }}
+            showSearch
+            optionFilterProp="label"
+            data-testid="access-bindings-account-select"
+          />
+          <Select
+            placeholder="subject_type (все)"
+            value={subjectTypeFilter || undefined}
+            onChange={(v) => setSubjectTypeFilter(v ?? "")}
+            allowClear
+            options={SUBJECT_TYPES.map((t) => ({ value: t, label: t }))}
+            style={{ width: 200 }}
+          />
+          <Select
+            value={includeRevoked ? "true" : "false"}
+            onChange={(v) => setIncludeRevoked(v === "true")}
+            options={[
+              { value: "false", label: "Только активные" },
+              { value: "true", label: "Включая отозванные" },
+            ]}
+            style={{ width: 200 }}
+          />
+        </Space>
+      )}
 
-      {(mode === "byResource" ? !resId : !subjId) ? (
+      {emptyHint(mode, resId, subjId, accountIdForList) ? (
         <Typography.Text type="secondary">
-          {mode === "byResource"
-            ? "Введите resource_id для просмотра bindings."
-            : "Выберите subject для просмотра bindings."}
+          {emptyHint(mode, resId, subjId, accountIdForList)}
         </Typography.Text>
       ) : (
         <Table<AccessBinding>
@@ -309,12 +467,14 @@ export function AccessBindingsPage() {
           columns={columns}
           pagination={false}
           locale={{ emptyText: "AccessBinding'ов нет." }}
+          data-testid="access-bindings-table"
         />
       )}
 
       <AccessBindingCreateModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        preset={presetFromUrl}
       />
     </Space>
   );
@@ -331,6 +491,19 @@ function subjectColor(t: string): string {
     default:
       return "default";
   }
+}
+
+/** Подсказка для пустого селектора — что нужно выбрать чтобы увидеть данные. */
+function emptyHint(
+  mode: ViewMode,
+  resId: string,
+  subjId: string,
+  accountId: string,
+): string | null {
+  if (mode === "byResource" && !resId) return "Введите resource_id для просмотра bindings.";
+  if (mode === "bySubject" && !subjId) return "Выберите subject для просмотра bindings.";
+  if (mode === "byAccount" && !accountId) return "Выберите account для просмотра bindings.";
+  return null;
 }
 
 function ResourceIdInput({
@@ -371,15 +544,59 @@ function ResourceIdInput({
   );
 }
 
-function AccessBindingCreateModal({
+/**
+ * Preset для модалки — pre-fill полей (KAC item #5 "Grant Cluster Admin" CTA).
+ * Если передать `resource_type: "cluster"` + `resource_id: "cluster_kacho_root"` +
+ * `role_id: "roles/admin"` — модалка откроется с pre-fixated cluster-admin grant.
+ */
+export interface AccessBindingPreset {
+  subject_type?: SubjectType;
+  subject_id?: string;
+  role_id?: string;
+  resource_type?: ResourceType;
+  resource_id?: string;
+}
+
+export function AccessBindingCreateModal({
   open,
   onClose,
+  preset,
 }: {
   open: boolean;
   onClose: () => void;
+  preset?: AccessBindingPreset;
 }) {
   const [form] = Form.useForm();
-  const [subjectType, setSubjectType] = useState<SubjectType>("user");
+  const [subjectType, setSubjectType] = useState<SubjectType>(
+    preset?.subject_type ?? "user",
+  );
+  const [resourceType, setResourceType] = useState<ResourceType>(
+    preset?.resource_type ?? "account",
+  );
+  // KAC item #3: при 409 ALREADY_EXISTS / любой другой ошибке — inline
+  // Alert внутри модалки, форма НЕ закрывается (см. CLAUDE.md §3.5).
+  const [inlineError, setInlineError] = useState<{
+    type: "warning" | "error";
+    message: string;
+  } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const qc = useQueryClient();
+
+  // Сбрасываем форму при открытии (если был preset — применить).
+  useEffect(() => {
+    if (!open) return;
+    setInlineError(null);
+    setSubjectType(preset?.subject_type ?? "user");
+    setResourceType(preset?.resource_type ?? "account");
+    form.setFieldsValue({
+      subject_type: preset?.subject_type ?? "user",
+      subject_id: preset?.subject_id ?? undefined,
+      role_id: preset?.role_id ?? undefined,
+      resource_type: preset?.resource_type ?? "account",
+      resource_id: preset?.resource_id ?? undefined,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, preset?.subject_type, preset?.subject_id, preset?.role_id, preset?.resource_type, preset?.resource_id]);
 
   const users = useQuery({
     queryKey: ["iam", "users", "list"],
@@ -428,17 +645,6 @@ function AccessBindingCreateModal({
     staleTime: 30_000,
   });
 
-  const mut = useIamMutation({
-    method: "POST",
-    path: IAM.accessBindings,
-    invalidateKeys: [["iam", "access-bindings"]],
-    successText: "AccessBinding создан",
-    onSuccess: () => {
-      form.resetFields();
-      onClose();
-    },
-  });
-
   const subjectOptions = useMemo(() => {
     switch (subjectType) {
       case "user":
@@ -459,6 +665,53 @@ function AccessBindingCreateModal({
     }
   }, [subjectType, users.data, sas.data, groups.data]);
 
+  // Submit: вызов POST /iam/v1/accessBindings напрямую через `api.create`,
+  // чтобы поймать 409 ALREADY_EXISTS (verbatim сообщение
+  // "these permissions are already granted to <subject_id> on
+  // <resource_type>:<resource_id>") — KAC item #3.
+  const onFinish = async (v: Record<string, string>) => {
+    setSubmitting(true);
+    setInlineError(null);
+    const body = {
+      subject_type: v.subject_type,
+      subject_id: v.subject_id,
+      role_id: v.role_id,
+      resource_type: v.resource_type,
+      // KAC item #5: для cluster — auto-fill cluster_kacho_root, если user не
+      // ввёл (Input может быть disabled = preset на cluster).
+      resource_id:
+        v.resource_type === "cluster"
+          ? v.resource_id || CLUSTER_RESOURCE_ID
+          : v.resource_id,
+    };
+    try {
+      await api.create(IAM.accessBindings, body);
+      // Sync success или Operation envelope — invalidate всё и закрываем.
+      void qc.invalidateQueries({ queryKey: ["iam", "access-bindings"] });
+      void qc.invalidateQueries({ queryKey: ["cluster-admins"] });
+      form.resetFields();
+      setSubmitting(false);
+      onClose();
+    } catch (e) {
+      setSubmitting(false);
+      if (isAlreadyExistsError(e)) {
+        // KAC item #3: верность verbatim текста ("these permissions are
+        // already granted to <subject_id> on <resource_type>:<resource_id>").
+        setInlineError({
+          type: "warning",
+          message:
+            (e instanceof ApiError && e.message) ||
+            "These permissions are already granted",
+        });
+        return;
+      }
+      setInlineError({
+        type: "error",
+        message: mapApiErrorToMessage(e),
+      });
+    }
+  };
+
   return (
     <Modal
       title="Создать AccessBinding"
@@ -466,12 +719,23 @@ function AccessBindingCreateModal({
       onCancel={onClose}
       maskClosable
       width={860}
-      destroyOnClose
+      destroyOnHidden
       onOk={() => form.submit()}
       okText="Создать"
       cancelText="Отмена"
-      confirmLoading={mut.submitting}
+      confirmLoading={submitting}
     >
+      {inlineError && (
+        <Alert
+          type={inlineError.type}
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={inlineError.message}
+          closable
+          onClose={() => setInlineError(null)}
+          data-testid="access-bindings-create-error"
+        />
+      )}
       <Form
         form={form}
         layout="horizontal"
@@ -480,18 +744,16 @@ function AccessBindingCreateModal({
         labelAlign="left"
         colon={false}
         initialValues={{
-          subject_type: "user",
-          resource_type: "account",
+          subject_type: preset?.subject_type ?? "user",
+          resource_type: preset?.resource_type ?? "account",
+          resource_id:
+            preset?.resource_type === "cluster"
+              ? preset?.resource_id ?? CLUSTER_RESOURCE_ID
+              : preset?.resource_id,
+          subject_id: preset?.subject_id,
+          role_id: preset?.role_id,
         }}
-        onFinish={(v) => {
-          void mut.run({
-            subject_type: v.subject_type,
-            subject_id: v.subject_id,
-            role_id: v.role_id,
-            resource_type: v.resource_type,
-            resource_id: v.resource_id,
-          });
-        }}
+        onFinish={onFinish}
       >
         <Form.Item label="Subject type" name="subject_type" required>
           <Select
@@ -535,6 +797,16 @@ function AccessBindingCreateModal({
         <Form.Item label="Resource type" name="resource_type" required>
           <Select
             options={RESOURCE_TYPES.map((t) => ({ value: t, label: t }))}
+            onChange={(v) => {
+              const rt = v as ResourceType;
+              setResourceType(rt);
+              // KAC item #5: cluster → auto-fill singleton id.
+              if (rt === "cluster") {
+                form.setFieldValue("resource_id", CLUSTER_RESOURCE_ID);
+              } else if (form.getFieldValue("resource_id") === CLUSTER_RESOURCE_ID) {
+                form.setFieldValue("resource_id", undefined);
+              }
+            }}
           />
         </Form.Item>
         <Form.Item
@@ -545,15 +817,30 @@ function AccessBindingCreateModal({
         >
           <Input
             style={{ fontFamily: "monospace" }}
-            placeholder="acc-... / prj-... / любой идентификатор"
+            placeholder={
+              resourceType === "cluster"
+                ? CLUSTER_RESOURCE_ID
+                : "acc-... / prj-... / любой идентификатор"
+            }
+            disabled={resourceType === "cluster"}
           />
         </Form.Item>
         <Typography.Paragraph
           type="secondary"
           style={{ fontSize: 12, marginBottom: 0, marginLeft: 200 }}
         >
-          Подсказка: для resource_type=account → используйте id из вкладки
-          Accounts; для project → из вкладки Projects.
+          {resourceType === "cluster" ? (
+            <>
+              Cluster admin grant: subject получит cluster-wide роль на
+              singleton <code>{CLUSTER_RESOURCE_ID}</code>. Эквивалент legacy
+              <code> POST /iam/v1/internal/cluster/admins</code> (KAC item #5).
+            </>
+          ) : (
+            <>
+              Подсказка: для resource_type=account → используйте id из вкладки
+              Accounts; для project → из вкладки Projects.
+            </>
+          )}
         </Typography.Paragraph>
       </Form>
     </Modal>

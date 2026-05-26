@@ -198,4 +198,32 @@ export const iamApi = {
       subject_id,
       ...(q ?? {}),
     }),
+  /**
+   * KAC item #1: GET /iam/v1/accounts/{account_id}/accessBindings — все
+   * AccessBinding'и видимые админу в account'е (включает project-scoped + account-scoped).
+   * Опциональные фильтры:
+   *   - subject_type_filter — "user" | "service_account" | "group"
+   *   - include_revoked — "true" / "false" (default false)
+   *   - page_size / page_token — opaque cursor pagination.
+   */
+  listAccessBindingsByAccount: (
+    accountId: string,
+    q?: {
+      page_size?: number | string;
+      page_token?: string;
+      include_revoked?: boolean;
+      subject_type_filter?: string;
+    },
+  ) => {
+    const query: Record<string, string> = {};
+    if (q?.page_size !== undefined) query.page_size = String(q.page_size);
+    if (q?.page_token) query.page_token = q.page_token;
+    if (q?.include_revoked !== undefined)
+      query.include_revoked = q.include_revoked ? "true" : "false";
+    if (q?.subject_type_filter) query.subject_type_filter = q.subject_type_filter;
+    return api.list<AccessBindingList>(
+      `${IAM.accounts}/${encodeURIComponent(accountId)}/accessBindings`,
+      query,
+    );
+  },
 };
