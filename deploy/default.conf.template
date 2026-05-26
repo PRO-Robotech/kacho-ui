@@ -57,7 +57,9 @@ server {
     # "uninitialized variable" — set после rewrite в location не propagate'ится
     # к proxy_pass с переменной).
     location /.ory/kratos/public/ {
-        proxy_pass http://kacho-umbrella-kratos-public.kacho.svc.cluster.local:80/;
+        # lazy DNS resolve через переменную — nginx не падает если kratos DNS slow на startup
+        set $kratos_public_upstream "kacho-umbrella-kratos-public.kacho.svc.cluster.local:80";
+        proxy_pass http://$kratos_public_upstream/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -68,7 +70,8 @@ server {
     }
 
     location /.ory/hydra/public/ {
-        proxy_pass http://kacho-umbrella-hydra-public.kacho.svc.cluster.local:4444/;
+        set $hydra_public_upstream "kacho-umbrella-hydra-public.kacho.svc.cluster.local:4444";
+        proxy_pass http://$hydra_public_upstream/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -79,10 +82,11 @@ server {
     }
 
     # kratos-selfservice-ui — UI flows. Regex чтобы пропускать SPA-route /iam/...
-    # NB: используем `set` + literal proxy_pass (без переменной) — переменная нужна
-    # только для lazy DNS resolve, который не требуется когда target stable.
+    # NB: lazy resolve через переменную ровно как в kratos/hydra-блоках — иначе
+    # nginx pad'ает на startup если DNS не успел прогреться (наблюдалось 2026-05-26).
     location ~ ^/(login|registration|recovery|verification|settings|error|consent|logout)(/|$) {
-        proxy_pass http://kratos-selfservice-ui.kacho.svc.cluster.local:3000;
+        set $kratos_ui_upstream "kratos-selfservice-ui.kacho.svc.cluster.local:3000";
+        proxy_pass http://$kratos_ui_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -129,7 +133,8 @@ server {
     }
 
     location @kratos_ui_assets_fallback {
-        proxy_pass http://kratos-selfservice-ui.kacho.svc.cluster.local:3000;
+        set $kratos_ui_assets_upstream "kratos-selfservice-ui.kacho.svc.cluster.local:3000";
+        proxy_pass http://$kratos_ui_assets_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
