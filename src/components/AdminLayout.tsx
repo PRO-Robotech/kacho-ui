@@ -4,25 +4,56 @@
 //
 // Применяется только для list-страниц через App.tsx. Detail/Create/Edit
 // используют ResourceDetailPage/CreatePage/EditPage как обычно.
+//
+// KAC item #2b: /iam/v1/internal/cluster/* теперь требует system_admin
+// (раньше был exempt — некоторые ручки cluster_viewer). UI скрывает таб
+// "Cluster admins" от не-админов; AddressPool admin тоже admin-only через FGA.
 
+import { useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Space, Tabs, Typography } from "antd";
 import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
+import { usePermissions } from "@/lib/permissions";
 
-const TABS = [
+interface AdminTab {
+  key: string;
+  label: string;
+  /** Predicate над PermissionSnapshot — true → таб виден; default — всегда. */
+  visible?: (p: ReturnType<typeof usePermissions>) => boolean;
+}
+
+const TABS: AdminTab[] = [
   { key: "/system/regions", label: "Регионы" },
   { key: "/system/zones", label: "Зоны" },
-  { key: "/system/address-pools", label: "Пулы адресов" },
-  // KAC-196: Cluster admins (Grant/Revoke /iam/v1/internal/cluster/admins).
-  { key: "/system/cluster/admins", label: "Cluster admins" },
+  {
+    key: "/system/address-pools",
+    label: "Пулы адресов",
+    // AddressPool — admin-only (FGA admin@cluster:cluster_kacho_root).
+    // Скрываем для не-админов (KAC item #2b).
+    visible: (p) => p.isSystemAdmin,
+  },
+  {
+    key: "/system/cluster/admins",
+    label: "Cluster admins",
+    // KAC-196 + KAC item #2b: /iam/v1/internal/cluster/* теперь требует
+    // system_admin (раньше был exempt).
+    visible: (p) => p.isSystemAdmin,
+  },
 ];
 
 export function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const perms = usePermissions();
+
+  const visibleTabs = useMemo(
+    () => TABS.filter((t) => !t.visible || t.visible(perms)),
+    [perms],
+  );
 
   const active =
-    TABS.find((t) => location.pathname.startsWith(t.key))?.key ??
+    visibleTabs.find((t) => location.pathname.startsWith(t.key))?.key ??
+    visibleTabs[0]?.key ??
     TABS[0].key;
 
   return (
@@ -39,9 +70,10 @@ export function AdminLayout() {
       <Tabs
         activeKey={active}
         onChange={(k) => navigate(k)}
-        items={TABS.map((t) => ({ key: t.key, label: t.label }))}
+        items={visibleTabs.map((t) => ({ key: t.key, label: t.label }))}
         size="middle"
         style={{ marginBottom: 0 }}
+        data-testid="admin-tabs"
       />
 
       <Outlet />

@@ -15,6 +15,7 @@
 // (для системы прав см. workspace CLAUDE.md §«Инфра-чувствительные данные»).
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Button,
@@ -44,6 +45,7 @@ import { toast } from "@/lib/toast";
 
 export default function ClusterAdminsPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [grantOpen, setGrantOpen] = useState(false);
   const [revokeOpId, setRevokeOpId] = useState<string | null>(null);
@@ -254,7 +256,18 @@ export default function ClusterAdminsPage() {
           onClick={() => setGrantOpen(true)}
           data-testid="cluster-admins-grant-button"
         >
-          Добавить admin
+          Добавить admin (legacy)
+        </Button>
+        <Button
+          icon={<UserAddOutlined />}
+          onClick={() =>
+            navigate(
+              "/iam/access-bindings?modal=cluster-admin&resource_type=cluster&resource_id=cluster_kacho_root&role_id=roles/admin",
+            )
+          }
+          data-testid="cluster-admins-grant-via-binding"
+        >
+          Выдать через AccessBinding
         </Button>
         <Button
           icon={<ReloadOutlined />}
@@ -264,6 +277,27 @@ export default function ClusterAdminsPage() {
           Обновить
         </Button>
       </Space>
+
+      {/* KAC item #5: cluster-admin grants теперь видимы и через AccessBindings
+          page (resource_type=cluster). Legacy форма "Добавить admin" продолжает
+          работать (POST /iam/v1/internal/cluster/admins), но новый unified
+          flow — это POST /iam/v1/accessBindings с resource_type=cluster. */}
+      <Alert
+        type="info"
+        showIcon
+        message="Unified flow: cluster admin = AccessBinding"
+        description={
+          <>
+            Cluster admin grants теперь видны и через страницу{" "}
+            <a onClick={() => navigate("/iam/access-bindings")}>Access Bindings</a> (фильтр
+            <code> resource_type=cluster, resource_id=cluster_kacho_root</code>).
+            Создавать новый grant можно как через "Добавить admin (legacy)"
+            (POST <code>/iam/v1/internal/cluster/admins</code>), так и через
+            "Выдать через AccessBinding" — оба flow идемпотентны.
+          </>
+        }
+        data-testid="cluster-admins-unified-flow-note"
+      />
 
       {adminsQ.error && !isForbidden && (
         <Alert
