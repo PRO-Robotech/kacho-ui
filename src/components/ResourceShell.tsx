@@ -21,6 +21,9 @@ import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
+import { CopyableId } from "@/components/CopyableId";
+import { LabelsCell } from "@/components/LabelsCell";
+import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { useBreadcrumb } from "@/components/PageHeaderSlot";
 import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
@@ -51,6 +54,47 @@ function specByRoute(route: string): ResourceSpec | undefined {
   return Object.values(REGISTRY).find((s) => s.route === route);
 }
 
+/** Дата создания в формате "30.05.2026, в 00:38". */
+function fmtCreatedAt(iso?: string): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const date = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return `${date}, в ${time}`;
+}
+
+interface EmptyCopy {
+  title: string;
+  body: string;
+  docs?: string[];
+}
+// Welcome-копирайт для пустых дочерних таблиц (Kachō-style; без «yandex»).
+const EMPTY_STATE: Record<string, EmptyCopy> = {
+  "route-tables": {
+    title: "Создайте вашу первую таблицу маршрутизации",
+    body:
+      "С помощью таблиц маршрутизации вы можете построить маршруты между сетью в облаке Kachō и другими " +
+      "виртуальными или локальными сетями. Или же настроить отказоустойчивую схему передачи данных с " +
+      "маршрутами в нескольких зонах доступности.",
+    docs: ["Статическая маршрутизация", "Маршрутизация с помощью NAT-инстанса"],
+  },
+  subnets: {
+    title: "Создайте вашу первую подсеть",
+    body:
+      "Подсеть — диапазон IP-адресов внутри сети, привязанный к зоне доступности. Ресурсы (ВМ, " +
+      "балансировщики, NIC) размещаются в подсетях и получают адреса из их CIDR.",
+    docs: ["Облачные сети и подсети"],
+  },
+  "security-groups": {
+    title: "Создайте вашу первую группу безопасности",
+    body:
+      "Группа безопасности — набор правил, определяющих разрешённый входящий и исходящий трафик для " +
+      "ресурсов сети.",
+    docs: ["Группы безопасности"],
+  },
+};
+
 /** RelatedTable — встроенная таблица дочернего ресурса (тот же ResourceTable,
  *  что на списке), client-side отфильтрованная по родителю. */
 function RelatedTable({
@@ -70,7 +114,62 @@ function RelatedTable({
   const { data, isLoading, isError, error } = useResourceList(childSpec, "project_id", projectId);
   const all = (data?.[childSpec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
   const rows = all.filter((r) => getByPath<string>(r, filterField) === parentId);
-  const columns = buildSpecColumns(childSpec, { projectId });
+
+  const createPath = `${detailBase}/${childSpec.route}/create`;
+  const childBase = `${detailBase}/${childSpec.route}`; // nested base: detail/edit/actions
+  const createLabel = `Создать ${childSpec.singular.toLowerCase()}`;
+
+  // Колонки: spec.columns без столбца-ссылки на родителя (filterField) + "⋮" actions.
+  const specNoParent: ResourceSpec = {
+    ...childSpec,
+    columns: childSpec.columns.filter((c) => c.path !== filterField),
+  };
+  const columns = buildSpecColumns(specNoParent, { projectId });
+  columns.push({
+    header: "",
+    className: "text-right whitespace-nowrap",
+    cell: (row) => (
+      <RowActionsMenu spec={childSpec} row={row} basePath={childBase} projectId={projectId || null} />
+    ),
+  });
+
+  if (isError) return <ErrorResult error={error} />;
+
+  // Пустое состояние — приветственный welcome с описанием, доками и кнопкой.
+  if (!isLoading && rows.length === 0) {
+    const copy = EMPTY_STATE[childSpec.id];
+    return (
+      <div style={{ maxWidth: 580, margin: "56px auto", textAlign: "center" }}>
+        <Typography.Title level={4} style={{ marginBottom: 12 }}>
+          {copy?.title ?? `Создайте первый ресурс «${childSpec.singular.toLowerCase()}»`}
+        </Typography.Title>
+        {copy?.body && (
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+            {copy.body}
+          </Typography.Paragraph>
+        )}
+        {copy?.docs && copy.docs.length > 0 && (
+          <div style={{ marginBottom: 20, textAlign: "left", display: "inline-block" }}>
+            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+              О создании и управлении читайте в документации:
+            </Typography.Text>
+            <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+              {copy.docs.map((d) => (
+                <li key={d}>
+                  <Typography.Link href="#">{d}</Typography.Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
+            {createLabel}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ marginBottom: 28 }}>
@@ -78,33 +177,21 @@ function RelatedTable({
         <Typography.Text strong>
           {childSpec.plural} <Tag color="blue">{rows.length}</Tag>
         </Typography.Text>
-        <Button
-          size="small"
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => navigate(`${detailBase}/${childSpec.route}/create`)}
-        >
-          Создать
+        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
+          {createLabel}
         </Button>
       </Space>
-      {isError ? (
-        <ErrorResult error={error} />
-      ) : rows.length === 0 ? (
-        <Typography.Text type="secondary">Нет ресурсов «{childSpec.plural.toLowerCase()}».</Typography.Text>
-      ) : (
-        <ResourceTable
-          rows={rows}
-          columns={columns}
-          loading={isLoading}
-          rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
-          onRowClick={(r) => {
-            const id = getByPath<string>(r, "id");
-            // network-вложенный detail (/networks/:nid/<child>/:id) — там
-            // useNestedBreadcrumb даёт «назад» в Network, откуда пришли.
-            if (id) navigate(`${detailBase}/${childSpec.route}/${id}`);
-          }}
-        />
-      )}
+      <ResourceTable
+        rows={rows}
+        columns={columns}
+        loading={isLoading}
+        rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+        onRowClick={(r) => {
+          const id = getByPath<string>(r, "id");
+          // network-вложенный detail — «назад» возвращает в Network, откуда пришли.
+          if (id) navigate(`${childBase}/${id}`);
+        }}
+      />
     </div>
   );
 }
@@ -173,17 +260,13 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   const status = getByPath<string>(data, "status");
   const related = RELATED[spec.id] ?? [];
 
-  // ── Обзор (key-value) ──
+  // ── Обзор: обязательные поля ID / Имя / Описание / Дата создания / Метки ──
   const overviewItems: { label: string; value: ReactNode }[] = [
+    { label: "Идентификатор", value: <CopyableId id={getByPath<string>(data, "id") ?? ""} /> },
     { label: "Имя", value: name },
-    { label: "ID", value: <Typography.Text code copyable>{getByPath<string>(data, "id")}</Typography.Text> },
-    ...(status ? [{ label: "Статус", value: <Tag>{status}</Tag> }] : []),
-    ...(getByPath<string>(data, "description")
-      ? [{ label: "Описание", value: getByPath<string>(data, "description")! }]
-      : []),
-    ...(getByPath<string>(data, "created_at")
-      ? [{ label: "Создано", value: new Date(getByPath<string>(data, "created_at")!).toLocaleString() }]
-      : []),
+    { label: "Описание", value: getByPath<string>(data, "description") || "—" },
+    { label: "Дата создания", value: fmtCreatedAt(getByPath<string>(data, "created_at")) },
+    { label: "Метки", value: <LabelsCell labels={getByPath<Record<string, string>>(data, "labels")} /> },
   ];
 
   const tabs: DetailTab[] = [
@@ -191,12 +274,19 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       id: "overview",
       label: "Обзор",
       render: () => (
-        <Descriptions
-          column={1}
-          size="small"
-          bordered
-          items={overviewItems.map((it, i) => ({ key: String(i), label: it.label, children: it.value }))}
-        />
+        <div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+            <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
+              Редактировать
+            </Button>
+          </div>
+          <Descriptions
+            column={1}
+            size="small"
+            bordered
+            items={overviewItems.map((it, i) => ({ key: String(i), label: it.label, children: it.value }))}
+          />
+        </div>
       ),
     },
   ];
@@ -292,13 +382,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       mainOverride={mainOverride}
       activeTabId={activeTabId}
       onTabSelect={onTabSelect}
-      secondaryActions={
-        mode ? undefined : (
-          <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
-            Редактировать
-          </Button>
-        )
-      }
     />
   );
 }
