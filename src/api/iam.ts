@@ -132,7 +132,15 @@ export interface RoleList {
 
 // ====== AccessBinding ======
 export type SubjectType = "user" | "service_account" | "group";
-export type ResourceType = "account" | "project" | "folder" | string;
+// RBAC v2 (KAC-214): resource_type ограничен высокоуровневыми скоупами,
+// которые принимает AccessBindingsPage. Legacy resource-manager типы
+// (folder/organization/cloud) удалены — backend validResourceTypes их не
+// содержит (KAC-124 / KAC-223 mig0008).
+export type ResourceType = "account" | "project" | "cluster";
+
+// RBAC v2 (KAC-214): anchor-tier binding'а. Output-only — backend derive
+// из resource_type; в CreateAccessBindingRequest поля scope НЕТ.
+export type Scope = "CLUSTER" | "ACCOUNT" | "PROJECT" | "SCOPE_UNSPECIFIED";
 
 export interface AccessBinding {
   id: string;
@@ -142,6 +150,8 @@ export interface AccessBinding {
   resource_type: string;
   resource_id: string;
   created_at?: string;
+  // RBAC v2 (KAC-214): output-only scope tier (CLUSTER/ACCOUNT/PROJECT).
+  scope?: Scope;
 }
 export interface AccessBindingList {
   access_bindings: AccessBinding[];
