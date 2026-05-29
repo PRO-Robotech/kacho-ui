@@ -40,6 +40,10 @@ interface Props {
   secondaryActions?: ReactNode;
   docLinks?: DocLink[];
   defaultTab?: string;
+  /** KAC-232: если задан — main pane (zone 3) рендерит это вместо контента
+   *  активного таба. Используется для form-panel (edit / create связного
+   *  ресурса разворачивается в правой зоне, табы остаются для контекста). */
+  mainOverride?: ReactNode;
 }
 
 const SUB_PANE_WIDTH = 240;
@@ -52,6 +56,7 @@ export function DetailShell({
   secondaryActions,
   docLinks,
   defaultTab,
+  mainOverride,
 }: Props) {
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
@@ -193,21 +198,27 @@ export function DetailShell({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0 }}>
-        {secondaryActions && (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              marginBottom: 16,
-              paddingBottom: 12,
-              borderBottom: "1px solid var(--ant-color-border-secondary)",
-            }}
-          >
-            {secondaryActions}
-          </div>
+        {mainOverride ? (
+          mainOverride
+        ) : (
+          <>
+            {secondaryActions && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  marginBottom: 16,
+                  paddingBottom: 12,
+                  borderBottom: "1px solid var(--ant-color-border-secondary)",
+                }}
+              >
+                {secondaryActions}
+              </div>
+            )}
+            {active?.render()}
+          </>
         )}
-        {active?.render()}
       </main>
     </div>
   );

@@ -13,11 +13,10 @@ import { ResourceEditPage } from "@/components/ResourceEditPage";
 import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
-import { NetworkDetailPage } from "@/pages/NetworkDetailPage";
+import { ResourceShell } from "@/components/ResourceShell";
 import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
 import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
 import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
-import { SubnetCreateRedirect } from "@/pages/SubnetCreateRedirect";
 import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
 import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
@@ -251,7 +250,7 @@ export function AppRoutes() {
                   path={`/projects/:projectId/vpc/${spec.route}/:uid`}
                   element={
                     spec.id === "networks"
-                      ? <NetworkDetailPage />
+                      ? <ResourceShell spec={spec} />
                       : spec.id === "subnets"
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
@@ -268,7 +267,7 @@ export function AppRoutes() {
                   path={`/projects/:projectId/vpc/${spec.route}/:uid/edit`}
                   element={
                     spec.id === "networks"
-                      ? <NetworkDetailPage />
+                      ? <ResourceShell spec={spec} mode="edit" />
                       : spec.id === "subnets"
                         ? <SubnetDetailPage />
                         : spec.id === "security-groups"
@@ -374,29 +373,12 @@ export function AppRoutes() {
             {/* === Network-nested CREATE для дочерних ресурсов === */}
             {/* Сохраняет network-context: при создании RT/SG из network detail
                 URL остаётся под /networks/<n>/. */}
+            {/* KAC-232/233: создание дочерних ресурсов сети — форма в зоне 3
+                ResourceShell (form-panel), а не отдельная страница/модалка.
+                :childRoute = subnets | route-tables | security-groups. */}
             <Route
-              path="/projects/:projectId/vpc/networks/:networkId/route-tables/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY["route-tables"]}
-                  parentField="project_id"
-                  parentParam="projectId"
-                />
-              }
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/security-groups/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY["security-groups"]}
-                  parentField="project_id"
-                  parentParam="projectId"
-                />
-              }
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/create"
-              element={<SubnetCreateRedirect />}
+              path="/projects/:projectId/vpc/networks/:uid/:childRoute/create"
+              element={<ResourceShell spec={REGISTRY.networks} mode="child-create" />}
             />
             <Route
               path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
