@@ -55,25 +55,15 @@ import {
 
 type ViewMode = "byResource" | "bySubject" | "byAccount";
 type SubjectType = "user" | "service_account" | "group";
-// KAC item #5: добавлен "cluster" — для unified cluster-admin grant
-// (resource_id = "cluster_kacho_root").
-type ResourceType =
-  | "account"
-  | "project"
-  | "folder"
-  | "organization"
-  | "cloud"
-  | "cluster";
+// KAC-224 (RBAC v2): только высокоуровневые скоупы, принимаемые backend
+// validResourceTypes. Legacy resource-manager типы folder/organization/cloud
+// удалены (KAC-124 / KAC-223 mig0008) — их выбор давал backend
+// INVALID_ARGUMENT "Illegal argument resource_type". "cluster" — для unified
+// cluster-admin grant (item #5, resource_id = "cluster_kacho_root").
+type ResourceType = "account" | "project" | "cluster";
 
 const SUBJECT_TYPES: SubjectType[] = ["user", "service_account", "group"];
-const RESOURCE_TYPES: ResourceType[] = [
-  "account",
-  "project",
-  "folder",
-  "organization",
-  "cloud",
-  "cluster",
-];
+export const RESOURCE_TYPES: ResourceType[] = ["account", "project", "cluster"];
 
 /** Cluster singleton id для resource_type="cluster" (KAC item #5). */
 export const CLUSTER_RESOURCE_ID = "cluster_kacho_root";
@@ -285,6 +275,19 @@ export function AccessBindingsPage() {
       ),
     },
     {
+      // RBAC v2 (KAC-224): output-only scope tier из ответа AccessBinding.
+      title: "Scope",
+      dataIndex: "scope",
+      key: "scope",
+      width: 120,
+      render: (v?: string) =>
+        v && v !== "SCOPE_UNSPECIFIED" ? (
+          <Tag color={scopeColor(v)}>{v}</Tag>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
+    },
+    {
       title: "Создано",
       dataIndex: "created_at",
       key: "created_at",
@@ -488,6 +491,20 @@ function subjectColor(t: string): string {
       return "gold";
     case "group":
       return "purple";
+    default:
+      return "default";
+  }
+}
+
+/** RBAC v2 (KAC-224): цвет тега scope-tier'а. */
+function scopeColor(s: string): string {
+  switch (s) {
+    case "CLUSTER":
+      return "red";
+    case "ACCOUNT":
+      return "blue";
+    case "PROJECT":
+      return "green";
     default:
       return "default";
   }
