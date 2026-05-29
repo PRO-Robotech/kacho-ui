@@ -2074,7 +2074,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     id: "load-balancers",
     route: "load-balancers",
     apiPath: "/nlb/v1/networkLoadBalancers",
-    payloadKey: "load_balancers",
+    // KAC-226: proto ListNetworkLoadBalancersResponse repeated-поле —
+    // `network_load_balancers` (на проводе networkLoadBalancers → camelToSnake).
+    // Было "load_balancers" → ResourceListPage читал data[undefined] → список пуст.
+    payloadKey: "network_load_balancers",
     singular: "Балансировщик нагрузки",
     plural: "Балансировщики нагрузки",
     serviceTitle: "Network Load Balancer",
