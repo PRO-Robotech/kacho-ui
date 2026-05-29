@@ -380,6 +380,12 @@ export function AppRoutes() {
               path="/projects/:projectId/vpc/networks/:uid/:childRoute/create"
               element={<ResourceShell spec={REGISTRY.networks} mode="child-create" />}
             />
+            {/* KAC-233: path-based табы (уникальный URI на таб): json / subnets /
+                route-tables / security-groups. Overview = /networks/:uid. */}
+            <Route
+              path="/projects/:projectId/vpc/networks/:uid/:tab"
+              element={<ResourceShell spec={REGISTRY.networks} />}
+            />
             <Route
               path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
               element={

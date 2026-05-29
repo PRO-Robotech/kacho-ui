@@ -44,6 +44,12 @@ interface Props {
    *  активного таба. Используется для form-panel (edit / create связного
    *  ресурса разворачивается в правой зоне, табы остаются для контекста). */
   mainOverride?: ReactNode;
+  /** KAC-233: controlled-режим табов (path-based вместо ?tab=). Когда задан
+   *  `onTabSelect` — активный таб = `activeTabId`, клик по табу зовёт
+   *  `onTabSelect(id)` (caller навигирует по path → уникальный URI на таб,
+   *  и переключение таба выходит из form-panel). Иначе — legacy ?tab=. */
+  activeTabId?: string;
+  onTabSelect?: (id: string) => void;
 }
 
 const SUB_PANE_WIDTH = 240;
@@ -57,13 +63,20 @@ export function DetailShell({
   docLinks,
   defaultTab,
   mainOverride,
+  activeTabId,
+  onTabSelect,
 }: Props) {
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
-  const activeId = params.get("tab") ?? fallback;
+  const controlled = onTabSelect !== undefined;
+  const activeId = controlled ? (activeTabId ?? fallback) : (params.get("tab") ?? fallback);
   const active = tabs.find((t) => t.id === activeId) ?? tabs[0];
 
   const setTab = (id: string) => {
+    if (controlled) {
+      onTabSelect!(id);
+      return;
+    }
     const next = new URLSearchParams(params);
     if (id === fallback) next.delete("tab");
     else next.set("tab", id);

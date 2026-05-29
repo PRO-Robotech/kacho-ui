@@ -14,7 +14,7 @@
 // spec.related в resource-registry.
 
 import { type ReactNode, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Space, Spin, Tag, Typography } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
@@ -112,6 +112,7 @@ function RelatedTable({
 export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: ResourceShellMode }) {
   const { projectId, uid, childRoute } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const invalidate = useInvalidateResourceList();
 
   const detailBase = `/projects/${projectId}/vpc/${spec.route}/${uid}`;
@@ -146,7 +147,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
               <Typography.Text strong>Редактирование</Typography.Text>
             ) : (
               <>
-                <Link to={`${detailBase}?tab=${childRoute}`}>{sec(childSpec?.plural ?? childRoute ?? "")}</Link>
+                <Link to={`${detailBase}/${childRoute}`}>{sec(childSpec?.plural ?? childRoute ?? "")}</Link>
                 {sep}
                 <Typography.Text strong>Создание</Typography.Text>
               </>
@@ -245,8 +246,8 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   } else if (mode === "child-create" && childRoute) {
     const childSpec = specByRoute(childRoute);
     if (childSpec) {
-      // после create вернуться в таб этого связанного ресурса.
-      const back = `${detailBase}?tab=${childRoute}`;
+      // после create вернуться в таб этого связанного ресурса (path-based URI).
+      const back = `${detailBase}/${childRoute}`;
       mainOverride =
         childSpec.id === "subnets" ? (
           <InlineSubnetCreateForm networkId={uid} projectId={projectId ?? ""} onCancel={() => navigate(back)} onSuccess={() => navigate(back)} />
@@ -263,6 +264,24 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     }
   }
 
+  // Активный таб — из pathname (path-based, уникальный URI на таб). В form-mode
+  // подсвечиваем соответствующий таб (edit → Обзор, child-create → таб ребёнка).
+  const sub = location.pathname.startsWith(detailBase)
+    ? location.pathname.slice(detailBase.length).replace(/^\/+/, "")
+    : "";
+  let activeTabId = "overview";
+  if (mode === "child-create" && childRoute) activeTabId = childRoute;
+  else if (mode === "edit") activeTabId = "overview";
+  else if (sub === "json") activeTabId = "json";
+  else if (sub && related.some((r) => r.route === sub)) activeTabId = sub;
+
+  // Клик по табу навигирует по path → выходит из form-panel + даёт уникальный URI.
+  const onTabSelect = (id: string) => {
+    if (id === "overview") navigate(detailBase);
+    else if (id === "json") navigate(`${detailBase}/json`);
+    else navigate(`${detailBase}/${id}`);
+  };
+
   return (
     <DetailShell
       resourceLabel={spec.singular}
@@ -271,6 +290,8 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       tabs={tabs}
       docLinks={[]}
       mainOverride={mainOverride}
+      activeTabId={activeTabId}
+      onTabSelect={onTabSelect}
       secondaryActions={
         mode ? undefined : (
           <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
