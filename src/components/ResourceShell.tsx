@@ -17,7 +17,8 @@ import { type ReactNode, useMemo } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Space, Spin, Tag, Typography } from "antd";
-import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { EditOutlined, PlusOutlined, ReadOutlined, RightOutlined } from "@ant-design/icons";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
@@ -135,38 +136,99 @@ function RelatedTable({
 
   if (isError) return <ErrorResult error={error} />;
 
-  // Пустое состояние — приветственный welcome с описанием, доками и кнопкой.
+  // Пустое состояние — продакшн-реди welcome: иллюстрация + описание + доки + CTA.
   if (!isLoading && rows.length === 0) {
     const copy = EMPTY_STATE[childSpec.id];
     return (
-      <div style={{ maxWidth: 580, margin: "56px auto", textAlign: "center" }}>
-        <Typography.Title level={4} style={{ marginBottom: 12 }}>
+      <div
+        style={{
+          maxWidth: 600,
+          margin: "0 auto",
+          minHeight: "calc(100vh - 220px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          padding: "32px 16px",
+        }}
+      >
+        {/* Иллюстрация — иконка ресурса в мягком градиентном контейнере. */}
+        <div
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 24,
+            marginBottom: 24,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 44,
+            color: "#3D8DF5",
+            background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.04))",
+            border: "1px solid var(--ant-color-border-secondary, #2f3138)",
+            boxShadow: "0 1px 0 rgba(255,255,255,0.03) inset",
+          }}
+        >
+          <ResourceIcon specId={childSpec.id} />
+        </div>
+
+        <Typography.Title level={4} style={{ margin: "0 0 10px", fontWeight: 600 }}>
           {copy?.title ?? `Создайте первый ресурс «${childSpec.singular.toLowerCase()}»`}
         </Typography.Title>
+
         {copy?.body && (
-          <Typography.Paragraph type="secondary" style={{ marginBottom: 16 }}>
+          <Typography.Paragraph
+            type="secondary"
+            style={{ fontSize: 14, lineHeight: 1.65, margin: "0 0 24px", maxWidth: 500 }}
+          >
             {copy.body}
           </Typography.Paragraph>
         )}
+
+        <Button
+          type="primary"
+          size="large"
+          icon={<PlusOutlined />}
+          onClick={() => navigate(createPath)}
+          style={{ marginBottom: copy?.docs?.length ? 28 : 0 }}
+        >
+          {createLabel}
+        </Button>
+
         {copy?.docs && copy.docs.length > 0 && (
-          <div style={{ marginBottom: 20, textAlign: "left", display: "inline-block" }}>
-            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-              О создании и управлении читайте в документации:
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 460,
+              textAlign: "left",
+              padding: "14px 18px",
+              background: "var(--ant-color-fill-quaternary, rgba(255,255,255,0.03))",
+              border: "1px solid var(--ant-color-border-secondary, #2f3138)",
+              borderRadius: 12,
+            }}
+          >
+            <Typography.Text
+              type="secondary"
+              style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}
+            >
+              <ReadOutlined style={{ marginRight: 6 }} />
+              Документация
             </Typography.Text>
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               {copy.docs.map((d) => (
-                <li key={d}>
-                  <Typography.Link href="#">{d}</Typography.Link>
-                </li>
+                <Typography.Link
+                  key={d}
+                  href="#"
+                  style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <RightOutlined style={{ fontSize: 10, opacity: 0.6 }} />
+                  {d}
+                </Typography.Link>
               ))}
-            </ul>
+            </div>
           </div>
         )}
-        <div>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
-            {createLabel}
-          </Button>
-        </div>
       </div>
     );
   }
