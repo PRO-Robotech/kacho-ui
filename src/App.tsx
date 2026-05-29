@@ -23,6 +23,7 @@ import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
 import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
 import { AddressDetailPage } from "@/pages/AddressDetailPage";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
+import { TargetGroupDetailPage } from "@/pages/TargetGroupDetailPage";
 import { OperationsPage } from "@/pages/OperationsPage";
 import { SystemSearchPage } from "@/pages/SystemSearchPage";
 import { DashboardPage } from "@/pages/DashboardPage";
@@ -349,11 +350,23 @@ export function AppRoutes() {
                 />
                 <Route
                   path={`/projects/:projectId/nlb/${spec.route}/:uid`}
-                  element={<ResourceDetailPage spec={spec} />}
+                  element={
+                    spec.id === "target-groups" ? (
+                      <TargetGroupDetailPage />
+                    ) : (
+                      <ResourceDetailPage spec={spec} />
+                    )
+                  }
                 />
                 <Route
                   path={`/projects/:projectId/nlb/${spec.route}/:uid/edit`}
-                  element={<ResourceDetailPage spec={spec} />}
+                  element={
+                    spec.id === "target-groups" ? (
+                      <TargetGroupDetailPage />
+                    ) : (
+                      <ResourceDetailPage spec={spec} />
+                    )
+                  }
                 />
               </Route>
             ))}
