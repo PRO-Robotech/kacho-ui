@@ -13,18 +13,27 @@
 // Прототип-фаза: эталон VPC Network. RELATED-карта временно тут; в финале —
 // spec.related в resource-registry.
 
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Descriptions, Space, Spin, Tag, Typography } from "antd";
+import { Button, Descriptions, Tag, Spin, Typography } from "antd";
 import { EditOutlined, PlusOutlined, ReadOutlined, RightOutlined } from "@ant-design/icons";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
-import { DetailShell, type DetailTab } from "@/components/DetailShell";
+import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
+import { SectionHeader } from "@/components/SectionHeader";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
 import { LabelsCell } from "@/components/LabelsCell";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { JsonMonacoView } from "@/components/JsonMonacoView";
+import { OperationsTab } from "@/components/OperationsTab";
+import {
+  TableSearch,
+  ColumnSettings,
+  useHiddenColumns,
+  type ToggleCol,
+} from "@/components/TableToolbar";
 import { useBreadcrumb } from "@/components/PageHeaderSlot";
 import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
@@ -54,6 +63,17 @@ const RELATED: Record<string, RelatedDef[]> = {
 function specByRoute(route: string): ResourceSpec | undefined {
   return Object.values(REGISTRY).find((s) => s.route === route);
 }
+
+// Документация по типу мастер-ресурса (отображается в блоке табов слева).
+// Kachō docs (без «yandex»); hrefs — заглушки до публикации портала доков.
+const DOCS: Record<string, DocLink[]> = {
+  networks: [
+    { label: "Облачные сети и подсети", href: "#" },
+    { label: "Таблицы маршрутизации", href: "#" },
+    { label: "Группы безопасности", href: "#" },
+    { label: "Адреса облачных ресурсов", href: "#" },
+  ],
+};
 
 /** Дата создания в формате "30.05.2026, в 00:38". */
 function fmtCreatedAt(iso?: string): string {
@@ -112,20 +132,34 @@ function RelatedTable({
   detailBase: string;
 }) {
   const navigate = useNavigate();
+  const [search, setSearch] = useState("");
+  const [hidden, toggleHidden] = useHiddenColumns(`cols:${childSpec.id}`);
   const { data, isLoading, isError, error } = useResourceList(childSpec, "project_id", projectId);
   const all = (data?.[childSpec.payloadKey] as Record<string, unknown>[] | undefined) ?? [];
-  const rows = all.filter((r) => getByPath<string>(r, filterField) === parentId);
+  const ownRows = all.filter((r) => getByPath<string>(r, filterField) === parentId);
+
+  // Поиск по имени или идентификатору (client-side).
+  const q = search.trim().toLowerCase();
+  const rows = q
+    ? ownRows.filter((r) => {
+        const nm = (getByPath<string>(r, "name") ?? "").toLowerCase();
+        const id = (getByPath<string>(r, "id") ?? "").toLowerCase();
+        return nm.includes(q) || id.includes(q);
+      })
+    : ownRows;
 
   const createPath = `${detailBase}/${childSpec.route}/create`;
   const childBase = `${detailBase}/${childSpec.route}`; // nested base: detail/edit/actions
   const createLabel = `Создать ${childSpec.singular.toLowerCase()}`;
 
-  // Колонки: spec.columns без столбца-ссылки на родителя (filterField) + "⋮" actions.
+  // Колонки: spec.columns без столбца-ссылки на родителя (filterField).
   const specNoParent: ResourceSpec = {
     ...childSpec,
     columns: childSpec.columns.filter((c) => c.path !== filterField),
   };
-  const columns = buildSpecColumns(specNoParent, { projectId });
+  const toggleCols: ToggleCol[] = specNoParent.columns.map((c) => ({ key: c.header, label: c.header }));
+  // Видимые data-колонки (по конфигу шестерёнки) + всегда-видимая "⋮" actions.
+  const columns = buildSpecColumns(specNoParent, { projectId }).filter((c) => !hidden.has(c.header));
   columns.push({
     header: "",
     className: "text-right whitespace-nowrap",
@@ -136,8 +170,9 @@ function RelatedTable({
 
   if (isError) return <ErrorResult error={error} />;
 
-  // Пустое состояние — продакшн-реди welcome: иллюстрация + описание + доки + CTA.
-  if (!isLoading && rows.length === 0) {
+  // Пустое состояние — продакшн-реди welcome (только когда у родителя реально
+  // нет дочерних ресурсов; промах поиска показывается внутри таблицы).
+  if (!isLoading && ownRows.length === 0) {
     const copy = EMPTY_STATE[childSpec.id];
     return (
       <div
@@ -188,7 +223,6 @@ function RelatedTable({
 
         <Button
           type="primary"
-          size="large"
           icon={<PlusOutlined />}
           onClick={() => navigate(createPath)}
           style={{ marginBottom: copy?.docs?.length ? 28 : 0 }}
@@ -234,20 +268,29 @@ function RelatedTable({
   }
 
   return (
-    <div style={{ marginBottom: 28 }}>
-      <Space style={{ justifyContent: "space-between", width: "100%", marginBottom: 8 }}>
-        <Typography.Text strong>
-          {childSpec.plural} <Tag color="blue">{rows.length}</Tag>
-        </Typography.Text>
-        <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
-          {createLabel}
-        </Button>
-      </Space>
+    <div>
+      <SectionHeader
+        title={
+          <>
+            {childSpec.plural} <Tag style={{ marginLeft: 4 }}>{ownRows.length}</Tag>
+          </>
+        }
+        right={
+          <>
+            <TableSearch value={search} onChange={setSearch} />
+            <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
+              {createLabel}
+            </Button>
+          </>
+        }
+      />
       <ResourceTable
         rows={rows}
         columns={columns}
         loading={isLoading}
         rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+        empty={q ? "По запросу ничего не найдено." : undefined}
         onRowClick={(r) => {
           const id = getByPath<string>(r, "id");
           // network-вложенный detail — «назад» возвращает в Network, откуда пришли.
@@ -337,11 +380,14 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "Обзор",
       render: () => (
         <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-            <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
-              Редактировать
-            </Button>
-          </div>
+          <SectionHeader
+            title="Обзор"
+            right={
+              <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
+                Редактировать
+              </Button>
+            }
+          />
           <Descriptions
             column={1}
             size="small"
@@ -370,13 +416,20 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       ),
     });
   });
+  // Базовый таб «Операции» — список LRO для этого ресурса (у каждого мастера).
+  tabs.push({
+    id: "operations",
+    label: "Операции",
+    render: () => <OperationsTab spec={spec} resourceId={getByPath<string>(data, "id") ?? (uid ?? "")} />,
+  });
   tabs.push({
     id: "json",
     label: "JSON",
     render: () => (
-      <pre style={{ fontSize: 12, fontFamily: "ui-monospace, monospace", whiteSpace: "pre-wrap", margin: 0 }}>
-        {JSON.stringify(data, null, 2)}
-      </pre>
+      <div>
+        <SectionHeader title="JSON" />
+        <JsonMonacoView data={data} />
+      </div>
     ),
   });
 
@@ -425,6 +478,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   if (mode === "child-create" && childRoute) activeTabId = childRoute;
   else if (mode === "edit") activeTabId = "overview";
   else if (sub === "json") activeTabId = "json";
+  else if (sub === "operations") activeTabId = "operations";
   else if (sub && related.some((r) => r.route === sub)) activeTabId = sub;
 
   // Клик по табу навигирует по path → выходит из form-panel + даёт уникальный URI.
@@ -440,7 +494,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       resourceName={name}
       badges={status ? <Tag>{status}</Tag> : undefined}
       tabs={tabs}
-      docLinks={[]}
+      docLinks={DOCS[spec.id] ?? []}
       mainOverride={mainOverride}
       activeTabId={activeTabId}
       onTabSelect={onTabSelect}

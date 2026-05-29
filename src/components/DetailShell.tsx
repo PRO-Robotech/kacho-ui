@@ -237,12 +237,12 @@ export function DetailShell({
   );
 }
 
-// Дефолтные ссылки для VPC ресурсов. Те же, что показывает YC console.
+// Дефолтные ссылки для VPC ресурсов (Kachō docs; конкретные ссылки на тип
+// мастер-ресурса передаёт ResourceShell через docLinks).
 const DEFAULT_VPC_DOCS: DocLink[] = [
-  { label: "Начать работу с сетями и подсетями", href: "https://yandex.cloud/ru/docs/vpc/quickstart" },
-  { label: "Облачные сети и подсети", href: "https://yandex.cloud/ru/docs/vpc/concepts/network" },
-  { label: "Группы безопасности", href: "https://yandex.cloud/ru/docs/vpc/concepts/security-groups" },
-  { label: "Адреса облачных ресурсов", href: "https://yandex.cloud/ru/docs/vpc/concepts/address" },
-  { label: "Получить статический публичный IP-адрес", href: "https://yandex.cloud/ru/docs/vpc/operations/enable-static-ip" },
-  { label: "История изменений Virtual Private Cloud", href: "https://yandex.cloud/ru/docs/release-notes/vpc" },
+  { label: "Начать работу с сетями и подсетями", href: "#" },
+  { label: "Облачные сети и подсети", href: "#" },
+  { label: "Группы безопасности", href: "#" },
+  { label: "Адреса облачных ресурсов", href: "#" },
+  { label: "Получить статический публичный IP-адрес", href: "#" },
 ];
