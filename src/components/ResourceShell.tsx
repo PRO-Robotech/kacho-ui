@@ -13,19 +13,20 @@
 // Прототип-фаза: эталон VPC Network. RELATED-карта временно тут; в финале —
 // spec.related в resource-registry.
 
-import { type ReactNode } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { type ReactNode, useMemo } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Space, Spin, Tag, Typography } from "antd";
 import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab } from "@/components/DetailShell";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
+import { useBreadcrumb } from "@/components/PageHeaderSlot";
 import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
 import { api } from "@/api/client";
-import { REGISTRY, getByPath, type ResourceSpec } from "@/lib/resource-registry";
+import { REGISTRY, getByPath, resourceProjectPath, type ResourceSpec } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
 import { useInvalidateResourceList } from "@/lib/use-operation";
@@ -98,7 +99,9 @@ function RelatedTable({
           rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
           onRowClick={(r) => {
             const id = getByPath<string>(r, "id");
-            if (id) navigate(`/projects/${projectId}/vpc/${childSpec.route}/${id}`);
+            // network-вложенный detail (/networks/:nid/<child>/:id) — там
+            // useNestedBreadcrumb даёт «назад» в Network, откуда пришли.
+            if (id) navigate(`${detailBase}/${childSpec.route}/${id}`);
           }}
         />
       )}
@@ -121,6 +124,44 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     staleTime: 0,
   });
 
+  // Имя — для крошек (до early-return; при загрузке data может быть undefined).
+  const name = (data ? getByPath<string>(data, "name") : "") || (uid ?? "");
+
+  // Крошки в глобальный хедер (хук вызывается безусловно, до early-return).
+  const listHref = resourceProjectPath(spec.id, projectId);
+  const breadcrumb = useMemo(() => {
+    const childSpec = mode === "child-create" && childRoute ? specByRoute(childRoute) : undefined;
+    const sec = (txt: string) => <Typography.Text type="secondary">{txt}</Typography.Text>;
+    const sep = <Typography.Text type="secondary">/</Typography.Text>;
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        {spec.serviceTitle && (<>{sec(spec.serviceTitle)}{sep}</>)}
+        {listHref ? <Link to={listHref}>{sec(spec.plural)}</Link> : sec(spec.plural)}
+        {sep}
+        {mode ? (
+          <>
+            <Link to={detailBase}>{sec(name)}</Link>
+            {sep}
+            {mode === "edit" ? (
+              <Typography.Text strong>Редактирование</Typography.Text>
+            ) : (
+              <>
+                <Link to={`${detailBase}?tab=${childRoute}`}>{sec(childSpec?.plural ?? childRoute ?? "")}</Link>
+                {sep}
+                <Typography.Text strong>Создание</Typography.Text>
+              </>
+            )}
+          </>
+        ) : (
+          <Typography.Text strong style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {name}
+          </Typography.Text>
+        )}
+      </span>
+    );
+  }, [spec.serviceTitle, spec.plural, listHref, detailBase, name, mode, childRoute]);
+  useBreadcrumb(breadcrumb);
+
   if (isLoading && !data) {
     return <div style={{ padding: 48, textAlign: "center" }}><Spin /></div>;
   }
@@ -128,7 +169,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     return <ErrorResult error={error} />;
   }
 
-  const name = getByPath<string>(data, "name") || (uid ?? "");
   const status = getByPath<string>(data, "status");
   const related = RELATED[spec.id] ?? [];
 
