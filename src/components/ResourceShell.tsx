@@ -159,30 +159,24 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       ),
     },
   ];
-  if (related.length > 0) {
+  // Каждый тип связанного ресурса — отдельный таб (Subnets / RouteTables / ...).
+  related.forEach((r) => {
+    const childSpec = specByRoute(r.route);
+    if (!childSpec) return;
     tabs.push({
-      id: "related",
-      label: "Связанные",
+      id: childSpec.route,
+      label: childSpec.plural,
       render: () => (
-        <div>
-          {related.map((r) => {
-            const childSpec = specByRoute(r.route);
-            if (!childSpec) return null;
-            return (
-              <RelatedTable
-                key={r.route}
-                childSpec={childSpec}
-                filterField={r.filterField}
-                parentId={getByPath<string>(data, "id") ?? (uid ?? "")}
-                projectId={projectId ?? ""}
-                detailBase={detailBase}
-              />
-            );
-          })}
-        </div>
+        <RelatedTable
+          childSpec={childSpec}
+          filterField={r.filterField}
+          parentId={getByPath<string>(data, "id") ?? (uid ?? "")}
+          projectId={projectId ?? ""}
+          detailBase={detailBase}
+        />
       ),
     });
-  }
+  });
   tabs.push({
     id: "json",
     label: "JSON",
@@ -211,7 +205,8 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   } else if (mode === "child-create" && childRoute) {
     const childSpec = specByRoute(childRoute);
     if (childSpec) {
-      const back = `${detailBase}?tab=related`;
+      // после create вернуться в таб этого связанного ресурса.
+      const back = `${detailBase}?tab=${childRoute}`;
       mainOverride =
         childSpec.id === "subnets" ? (
           <InlineSubnetCreateForm networkId={uid} projectId={projectId ?? ""} onCancel={() => navigate(back)} onSuccess={() => navigate(back)} />
