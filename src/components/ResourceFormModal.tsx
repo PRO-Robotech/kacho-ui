@@ -16,15 +16,7 @@ import { useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "antd";
-import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
-import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
-import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
-import { InlineSubnetEditForm } from "@/components/InlineSubnetEditForm";
-import { InlineSecurityGroupEditForm } from "@/components/InlineSecurityGroupEditForm";
-import { InlineAddressPoolCreateForm } from "@/components/InlineAddressPoolCreateForm";
-import { InlineAddressPoolEditForm } from "@/components/InlineAddressPoolEditForm";
-import { InlineNetworkInterfaceEditForm } from "@/components/InlineNetworkInterfaceEditForm";
-import { InlineNetworkInterfaceCreateForm } from "@/components/InlineNetworkInterfaceCreateForm";
+import { InlineResourceForm } from "@/components/InlineResourceForm";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useContext } from "@/lib/context-store";
 import { api } from "@/api/client";
@@ -89,127 +81,24 @@ export function ResourceFormModal({ projectId }: Props) {
     ? `Создание: ${spec.singular}`
     : `Редактирование: ${spec.singular}`;
 
-  // Custom-форма по spec.id (если есть отдельный YC-style виджет) — иначе
-  // generic spec-based.
-  const formNode = (() => {
-    if (specId === "subnets" && action === "create") {
-      return (
-        <InlineSubnetCreateForm
-          projectId={projectId}
-          networkId={searchParams.get("networkId") ?? undefined}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    if (specId === "subnets" && action === "edit" && id) {
-      return (
-        <InlineSubnetEditForm
-          projectId={projectId}
-          subnetId={id}
-          onCancel={close}
-        />
-      );
-    }
-    if (specId === "security-groups" && action === "edit" && id) {
-      return (
-        <InlineSecurityGroupEditForm
-          projectId={projectId}
-          sgId={id}
-          onCancel={close}
-        />
-      );
-    }
-    if (specId === "address-pools" && action === "create") {
-      // KAC-71: AddressPool с тем же CIDR-chip layout, что у Subnet
-      // (поддержка v4/v6, KAC-60 sparse IPAM).
-      return (
-        <InlineAddressPoolCreateForm
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    if (specId === "address-pools" && action === "edit" && id) {
-      return (
-        <InlineAddressPoolEditForm
-          poolId={id}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    if (specId === "network-interfaces" && action === "edit" && id) {
-      return (
-        <InlineNetworkInterfaceEditForm
-          projectId={projectId}
-          nicId={id}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    if (specId === "network-interfaces" && action === "create") {
-      return (
-        <InlineNetworkInterfaceCreateForm
-          projectId={projectId}
-          subnetId={searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    // addresses + create в контексте subnet (subnetId в query) — preset обе
-    // ветки internal_ipv4/v6_address_spec.subnet_id, editable _address_kind
-    // только internal v4/v6 (external не имеет смысла под subnet).
-    if (specId === "addresses" && action === "create") {
-      const subnetId =
-        searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined;
-      if (subnetId) {
-        return (
-          <InlineResourceCreateForm
-            spec={spec}
-            ctx={{ projectId }}
-            presetFields={{
-              "internal_ipv4_address_spec.subnet_id": subnetId,
-              "internal_ipv6_address_spec.subnet_id": subnetId,
-            }}
-            editablePresetFields={{ _address_kind: "internal" }}
-            fieldOptionsFilter={{ _address_kind: ["internal", "internal_v6"] }}
-            projectId={projectId}
-            title="Резервирование IP-адреса"
-            onCancel={close}
-            onSuccess={close}
-          />
-        );
-      }
-    }
-    if (action === "create") {
-      return (
-        <InlineResourceCreateForm
-          spec={spec}
-          ctx={{ projectId, accountId }}
-          presetFields={presetFields}
-          projectId={projectId}
-          title={title}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    if (action === "edit" && editData) {
-      return (
-        <InlineResourceEditForm
-          spec={spec}
-          data={editData}
-          projectId={projectId}
-          onCancel={close}
-          onSuccess={close}
-        />
-      );
-    }
-    return null;
-  })();
+  // Диспетч кастомных/generic форм вынесен в InlineResourceForm (тот же
+  // компонент использует form-panel ResourceShell в зоне 3 detail-страницы).
+  const formNode = (
+    <InlineResourceForm
+      spec={spec}
+      action={action}
+      id={id}
+      data={editData}
+      projectId={projectId}
+      accountId={accountId}
+      presetFields={presetFields}
+      networkId={searchParams.get("networkId") ?? undefined}
+      subnetId={searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined}
+      title={title}
+      onCancel={close}
+      onSuccess={close}
+    />
+  );
 
   return (
     <Modal

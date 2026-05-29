@@ -14,13 +14,11 @@ import { Toaster } from "@/components/Toaster";
 import { REGISTRY } from "@/lib/resource-registry";
 import { AddressPoolDetailPage } from "@/pages/AddressPoolDetailPage";
 import { ResourceShell } from "@/components/ResourceShell";
-import { SubnetDetailPage } from "@/pages/SubnetDetailPage";
-import { SecurityGroupDetailPage } from "@/pages/SecurityGroupDetailPage";
-import { NetworkInterfaceDetailPage } from "@/pages/NetworkInterfaceDetailPage";
+// KAC-231: SubnetDetailPage/SecurityGroupDetailPage/RouteTableDetailPage/
+// AddressDetailPage/NetworkInterfaceDetailPage/VpcDetailShell заменены единым
+// ResourceShell + DETAIL_EXTENSIONS. SubnetCreatePage сохранён (create со списка).
 import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
-import { VpcListShell, VpcDetailShell } from "@/components/VpcShell";
-import { RouteTableDetailPage } from "@/pages/RouteTableDetailPage";
-import { AddressDetailPage } from "@/pages/AddressDetailPage";
+import { VpcListShell } from "@/components/VpcShell";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
 import { TargetGroupDetailPage } from "@/pages/TargetGroupDetailPage";
 import { OperationsPage } from "@/pages/OperationsPage";
@@ -246,36 +244,26 @@ export function AppRoutes() {
                         />
                   }
                 />
+                {/* KAC-231: единый ResourceShell для ВСЕХ VPC-ресурсов.
+                    Доменный контент (SG-правила, RT-маршруты, Subnet-CIDR, ...)
+                    подключён через DETAIL_EXTENSIONS (resource-detail-extensions). */}
                 <Route
                   path={`/projects/:projectId/vpc/${spec.route}/:uid`}
-                  element={
-                    spec.id === "networks"
-                      ? <ResourceShell spec={spec} />
-                      : spec.id === "subnets"
-                        ? <SubnetDetailPage />
-                        : spec.id === "security-groups"
-                          ? <SecurityGroupDetailPage />
-                          : spec.id === "network-interfaces"
-                            ? <NetworkInterfaceDetailPage />
-                            : <VpcDetailShell spec={spec} />
-                  }
+                  element={<ResourceShell spec={spec} />}
                 />
-                {/* /edit URL ведёт на ту же detail-страницу — она авто-
-                    детектит /edit-суффикс и разворачивает inline-форму
-                    редактирования в правой панели вместо "Общее". */}
                 <Route
                   path={`/projects/:projectId/vpc/${spec.route}/:uid/edit`}
-                  element={
-                    spec.id === "networks"
-                      ? <ResourceShell spec={spec} mode="edit" />
-                      : spec.id === "subnets"
-                        ? <SubnetDetailPage />
-                        : spec.id === "security-groups"
-                          ? <SecurityGroupDetailPage />
-                          : spec.id === "network-interfaces"
-                            ? <NetworkInterfaceDetailPage />
-                            : <VpcDetailShell spec={spec} />
-                  }
+                  element={<ResourceShell spec={spec} mode="edit" />}
+                />
+                {/* child-create: форма-панель в зоне 3 shell родителя (URI уникален). */}
+                <Route
+                  path={`/projects/:projectId/vpc/${spec.route}/:uid/:childRoute/create`}
+                  element={<ResourceShell spec={spec} mode="child-create" />}
+                />
+                {/* path-based табы (related / extra / operations / json). */}
+                <Route
+                  path={`/projects/:projectId/vpc/${spec.route}/:uid/:tab`}
+                  element={<ResourceShell spec={spec} />}
                 />
               </Route>
             ))}
@@ -370,42 +358,9 @@ export function AppRoutes() {
               </Route>
             ))}
 
-            {/* === Network-nested CREATE для дочерних ресурсов === */}
-            {/* Сохраняет network-context: при создании RT/SG из network detail
-                URL остаётся под /networks/<n>/. */}
-            {/* KAC-232/233: создание дочерних ресурсов сети — форма в зоне 3
-                ResourceShell (form-panel), а не отдельная страница/модалка.
-                :childRoute = subnets | route-tables | security-groups. */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:uid/:childRoute/create"
-              element={<ResourceShell spec={REGISTRY.networks} mode="child-create" />}
-            />
-            {/* KAC-233: path-based табы (уникальный URI на таб): json / subnets /
-                route-tables / security-groups. Overview = /networks/:uid. */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:uid/:tab"
-              element={<ResourceShell spec={REGISTRY.networks} />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.addresses}
-                  parentField="project_id"
-                  parentParam="projectId"
-                />
-              }
-            />
-            <Route
-              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/create"
-              element={
-                <ResourceCreatePage
-                  spec={REGISTRY.addresses}
-                  parentField="project_id"
-                  parentParam="projectId"
-                />
-              }
-            />
+            {/* KAC-231: child-create и path-based табы для ВСЕХ VPC-ресурсов
+                генерируются в VPC_SCOPED.map (см. выше) — отдельные
+                networks-/addresses-роуты больше не нужны. */}
 
             {/* === Global VPC Operations (project-scoped) === */}
             <Route
@@ -413,52 +368,11 @@ export function AppRoutes() {
               element={<OperationsPage />}
             />
 
-            {/* === Network-nested ресурсы (YC-style URL) === */}
-            {/* /projects/:projectId/vpc/networks/:networkId/subnets/:uid */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/:uid"
-              element={<SubnetDetailPage />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/:uid/edit"
-              element={<SubnetDetailPage />}
-            />
-            {/* /projects/:projectId/vpc/networks/:networkId/route-tables/:uid */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/route-tables/:uid"
-              element={<RouteTableDetailPage />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/route-tables/:uid/edit"
-              element={<RouteTableDetailPage />}
-            />
-            {/* /projects/:projectId/vpc/networks/:networkId/security-groups/:uid */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/security-groups/:uid"
-              element={<SecurityGroupDetailPage />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/security-groups/:uid/edit"
-              element={<SecurityGroupDetailPage />}
-            />
-            {/* /projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid */}
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid"
-              element={<AddressDetailPage />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/networks/:networkId/subnets/:subnetId/addresses/:uid/edit"
-              element={<AddressDetailPage />}
-            />
-            {/* /projects/:projectId/vpc/subnets/:subnetId/addresses/:uid (flat-subnet-context) */}
-            <Route
-              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/:uid"
-              element={<AddressDetailPage />}
-            />
-            <Route
-              path="/projects/:projectId/vpc/subnets/:subnetId/addresses/:uid/edit"
-              element={<AddressDetailPage />}
-            />
+            {/* KAC-231: вложенные network-/subnet-scoped detail-страницы
+                (SubnetDetailPage/RouteTableDetailPage/SecurityGroupDetailPage/
+                AddressDetailPage) заменены единым flat ResourceShell (см.
+                VPC_SCOPED.map). Навигация в дочерний ресурс — на его flat-URL,
+                родитель показывается в хлебных крошках. */}
 
             {/* /projects/:projectId — редирект на dashboard */}
             <Route

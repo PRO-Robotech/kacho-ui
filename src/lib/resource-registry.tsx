@@ -80,6 +80,18 @@ export interface ResourceSpec {
    *  GET <internalGetPath с подставленным {id}> и pretty-print'ит JSON-ответ.
    *  Пример: "/vpc/v1/networks/{id}/internal". Большинство ресурсов его не имеют. */
   internalGetPath?: string;
+  /** KAC-233: связанные дочерние ресурсы — отдельные табы со встроенными
+   *  таблицами в ResourceShell. childId — ключ ребёнка в REGISTRY; filterField —
+   *  поле(я) ребёнка, ссылающееся на этот ресурс (client-side фильтр; массив =
+   *  OR по нескольким полям, напр. subnet→addresses v4∪v6). label —
+   *  переопределение заголовка таба (по умолчанию childSpec.plural). */
+  related?: { childId: string; filterField: string | string[]; label?: string }[];
+  /** KAC-233: ссылки на документацию по типу ресурса (блок «Документация» в
+   *  aside DetailShell). Kachō-style, без «yandex». */
+  docs?: { label: string; href: string }[];
+  /** KAC-233: welcome-копирайт для пустой таблицы этого ресурса (когда он
+   *  показан как ребёнок и список пуст). Kachō-style, без «yandex». */
+  emptyState?: { title: string; body: string; docs?: string[] };
 }
 
 // Pool kinds — единственный валидный тип. KAC-70 удалил EXTERNAL_TEST/
@@ -305,6 +317,25 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/networks",
     payloadKey: "networks",
     internalGetPath: "/vpc/v1/networks/{id}/internal",
+    related: [
+      { childId: "subnets", filterField: "network_id", label: "Подсети" },
+      { childId: "route-tables", filterField: "network_id", label: "Таблицы маршрутизации" },
+      { childId: "security-groups", filterField: "network_id", label: "Группы безопасности" },
+    ],
+    docs: [
+      { label: "Облачные сети и подсети", href: "#" },
+      { label: "Таблицы маршрутизации", href: "#" },
+      { label: "Группы безопасности", href: "#" },
+      { label: "Адреса облачных ресурсов", href: "#" },
+    ],
+    emptyState: {
+      title: "Создайте вашу первую облачную сеть",
+      body:
+        "Облачная сеть Kachō объединяет подсети, таблицы маршрутизации и группы безопасности в единое " +
+        "изолированное адресное пространство. Внутри сети ресурсы общаются напрямую, а наружу — через шлюзы " +
+        "и публичные адреса.",
+      docs: ["Облачные сети и подсети"],
+    },
     singular: "Network",
     plural: "Облачные сети",
     serviceTitle: "Virtual Private Cloud",
@@ -371,6 +402,26 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "subnets",
     apiPath: "/vpc/v1/subnets",
     payloadKey: "subnets",
+    related: [
+      {
+        childId: "addresses",
+        filterField: ["internal_ipv4_address.subnet_id", "internal_ipv6_address.subnet_id"],
+        label: "IP-адреса",
+      },
+    ],
+    docs: [
+      { label: "Облачные сети и подсети", href: "#" },
+      { label: "CIDR-блоки подсети", href: "#" },
+      { label: "Резервирование внутренних IP-адресов", href: "#" },
+    ],
+    emptyState: {
+      title: "Создайте вашу первую подсеть",
+      body:
+        "Подсеть — диапазон IP-адресов внутри облачной сети Kachō, привязанный к зоне доступности. Ресурсы " +
+        "(виртуальные машины, балансировщики, сетевые интерфейсы) размещаются в подсетях и получают адреса " +
+        "из их CIDR-блоков.",
+      docs: ["Облачные сети и подсети"],
+    },
     singular: "Subnet",
     plural: "Подсети",
     serviceTitle: "Virtual Private Cloud",
@@ -562,6 +613,17 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "addresses",
     apiPath: "/vpc/v1/addresses",
     payloadKey: "addresses",
+    docs: [
+      { label: "Адреса облачных ресурсов", href: "#" },
+      { label: "Резервирование внутренних IP-адресов", href: "#" },
+    ],
+    emptyState: {
+      title: "Зарезервируйте первый IP-адрес",
+      body:
+        "IP-адрес можно зарезервировать в подсети (внутренний) или выделить публичный (внешний) для доступа " +
+        "к ресурсам Kachō извне. Зарезервированный адрес сохраняется за вами, пока вы его не освободите.",
+      docs: ["Адреса облачных ресурсов"],
+    },
     singular: "Address",
     plural: "Публичные IP-адреса",
     serviceTitle: "Virtual Private Cloud",
@@ -823,6 +885,19 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "route-tables",
     apiPath: "/vpc/v1/routeTables",
     payloadKey: "route_tables",
+    docs: [
+      { label: "Таблицы маршрутизации", href: "#" },
+      { label: "Статическая маршрутизация", href: "#" },
+      { label: "Маршрутизация через NAT-инстанс", href: "#" },
+    ],
+    emptyState: {
+      title: "Создайте вашу первую таблицу маршрутизации",
+      body:
+        "С помощью таблиц маршрутизации вы можете построить маршруты между облачной сетью Kachō и другими " +
+        "виртуальными или локальными сетями, либо настроить отказоустойчивую схему передачи данных с " +
+        "маршрутами в нескольких зонах доступности.",
+      docs: ["Статическая маршрутизация", "Маршрутизация через NAT-инстанс"],
+    },
     singular: "Route Table",
     plural: "Таблицы маршрутизации",
     serviceTitle: "Virtual Private Cloud",
@@ -1229,6 +1304,17 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "security-groups",
     apiPath: "/vpc/v1/securityGroups",
     payloadKey: "security_groups",
+    docs: [
+      { label: "Группы безопасности", href: "#" },
+      { label: "Правила групп безопасности", href: "#" },
+    ],
+    emptyState: {
+      title: "Создайте вашу первую группу безопасности",
+      body:
+        "Группа безопасности — набор правил, определяющих разрешённый входящий и исходящий трафик для " +
+        "ресурсов облачной сети Kachō (виртуальных машин, балансировщиков, сетевых интерфейсов).",
+      docs: ["Группы безопасности"],
+    },
     singular: "Security Group",
     plural: "Группы безопасности",
     serviceTitle: "Virtual Private Cloud",
