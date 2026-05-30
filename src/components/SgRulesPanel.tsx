@@ -14,13 +14,12 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Dropdown, Space, Typography } from "antd";
-import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Dropdown, Modal, Space, Typography } from "antd";
+import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { SectionHeader } from "@/components/SectionHeader";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
-import { DeleteDialog } from "@/components/DeleteDialog";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
 import { operationStore } from "@/lib/use-operation-store";
 import { toast } from "@/lib/toast";
@@ -83,7 +82,6 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
   // mode: null = список; иначе редактор одного правила (obj = {rules:[rule]}).
   const [editObj, setEditObj] = useState<Record<string, unknown> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null); // null = добавление
-  const [delRule, setDelRule] = useState<SgRule | null>(null);
 
   const mutation = useMutation({
     mutationFn: (payload: unknown) => api.update(`${sgSpec.apiPath}/${sgId}/rules`, payload),
@@ -101,6 +99,19 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
       const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
       toast.error(`Правило группы безопасности: ${m}`);
     }
+  };
+
+  const confirmDelete = (r: SgRule) => {
+    if (!r.id) return;
+    Modal.confirm({
+      title: "Удалить правило",
+      icon: <ExclamationCircleFilled />,
+      content: `${protoLabel(r)} · ${targetParts(r).value}`,
+      okText: "Удалить правило",
+      okButtonProps: { danger: true },
+      cancelText: "Отмена",
+      onOk: () => runOp({ deletion_rule_ids: [r.id as string] }, "Удаление правила группы безопасности"),
+    });
   };
 
   const startAdd = () => {
@@ -209,7 +220,7 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
                               label: "Удалить",
                               danger: true,
                               disabled: !r.id,
-                              onClick: () => setDelRule(r),
+                              onClick: () => confirmDelete(r),
                             },
                           ],
                         }}
@@ -224,23 +235,6 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
           </table>
         </div>
       )}
-
-      <DeleteDialog
-        open={!!delRule}
-        onOpenChange={(o) => {
-          if (!o) setDelRule(null);
-        }}
-        apiPath={`${sgSpec.apiPath}/${sgId}/rules`}
-        resourceId="правило"
-        resourceLabel="правило"
-        name={delRule ? `${protoLabel(delRule)} · ${targetParts(delRule).value}` : ""}
-        projectId={projectId}
-        onConfirm={() => {
-          const id = delRule?.id;
-          setDelRule(null);
-          if (id) void runOp({ deletion_rule_ids: [id] }, "Удаление правила группы безопасности");
-        }}
-      />
     </div>
   );
 }
