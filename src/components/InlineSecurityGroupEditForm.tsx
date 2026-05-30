@@ -84,34 +84,34 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
     const newLabels = JSON.stringify(obj.labels ?? {});
     if (origLabels !== newLabels) mainMask.push("labels");
 
-    // 2) rules diff
+    // 2) rules diff — КОНТЕНТНАЯ reconciliation (KAC-239 / fix дублирования).
+    // Правила в JSONB могут не иметь id (sgRuleJSON.ID = `omitempty` →
+    // legacy/Create-rules без id). id-based diff тогда считал ВСЕ правила
+    // новыми → backend append → дубли при каждом сохранении. Сравниваем по
+    // КОНТЕНТУ (sanitize без id): неизменённое правило (контент совпал с
+    // исходным) — пропускаем; изменённое — delete(старый id)+add; новое — add.
     const origRules = (data.rules as Rule[]) ?? [];
     const curRules = (obj.rules as Rule[]) ?? [];
-    const origIds = new Set(origRules.map((r) => r.id).filter(Boolean) as string[]);
-    const keptIds = new Set(
-      curRules
-        .map((r) => r.id)
-        .filter((x) => !!x && origIds.has(x as string)) as string[],
-    );
-    const deletion_rule_ids = [...origIds].filter((id) => !keptIds.has(id));
-    // Existing rules — без id у новых, и для изменённых (id есть, но spec
-    // отличается) — пересоздаём delete+add.
+    const keyOf = (r: Rule): string => {
+      const c = sanitizeSgRule({ ...r });
+      delete c.id;
+      return JSON.stringify(c);
+    };
+    const origByKey = new Map<string, Rule>();
+    for (const r of origRules) if (!origByKey.has(keyOf(r))) origByKey.set(keyOf(r), r);
+    const curKeys = new Set(curRules.map(keyOf));
+    // additions: текущие правила, контента которых нет среди исходных.
     const addition_rule_specs: Record<string, unknown>[] = [];
     for (const r of curRules) {
+      if (origByKey.has(keyOf(r))) continue; // неизменённое — оставляем как есть
       const clean = sanitizeSgRule({ ...r });
       delete clean.id;
-      if (!r.id) {
-        addition_rule_specs.push(clean);
-      } else {
-        const orig = origRules.find((o) => o.id === r.id);
-        const origClean = orig ? sanitizeSgRule({ ...orig }) : null;
-        if (origClean) delete origClean.id;
-        if (JSON.stringify(orig ? origClean : null) !== JSON.stringify(clean)) {
-          // изменённое — delete + re-add
-          deletion_rule_ids.push(r.id as string);
-          addition_rule_specs.push(clean);
-        }
-      }
+      addition_rule_specs.push(clean);
+    }
+    // deletions: исходные правила (с id), контента которых больше нет в текущих.
+    const deletion_rule_ids: string[] = [];
+    for (const r of origRules) {
+      if (r.id && !curKeys.has(keyOf(r))) deletion_rule_ids.push(r.id as string);
     }
 
     const promises: Promise<{ operation: { id?: string } }>[] = [];
