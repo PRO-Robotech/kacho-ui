@@ -60,7 +60,6 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
 
   const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
   const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
-  const tagColor = kind === "v4" ? "blue" : "geekblue";
 
   const mutate = useMutation({
     mutationFn: async (params: { verb: "add" | "remove"; cidr: string }) => {
@@ -132,13 +131,12 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
               — пусто —
             </Typography.Text>
           ) : (
-            <Space size={[6, 6]} wrap>
+            <Space direction="vertical" size={6} style={{ alignItems: "flex-start", width: "100%" }}>
               {blocks.map((cidr) => {
                 const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
                 return (
                   <Tag
                     key={cidr}
-                    color={tagColor}
                     closable={!busy}
                     closeIcon={
                       busy ? (
