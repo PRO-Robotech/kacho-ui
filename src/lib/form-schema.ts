@@ -31,6 +31,10 @@ interface BaseField {
   // Используется когда поле управляется отдельным action'ом на DetailPage
   // (например, Subnet.v4_cidr_blocks → :add-cidr-blocks/:remove-cidr-blocks).
   editHidden?: boolean;
+  // Create-only — поле только для Create (напр. create_default_security_group):
+  // в Edit не рендерится (ресурс такого поля не имеет). KAC-239. Семантически
+  // = editHidden; отдельное имя для читаемости registry.
+  createOnly?: boolean;
   // Условная видимость поля по значению другого поля формы (top-level path).
   // Используется для proto oneof: discriminator-enum (`_address_kind`) скрывает
   // неактивную ветку (external_* vs internal_*). Поле всё ещё может присутствовать

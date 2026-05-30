@@ -117,7 +117,7 @@ export function InlineResourceEditForm({
   const visibleFields = useMemo(
     () =>
       (fields ?? []).filter((f) => {
-        if (f.hidden || f.editHidden) return false;
+        if (f.hidden || f.editHidden || f.createOnly) return false;
         if (f.visibleWhen) {
           const cur = getByPath(obj, f.visibleWhen.field) as string | undefined;
           const want = f.visibleWhen.equals;
