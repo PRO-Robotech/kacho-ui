@@ -101,7 +101,6 @@ function refLinks(ids: string[] | undefined, specId: string): ReactNode {
     </span>
   );
 }
-}
 
 // ── RouteTable static_routes ──
 interface StaticRoute {
