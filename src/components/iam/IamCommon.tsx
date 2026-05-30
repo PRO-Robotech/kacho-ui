@@ -2,7 +2,7 @@
 // poll-обёртка для мутаций.
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Button, Typography, Tag, message } from "antd";
+import { Button, Typography, Tag } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { CopyOutlined } from "@ant-design/icons";
 import { api, ApiError } from "@/api/client";
@@ -55,7 +55,7 @@ export function CopyableMonoId({ id }: { id: string | undefined }) {
           e.stopPropagation();
           if (id) {
             void navigator.clipboard.writeText(id);
-            void message.success("Скопировано", 1);
+            toast.success("Скопировано");
           }
         }}
       />

@@ -13,8 +13,9 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, message, Tag, Typography } from "antd";
+import { Button, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import { toast } from "@/lib/toast";
 import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
@@ -77,7 +78,7 @@ function cidrTags(items: string[] | undefined): ReactNode {
           onClick={(e) => {
             e.stopPropagation();
             navigator.clipboard?.writeText(c);
-            void message.success(`Скопировано: ${c}`);
+            toast.success(`Скопировано: ${c}`);
           }}
           style={{ margin: 0, cursor: "pointer", fontFamily: "ui-monospace, monospace", fontSize: 12 }}
         >

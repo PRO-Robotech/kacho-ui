@@ -21,8 +21,8 @@ import {
   Tag,
   Typography,
   Alert,
-  message,
 } from "antd";
+import { toast } from "@/lib/toast";
 import { PlusOutlined, MailOutlined } from "@ant-design/icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnsType } from "antd/es/table";
@@ -299,7 +299,7 @@ function InviteModal({
       const selectedPaths: string[][] = values.role_paths ?? [];
       const roleIds = resolveRoleIds(selectedPaths, roles.data?.roles ?? []);
       if (roleIds.length === 0) {
-        message.error("Не выбрана ни одна роль");
+        toast.error("Не выбрана ни одна роль");
         return;
       }
 
@@ -322,7 +322,7 @@ function InviteModal({
             }),
           });
         }
-        message.success(`Доступ выдан пользователю ${matchedUser.email || matchedUser.id}`);
+        toast.success(`Доступ выдан пользователю ${matchedUser.email || matchedUser.id}`);
         qc.invalidateQueries({ queryKey: ["iam", "access-bindings"] });
         form.resetFields();
         setSubjectInput("");
@@ -340,17 +340,17 @@ function InviteModal({
         });
         const link = resp?.metadata?.magic_link_url;
         if (link) setMagicLink(link);
-        message.success("Пользователь приглашён");
+        toast.success("Пользователь приглашён");
         qc.invalidateQueries({ queryKey: ["iam", "access-bindings"] });
         qc.invalidateQueries({ queryKey: ["iam", "users"] });
         // НЕ закрываем модалку — показываем magic-link для копирования.
         return;
       }
 
-      message.error("Выберите пользователя или укажите email для приглашения");
+      toast.error("Выберите пользователя или укажите email для приглашения");
     } catch (e) {
       console.error(e);
-      message.error("Ошибка выдачи доступа");
+      toast.error("Ошибка выдачи доступа");
     }
   }
 
