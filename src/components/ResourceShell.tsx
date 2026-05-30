@@ -19,10 +19,10 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Spin, Tag, Typography } from "antd";
-import { EditOutlined, PlusOutlined, ReadOutlined, RightOutlined } from "@ant-design/icons";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
+import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
@@ -130,83 +130,10 @@ function RelatedTable({
 
   if (isError) return <ErrorResult error={error} />;
 
-  // Пустое состояние — продакшн-реди welcome (только когда детей реально нет).
+  // Пустое состояние — welcome (только когда детей реально нет; промах поиска
+  // показывается внутри таблицы). createLabel передаём отдельно (тот же текст).
   if (!isLoading && ownRows.length === 0) {
-    const copy = childSpec.emptyState;
-    return (
-      <div
-        style={{
-          maxWidth: 600,
-          margin: "0 auto",
-          minHeight: "calc(100vh - 260px)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          padding: "32px 16px",
-        }}
-      >
-        <div
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: 24,
-            marginBottom: 24,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 44,
-            color: "#3D8DF5",
-            background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.04))",
-            border: "1px solid var(--ant-color-border-secondary, #2f3138)",
-            boxShadow: "0 1px 0 rgba(255,255,255,0.03) inset",
-          }}
-        >
-          <ResourceIcon specId={childSpec.id} />
-        </div>
-        <Typography.Title level={4} style={{ margin: "0 0 10px", fontWeight: 600 }}>
-          {copy?.title ?? `Создайте первый ресурс «${childSpec.singular.toLowerCase()}»`}
-        </Typography.Title>
-        {copy?.body && (
-          <Typography.Paragraph
-            type="secondary"
-            style={{ fontSize: 14, lineHeight: 1.65, margin: "0 0 24px", maxWidth: 500 }}
-          >
-            {copy.body}
-          </Typography.Paragraph>
-        )}
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)} style={{ marginBottom: copy?.docs?.length ? 28 : 0 }}>
-          {createLabel}
-        </Button>
-        {copy?.docs && copy.docs.length > 0 && (
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 460,
-              textAlign: "left",
-              padding: "14px 18px",
-              background: "var(--ant-color-fill-quaternary, rgba(255,255,255,0.03))",
-              border: "1px solid var(--ant-color-border-secondary, #2f3138)",
-              borderRadius: 12,
-            }}
-          >
-            <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>
-              <ReadOutlined style={{ marginRight: 6 }} />
-              Документация
-            </Typography.Text>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-              {copy.docs.map((dlabel) => (
-                <Typography.Link key={dlabel} href="#" style={{ fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <RightOutlined style={{ fontSize: 10, opacity: 0.6 }} />
-                  {dlabel}
-                </Typography.Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
+    return <ResourceEmptyState spec={childSpec} onCreate={() => navigate(createPath)} createLabel={createLabel} />;
   }
 
   return (

@@ -81,12 +81,13 @@ export function RowActionsMenu({ spec, row, basePath, projectId, editAsPanel }: 
           key: "create-subnet",
           icon: <PlusOutlined />,
           label: "Создать подсеть",
-          // Открывает модалку SubnetFormModal поверх Network detail.
-          // Query-флаг `?modal=subnets-create&networkId=<n>` подхватывается
-          // SubnetFormModal — модалка появляется над Network detail-страницей.
+          // editAsPanel: форма-панель в зоне 3 shell сети (child-create).
+          // Иначе (legacy list-модалка): ?modal-флаг над текущей страницей.
           onClick: stop(() =>
             navigate(
-              `/projects/${currentProjectId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
+              editAsPanel
+                ? `/projects/${currentProjectId}/vpc/networks/${id}/subnets/create`
+                : `/projects/${currentProjectId}/vpc/networks/${id}?modal=subnets-create&networkId=${id}`,
             ),
           ),
         }

@@ -12,9 +12,10 @@ import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
 import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
-import { ResourceSpec, getByPath } from "@/lib/resource-registry";
+import { ResourceSpec, getByPath, resourceServicePrefix } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
 
@@ -57,20 +58,28 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   );
   useBreadcrumb(breadcrumb);
 
-  // KAC-70: Create открывается в модалке (ResourceFormModal) поверх list.
-  // URL: добавляем ?modal=<spec>-create — модалка показывается на текущей
-  // странице, не уходим на /create standalone route.
+  // KAC-231: модалки упразднены в пользу формы-страницы/панели (логика Network)
+  // у модулей с полноценными panel/page-формами: VPC (ResourceShell edit-панель,
+  // ResourceCreatePage) + admin (ResourceCreatePage/ResourceEditPage страницы).
+  // Compute/NLB/IAM остаются на модалках до своей раскатки (их detail ещё не
+  // ResourceShell, /edit редиректит в модалку). panelForms — этот гейт.
+  const panelForms =
+    resourceServicePrefix(spec.id) === "vpc" ||
+    spec.id === "regions" ||
+    spec.id === "zones" ||
+    spec.id === "address-pools";
+  const listBase = location.pathname.endsWith("/") ? location.pathname.slice(0, -1) : location.pathname;
+  const createTarget = panelForms ? `${listBase}/create` : `${listBase}?modal=${spec.id}-create`;
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
-    const target = `${location.pathname}?modal=${spec.id}-create`;
     return (
-      <Link to={target}>
+      <Link to={createTarget}>
         <Button type="primary" size="small" icon={<PlusOutlined />}>
           Создать {spec.singular.toLowerCase()}
         </Button>
       </Link>
     );
-  }, [spec, location.pathname]);
+  }, [spec, createTarget]);
 
   useHeaderRight(cta);
 
@@ -156,9 +165,19 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
         row={row}
         basePath={basePath}
         projectId={filterValue ?? null}
+        editAsPanel={panelForms}
       />
     ),
   });
+
+  // Пустой список (без активных фильтров) → welcome, как у дочерних таблиц.
+  const showWelcome =
+    !isLoading &&
+    !isError &&
+    items.length === 0 &&
+    spec.ops.create &&
+    query.trim() === "" &&
+    (!hasZoneFilter || zone === "all");
 
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
@@ -173,26 +192,30 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
         )}
       </div>
 
-      <Space size={12} wrap>
-        <Input.Search
-          placeholder="Фильтр по имени или идентификатору"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          style={{ width: 360 }}
-          allowClear
-        />
-        {hasZoneFilter && (
-          <Select
-            value={zone}
-            onChange={setZone}
-            options={zoneOptions}
-            style={{ width: 240 }}
+      {!showWelcome && (
+        <Space size={12} wrap>
+          <Input.Search
+            placeholder="Фильтр по имени или идентификатору"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            style={{ width: 360 }}
+            allowClear
           />
-        )}
-      </Space>
+          {hasZoneFilter && (
+            <Select
+              value={zone}
+              onChange={setZone}
+              options={zoneOptions}
+              style={{ width: 240 }}
+            />
+          )}
+        </Space>
+      )}
 
       {isError ? (
         <ErrorResult error={error} />
+      ) : showWelcome ? (
+        <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
       ) : (
       <ResourceTable
         rows={filteredItems}
