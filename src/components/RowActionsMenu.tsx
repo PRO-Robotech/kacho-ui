@@ -20,9 +20,14 @@ interface Props {
   row: Record<string, unknown>;
   basePath: string;
   projectId: string | null;
+  /** KAC-231: когда true — «Редактировать» открывает форму-ПАНЕЛЬ
+   *  (`${basePath}/${id}/edit` → ResourceShell mode=edit), а не модалку.
+   *  Используется во встроенных таблицах дочерних ресурсов ResourceShell —
+   *  единый panel-based флоу с созданием. На list-страницах — модалка (default). */
+  editAsPanel?: boolean;
 }
 
-export function RowActionsMenu({ spec, row, basePath, projectId }: Props) {
+export function RowActionsMenu({ spec, row, basePath, projectId, editAsPanel }: Props) {
   const navigate = useNavigate();
   const params = useParams();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -91,10 +96,15 @@ export function RowActionsMenu({ spec, row, basePath, projectId }: Props) {
           key: "edit",
           icon: <EditOutlined />,
           label: "Редактировать",
-          // KAC-70: Edit открывается в модалке (ResourceFormModal) поверх
-          // текущей страницы — URL остаётся list, query-флаг открывает форму.
+          // editAsPanel (ResourceShell-контекст): форма-панель в зоне 3
+          //   (`${basePath}/${id}/edit` → ResourceShell mode=edit), как создание.
+          // Иначе (list-страница, KAC-70): модалка через ?modal-флаг.
           onClick: stop(() =>
-            navigate(`${basePath}?modal=${spec.id}-edit&id=${id}`),
+            navigate(
+              editAsPanel
+                ? `${basePath}/${id}/edit`
+                : `${basePath}?modal=${spec.id}-edit&id=${id}`,
+            ),
           ),
         }
       : null,

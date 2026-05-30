@@ -124,7 +124,7 @@ function RelatedTable({
     header: "",
     className: "text-right whitespace-nowrap",
     cell: (row) => (
-      <RowActionsMenu spec={childSpec} row={row} basePath={flatChildBase} projectId={projectId || null} />
+      <RowActionsMenu spec={childSpec} row={row} basePath={flatChildBase} projectId={projectId || null} editAsPanel />
     ),
   });
 
