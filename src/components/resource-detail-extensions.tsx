@@ -337,17 +337,34 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
   },
 
   "security-groups": {
-    overviewExtra: ({ data }) => [
-      {
-        label: "Сеть",
-        value: getByPath<string>(data, "network_id") ? (
-          <RefNameLink specId="networks" refId={getByPath<string>(data, "network_id")} maxChars={42} />
-        ) : (
-          dash
-        ),
-      },
-      { label: "Default для сети", value: boolTag(getByPath<boolean>(data, "default_for_network")) },
-    ],
+    overviewExtra: ({ data, projectId }) => {
+      // KAC-239 S2: потребители SG (used_by) — к кому подключена группа.
+      const usedBy = (getByPath<{ referrer?: { type?: string; id?: string } }[]>(data, "used_by") ?? []);
+      return [
+        {
+          label: "Сеть",
+          value: getByPath<string>(data, "network_id") ? (
+            <RefNameLink specId="networks" refId={getByPath<string>(data, "network_id")} maxChars={42} />
+          ) : (
+            dash
+          ),
+        },
+        { label: "Default для сети", value: boolTag(getByPath<boolean>(data, "default_for_network")) },
+        {
+          label: "Потребители",
+          value:
+            usedBy.length === 0 ? (
+              dash
+            ) : (
+              <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                {usedBy.map((u, i) => (
+                  <ReferrerLink key={i} projectId={projectId} referrer={u.referrer} />
+                ))}
+              </span>
+            ),
+        },
+      ];
+    },
     extraTabs: ({ data, detailBase, navigate }) => {
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const ingress = all.filter((r) => (r.direction ?? "INGRESS").toUpperCase() === "INGRESS");
