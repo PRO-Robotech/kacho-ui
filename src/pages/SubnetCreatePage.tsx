@@ -1,25 +1,48 @@
-// SubnetCreatePage — legacy /vpc/subnets/create. После перехода на модалки
-// (KAC-69) этот route — редирект-обёртка: открывает модалку
-// SubnetFormModal на /vpc/subnets (list-page) через query-флаг.
+// SubnetCreatePage — /vpc/subnets/create. KAC-231: форма-страница (не модалка):
+// рендерит InlineSubnetCreateForm в контент-области (сайдбар сохраняется через
+// Layout), единый panel-флоу с остальным VPC. networkId (из query) — preset +
+// возврат в подсети сети.
 
-import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
+import { Typography } from "antd";
+import { InlineSubnetCreateForm } from "@/components/InlineSubnetCreateForm";
+import { useBreadcrumb } from "@/components/PageHeaderSlot";
 
 export function SubnetCreatePage() {
   const { projectId } = useParams();
   const [searchParams] = useSearchParams();
-  const networkId = searchParams.get("networkId");
+  const navigate = useNavigate();
+  const networkId = searchParams.get("networkId") ?? undefined;
+
+  const breadcrumb = useMemo(
+    () => (
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <Typography.Text type="secondary">Virtual Private Cloud</Typography.Text>
+        <Typography.Text type="secondary">/</Typography.Text>
+        <Typography.Text type="secondary">Подсети</Typography.Text>
+        <Typography.Text type="secondary">/</Typography.Text>
+        <Typography.Text strong>Создание</Typography.Text>
+      </span>
+    ),
+    [],
+  );
+  useBreadcrumb(breadcrumb);
 
   if (!projectId) return <Navigate to="/" replace />;
 
-  const params = new URLSearchParams();
-  params.set("modal", "subnets-create");
-  if (networkId) params.set("networkId", networkId);
-
-  // Если networkId известен — открываем модалку на Network detail (контекст
-  // ближе к user'у); иначе — на /vpc/subnets list.
-  const base = networkId
-    ? `/projects/${projectId}/vpc/networks/${networkId}`
+  const back = networkId
+    ? `/projects/${projectId}/vpc/networks/${networkId}/subnets`
     : `/projects/${projectId}/vpc/subnets`;
 
-  return <Navigate to={`${base}?${params.toString()}`} replace />;
+  return (
+    <div style={{ maxWidth: 920 }}>
+      <InlineSubnetCreateForm
+        projectId={projectId}
+        networkId={networkId}
+        onCancel={() => navigate(back)}
+        onSuccess={() => navigate(back)}
+      />
+    </div>
+  );
 }
