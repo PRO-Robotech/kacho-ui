@@ -19,7 +19,7 @@ import { toast } from "@/lib/toast";
 import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
-import { SgRulesPanel } from "@/components/SgRulesPanel";
+import { SgRulesPanel, type SgRule } from "@/components/SgRulesPanel";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";

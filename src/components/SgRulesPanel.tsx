@@ -227,7 +227,9 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
 
       <DeleteDialog
         open={!!delRule}
-        onOpenChange={(o) => !o && setDelRule(null)}
+        onOpenChange={(o) => {
+          if (!o) setDelRule(null);
+        }}
         apiPath={`${sgSpec.apiPath}/${sgId}/rules`}
         resourceId="правило"
         resourceLabel="правило"
