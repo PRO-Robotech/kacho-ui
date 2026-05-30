@@ -19,6 +19,7 @@ import { toast } from "@/lib/toast";
 import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
+import { SgRulesPanel } from "@/components/SgRulesPanel";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";
@@ -100,81 +101,6 @@ function refLinks(ids: string[] | undefined, specId: string): ReactNode {
     </span>
   );
 }
-
-// ── SecurityGroup rules (порт из SecurityGroupDetailPage) ──
-interface SgRule {
-  id?: string;
-  direction?: string;
-  description?: string;
-  protocol_name?: string;
-  protocol_number?: number;
-  ports?: { from_port?: number | string; to_port?: number | string };
-  cidr_blocks?: { v4_cidr_blocks?: string[]; v6_cidr_blocks?: string[] };
-  security_group_id?: string;
-  predefined_target?: string;
-}
-
-function sgProtocol(r: SgRule): string {
-  if (r.protocol_name) return r.protocol_name;
-  if (typeof r.protocol_number === "number") return `proto ${r.protocol_number}`;
-  return "Any";
-}
-function sgPorts(r: SgRule): string {
-  if (!r.ports) return "—";
-  const f = r.ports.from_port;
-  const t = r.ports.to_port;
-  if (f == null && t == null) return "—";
-  if (f === t || t == null) return String(f);
-  return `${f}–${t}`;
-}
-function sgTarget(r: SgRule): { kind: string; value: string } {
-  if (r.cidr_blocks) {
-    const v4 = r.cidr_blocks.v4_cidr_blocks ?? [];
-    const v6 = r.cidr_blocks.v6_cidr_blocks ?? [];
-    return { kind: "CIDR", value: [...v4, ...v6].join(", ") || "—" };
-  }
-  if (r.security_group_id) return { kind: "SG", value: r.security_group_id };
-  if (r.predefined_target) return { kind: "Predefined", value: r.predefined_target };
-  return { kind: "—", value: "—" };
-}
-
-function RulesTable({ rules }: { rules: SgRule[] }) {
-  if (rules.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        Правил нет — трафик блокируется (default-deny).
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-xs uppercase tracking-wide">
-          <tr>
-            <th className="text-left px-3 py-2">Протокол</th>
-            <th className="text-left px-3 py-2">Диапазон портов</th>
-            <th className="text-left px-3 py-2">Тип источника</th>
-            <th className="text-left px-3 py-2">Источник</th>
-            <th className="text-left px-3 py-2">Описание</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rules.map((r, i) => {
-            const tgt = sgTarget(r);
-            return (
-              <tr key={r.id ?? i} className="border-t border-border hover:bg-muted/20">
-                <td className="px-3 py-2">{sgProtocol(r)}</td>
-                <td className="px-3 py-2">{sgPorts(r)}</td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">{tgt.kind}</td>
-                <td className="px-3 py-2 font-mono text-xs">{tgt.value}</td>
-                <td className="px-3 py-2 text-xs">{r.description || "—"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
 }
 
 // ── RouteTable static_routes ──
@@ -365,32 +291,26 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
         },
       ];
     },
-    extraTabs: ({ data, detailBase, navigate }) => {
+    extraTabs: ({ data, projectId }) => {
+      // KAC-239: правила — PROP группы безопасности, управляются ПО ОДНОМУ
+      // (per-row ⋮ Редактировать/Удалить + single-rule editor) через SgRulesPanel,
+      // а не правкой всего ресурса SG. Бэкенд — UpdateRules по стабильным id.
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
+      const sgId = getByPath<string>(data, "id") ?? "";
       const ingress = all.filter((r) => (r.direction ?? "INGRESS").toUpperCase() === "INGRESS");
       const egress = all.filter((r) => (r.direction ?? "").toUpperCase() === "EGRESS");
-      // Правила — PROP группы безопасности, добавление/правка через edit-панель
-      // (InlineSecurityGroupEditForm → SgRulesEditor, split-endpoint UpdateRules).
-      const addBtn = (
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
-          Добавить правило
-        </Button>
-      );
-      const tab = (id: string, label: string, rules: SgRule[]): DetailTab => ({
+      const tab = (id: string, label: string, dir: "INGRESS" | "EGRESS", n: number): DetailTab => ({
         id,
         label,
-        count: rules.length,
+        count: n,
         render: () => (
-          <div>
-            <SectionHeader
-              title={<>{label} <Tag style={{ marginLeft: 4 }}>{rules.length}</Tag></>}
-              right={addBtn}
-            />
-            <RulesTable rules={rules} />
-          </div>
+          <SgRulesPanel sgId={sgId} projectId={projectId} direction={dir} title={label} allRules={all} />
         ),
       });
-      return [tab("ingress", "Входящий трафик", ingress), tab("egress", "Исходящий трафик", egress)];
+      return [
+        tab("ingress", "Входящий трафик", "INGRESS", ingress.length),
+        tab("egress", "Исходящий трафик", "EGRESS", egress.length),
+      ];
     },
   },
 
