@@ -382,7 +382,7 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
       const usedBy = (getByPath<{ referrer?: { type?: string; id?: string } }[]>(data, "used_by") ?? []);
       const used = getByPath<boolean>(data, "used") ?? usedBy.length > 0;
       return [
-        { label: "IP-адрес", value: mono(info.ip) },
+        { label: "IP-адрес", value: cidrTags(info.ip ? [info.ip] : undefined) },
         { label: "Версия", value: txt(info.family) },
         { label: "Вид", value: txt(info.kind) },
         { label: "Используется", value: boolTag(used) },
