@@ -18,6 +18,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";
 import { getByPath } from "@/lib/resource-registry";
@@ -239,7 +240,8 @@ function AddressRefTag({ id, projectId }: { id: string; projectId: string | null
   const name = (data ? getByPath<string>(data, "name") : "") || id.slice(0, 12);
   const ip = data ? addressInfo(data).ip : "";
   const tag = (
-    <Tag color="blue" style={{ margin: 0, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
+    <Tag style={{ margin: 0, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <ResourceIcon specId="addresses" />
       {name}
       {ip && <span style={{ fontFamily: "ui-monospace, monospace", opacity: 0.8 }}> · {ip}</span>}
     </Tag>

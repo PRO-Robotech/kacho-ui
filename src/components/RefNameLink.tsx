@@ -7,6 +7,7 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Tag } from "antd";
 import { api } from "@/api/client";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { useProjectStore } from "@/lib/context-store";
 import { REGISTRY, resourceProjectPath } from "@/lib/resource-registry";
 
@@ -52,6 +53,13 @@ export function RefNameLink({ specId, refId, projectId: projectOverride, asTag, 
   const basePath = resourceProjectPath(specId, projectId);
   const href = basePath ? `${basePath}/${refId}` : null;
 
+  // Единый вид ссылки на ресурс: иконка типа ресурса + имя (как в документации).
+  const content = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+      <ResourceIcon specId={specId} />
+      {display}
+    </span>
+  );
   const inner = href ? (
     <Link
       to={href}
@@ -59,10 +67,10 @@ export function RefNameLink({ specId, refId, projectId: projectOverride, asTag, 
       title={fullName}
       className="text-primary hover:underline"
     >
-      {display}
+      {content}
     </Link>
   ) : (
-    <span className="text-foreground" title={fullName}>{display}</span>
+    <span className="text-foreground" title={fullName}>{content}</span>
   );
 
   if (asTag) {

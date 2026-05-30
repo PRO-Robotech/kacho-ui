@@ -9,7 +9,20 @@ import { Typography } from "antd";
 import type { Column } from "@/components/ResourceTable";
 import { CopyableId } from "@/components/CopyableId";
 import { StatusBadge } from "@/components/StatusBadge";
+import { RefNameLink } from "@/components/RefNameLink";
 import { getByPath, type ResourceColumn, type ResourceSpec } from "@/lib/resource-registry";
+
+// Маппинг kacho.cloud.reference.Reference.referrer.type → registry specId, чтобы
+// рендерить потребителя как единую ссылку «иконка + имя» (RefNameLink) и иметь
+// корректный detail-роут (включая network_interface → kacho-vpc).
+const REFERRER_SPEC: Record<string, string> = {
+  compute_instance: "compute-instances",
+  compute_disk: "compute-disks",
+  compute_image: "compute-images",
+  compute_snapshot: "compute-snapshots",
+  nlb_target_group: "target-groups",
+  network_interface: "network-interfaces",
+};
 
 // Опции для рендеринга generic-форматов, которым нужен контекст вокруг ячейки.
 // Сейчас используется только `projectId` для построения SPA-ссылок в format:
@@ -76,6 +89,12 @@ export function ReferrerLink({
   projectId: string | null | undefined;
   referrer: { type?: string; id?: string } | undefined;
 }): ReactNode {
+  // Известный тип → единая ссылка «иконка + имя» через RefNameLink (резолв имени
+  // + detail-роут). Неизвестный тип — forward-compat fallback (label + id ниже).
+  const mappedSpec = referrer?.type ? REFERRER_SPEC[referrer.type] : undefined;
+  if (mappedSpec && referrer?.id) {
+    return <RefNameLink specId={mappedSpec} refId={referrer.id} projectId={projectId ?? undefined} maxChars={32} />;
+  }
   const meta = referrerMeta(referrer?.type);
   const id = referrer?.id ?? "";
   const href = referrerHref(projectId, referrer);
