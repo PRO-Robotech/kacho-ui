@@ -273,6 +273,8 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
             column={1}
             size="small"
             bordered
+            style={{ maxWidth: 920 }}
+            labelStyle={{ width: 260, whiteSpace: "nowrap", verticalAlign: "top" }}
             items={overviewItems.map((it, i) => ({ key: String(i), label: it.label, children: it.value }))}
           />
         </div>

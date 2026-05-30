@@ -11,9 +11,14 @@
 // docs/superpowers/specs/2026-05-30-kacho-ui-rollout-migration-map.json
 
 import { type ReactNode } from "react";
-import { Tag, Typography } from "antd";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Tag, Typography } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import type { DetailTab } from "@/components/DetailShell";
+import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
+import { api } from "@/api/client";
 import { getByPath } from "@/lib/resource-registry";
 
 export interface DescItem {
@@ -55,10 +60,11 @@ function boolTag(v: unknown, yes = "Да", no = "Нет"): ReactNode {
   return v ? <Tag color="green">{yes}</Tag> : <Tag>{no}</Tag>;
 }
 
-function chips(items: string[] | undefined, color?: string): ReactNode {
+// Вертикальный список чипов (каждый блок под предыдущим) — для CIDR-блоков.
+function chipsCol(items: string[] | undefined, color?: string): ReactNode {
   if (!items || items.length === 0) return dash;
   return (
-    <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 4 }}>
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
       {items.map((c) => (
         <Tag key={c} color={color} style={{ margin: 0, fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
           {c}
@@ -68,12 +74,13 @@ function chips(items: string[] | undefined, color?: string): ReactNode {
   );
 }
 
+// Ссылки на ресурсы тегами, друг под другом (RefNameLink asTag — имя + клик).
 function refLinks(ids: string[] | undefined, specId: string): ReactNode {
   if (!ids || ids.length === 0) return dash;
   return (
-    <span style={{ display: "inline-flex", flexWrap: "wrap", gap: 8 }}>
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
       {ids.map((id) => (
-        <RefNameLink key={id} specId={specId} refId={id} maxChars={28} />
+        <RefNameLink key={id} specId={specId} refId={id} asTag maxChars={28} />
       ))}
     </span>
   );
@@ -161,33 +168,23 @@ interface StaticRoute {
   next_hop_address?: string;
   gateway_id?: string;
 }
-function StaticRoutesTable({ routes }: { routes: StaticRoute[] }) {
-  if (routes.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        Статических маршрутов нет.
-      </div>
-    );
+// Статические маршруты — это PROP таблицы маршрутизации (не смежный ресурс),
+// показываем компактным вертикальным списком «prefix → next-hop» в Обзоре.
+// Добавление/правка — через «Редактировать» (generic array-field static_routes).
+function routesList(routes: StaticRoute[] | undefined): ReactNode {
+  if (!routes || routes.length === 0) {
+    return <Typography.Text type="secondary">Статических маршрутов нет</Typography.Text>;
   }
   return (
-    <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-xs uppercase tracking-wide">
-          <tr>
-            <th className="text-left px-3 py-2">Префикс назначения</th>
-            <th className="text-left px-3 py-2">Next hop</th>
-          </tr>
-        </thead>
-        <tbody>
-          {routes.map((r, i) => (
-            <tr key={i} className="border-t border-border hover:bg-muted/20">
-              <td className="px-3 py-2 font-mono text-xs">{r.destination_prefix || "—"}</td>
-              <td className="px-3 py-2 font-mono text-xs">{r.next_hop_address || r.gateway_id || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
+      {routes.map((r, i) => (
+        <span key={i} style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
+          {r.destination_prefix || "—"}
+          <span style={{ opacity: 0.55, margin: "0 8px" }}>→</span>
+          {r.next_hop_address || r.gateway_id || "—"}
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -202,6 +199,43 @@ function addressInfo(data: Record<string, unknown>): { ip: string; family: strin
   if (ext6?.address) return { ip: ext6.address, family: "IPv6", kind: "Внешний" };
   if (int6?.address) return { ip: int6.address, family: "IPv6", kind: "Внутренний" };
   return { ip: "", family: "—", kind: "—" };
+}
+
+// AddressRefTag — тег адреса: имя ресурса + доп-алиас (сам IP), кликабельно на
+// detail адреса. Резолвит адрес по id (TanStack-дедуп).
+function AddressRefTag({ id, projectId }: { id: string; projectId: string | null }) {
+  const { data } = useQuery({
+    queryKey: ["ref-address", id],
+    queryFn: () => api.get<Record<string, unknown>>(`/vpc/v1/addresses/${id}`),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+  const name = (data ? getByPath<string>(data, "name") : "") || id.slice(0, 12);
+  const ip = data ? addressInfo(data).ip : "";
+  const tag = (
+    <Tag color="blue" style={{ margin: 0, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }}>
+      {name}
+      {ip && <span style={{ fontFamily: "ui-monospace, monospace", opacity: 0.8 }}> · {ip}</span>}
+    </Tag>
+  );
+  return projectId ? (
+    <Link to={`/projects/${projectId}/vpc/addresses/${id}`} style={{ lineHeight: 1 }}>
+      {tag}
+    </Link>
+  ) : (
+    tag
+  );
+}
+
+function AddressRefTags({ ids, projectId }: { ids: string[] | undefined; projectId: string | null }): ReactNode {
+  if (!ids || ids.length === 0) return dash;
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+      {ids.map((id) => (
+        <AddressRefTag key={id} id={id} projectId={projectId} />
+      ))}
+    </span>
+  );
 }
 
 // ─────────────────────────── реестр ───────────────────────────
@@ -237,8 +271,8 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
           dash
         ),
       },
-      { label: "IPv4 CIDR-блоки", value: chips(getByPath<string[]>(data, "v4_cidr_blocks"), "blue") },
-      { label: "IPv6 CIDR-блоки", value: chips(getByPath<string[]>(data, "v6_cidr_blocks"), "geekblue") },
+      { label: "IPv4 CIDR-блоки", value: chipsCol(getByPath<string[]>(data, "v4_cidr_blocks"), "blue") },
+      { label: "IPv6 CIDR-блоки", value: chipsCol(getByPath<string[]>(data, "v6_cidr_blocks"), "geekblue") },
     ],
   },
 
@@ -248,18 +282,12 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
         label: "Сеть",
         value: <RefNameLink specId="networks" refId={getByPath<string>(data, "network_id")} maxChars={42} />,
       },
+      {
+        // static_routes — PROP таблицы, не смежный ресурс → в Обзор.
+        label: "Статические маршруты",
+        value: routesList(getByPath<StaticRoute[]>(data, "static_routes")),
+      },
     ],
-    extraTabs: ({ data }) => {
-      const routes = (getByPath<StaticRoute[]>(data, "static_routes") ?? []) as StaticRoute[];
-      return [
-        {
-          id: "static-routes",
-          label: "Статические маршруты",
-          count: routes.length,
-          render: () => <StaticRoutesTable routes={routes} />,
-        },
-      ];
-    },
   },
 
   "security-groups": {
@@ -274,14 +302,32 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
       },
       { label: "Default для сети", value: boolTag(getByPath<boolean>(data, "default_for_network")) },
     ],
-    extraTabs: ({ data }) => {
+    extraTabs: ({ data, detailBase, navigate }) => {
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const ingress = all.filter((r) => (r.direction ?? "INGRESS").toUpperCase() === "INGRESS");
       const egress = all.filter((r) => (r.direction ?? "").toUpperCase() === "EGRESS");
-      return [
-        { id: "ingress", label: "Входящий трафик", count: ingress.length, render: () => <RulesTable rules={ingress} /> },
-        { id: "egress", label: "Исходящий трафик", count: egress.length, render: () => <RulesTable rules={egress} /> },
-      ];
+      // Правила — PROP группы безопасности, добавление/правка через edit-панель
+      // (InlineSecurityGroupEditForm → SgRulesEditor, split-endpoint UpdateRules).
+      const addBtn = (
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
+          Добавить правило
+        </Button>
+      );
+      const tab = (id: string, label: string, rules: SgRule[]): DetailTab => ({
+        id,
+        label,
+        count: rules.length,
+        render: () => (
+          <div>
+            <SectionHeader
+              title={<>{label} <Tag style={{ marginLeft: 4 }}>{rules.length}</Tag></>}
+              right={addBtn}
+            />
+            <RulesTable rules={rules} />
+          </div>
+        ),
+      });
+      return [tab("ingress", "Входящий трафик", ingress), tab("egress", "Исходящий трафик", egress)];
     },
   },
 
@@ -305,14 +351,14 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
   },
 
   "network-interfaces": {
-    overviewExtra: ({ data }) => [
+    overviewExtra: ({ data, projectId }) => [
       {
         label: "Подсеть",
         value: <RefNameLink specId="subnets" refId={getByPath<string>(data, "subnet_id")} maxChars={42} />,
       },
       { label: "MAC-адрес", value: mono(getByPath<string>(data, "mac_address")) },
-      { label: "IPv4-адреса", value: refLinks(getByPath<string[]>(data, "v4_address_ids"), "addresses") },
-      { label: "IPv6-адреса", value: refLinks(getByPath<string[]>(data, "v6_address_ids"), "addresses") },
+      { label: "IPv4-адреса", value: <AddressRefTags ids={getByPath<string[]>(data, "v4_address_ids")} projectId={projectId} /> },
+      { label: "IPv6-адреса", value: <AddressRefTags ids={getByPath<string[]>(data, "v6_address_ids")} projectId={projectId} /> },
       { label: "Группы безопасности", value: refLinks(getByPath<string[]>(data, "security_group_ids"), "security-groups") },
     ],
   },
