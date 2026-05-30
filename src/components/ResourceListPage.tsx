@@ -170,11 +170,13 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     ),
   });
 
-  // Пустой список (без активных фильтров) → welcome, как у дочерних таблиц.
+  // Пустой список (без активных пользовательских фильтров) → welcome, как у
+  // дочерних таблиц. По filteredItems (учитывает intrinsic-фильтр addresses
+  // «только внешние»): нет отображаемых строк при пустом поиске/зоне → welcome.
   const showWelcome =
     !isLoading &&
     !isError &&
-    items.length === 0 &&
+    filteredItems.length === 0 &&
     spec.ops.create &&
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");

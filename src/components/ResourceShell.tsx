@@ -277,6 +277,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
             labelStyle={{ width: 260, whiteSpace: "nowrap", verticalAlign: "top" }}
             items={overviewItems.map((it, i) => ({ key: String(i), label: it.label, children: it.value }))}
           />
+          {ext?.overviewBelow?.(extCtx)}
         </div>
       ),
     },

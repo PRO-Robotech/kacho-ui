@@ -13,11 +13,12 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Tag, Typography } from "antd";
+import { Button, message, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
+import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";
 import { getByPath } from "@/lib/resource-registry";
 
@@ -36,6 +37,9 @@ export interface DetailExtCtx {
 
 export interface DetailExtension {
   overviewExtra?: (ctx: DetailExtCtx) => DescItem[];
+  /** Контент под Обзор-таблицей (отдельные секции-таблицы с подписью, напр.
+   *  статические маршруты RouteTable). */
+  overviewBelow?: (ctx: DetailExtCtx) => ReactNode;
   headerActions?: (ctx: DetailExtCtx) => ReactNode;
   extraTabs?: (ctx: DetailExtCtx) => DetailTab[];
   hideOperations?: boolean;
@@ -60,13 +64,22 @@ function boolTag(v: unknown, yes = "Да", no = "Нет"): ReactNode {
   return v ? <Tag color="green">{yes}</Tag> : <Tag>{no}</Tag>;
 }
 
-// Вертикальный список чипов (каждый блок под предыдущим) — для CIDR-блоков.
-function chipsCol(items: string[] | undefined, color?: string): ReactNode {
+// CIDR-блоки — нейтральные (цвет текста) теги, друг под другом, клик = копировать.
+function cidrTags(items: string[] | undefined): ReactNode {
   if (!items || items.length === 0) return dash;
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
       {items.map((c) => (
-        <Tag key={c} color={color} style={{ margin: 0, fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
+        <Tag
+          key={c}
+          title="Нажмите, чтобы скопировать"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard?.writeText(c);
+            void message.success(`Скопировано: ${c}`);
+          }}
+          style={{ margin: 0, cursor: "pointer", fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+        >
           {c}
         </Tag>
       ))}
@@ -168,23 +181,36 @@ interface StaticRoute {
   next_hop_address?: string;
   gateway_id?: string;
 }
-// Статические маршруты — это PROP таблицы маршрутизации (не смежный ресурс),
-// показываем компактным вертикальным списком «prefix → next-hop» в Обзоре.
-// Добавление/правка — через «Редактировать» (generic array-field static_routes).
-function routesList(routes: StaticRoute[] | undefined): ReactNode {
-  if (!routes || routes.length === 0) {
-    return <Typography.Text type="secondary">Статических маршрутов нет</Typography.Text>;
+// Статические маршруты — PROP таблицы маршрутизации (не смежный ресурс).
+// Показываем ОТДЕЛЬНОЙ таблицей с подписью под Обзором (overviewBelow);
+// добавление/правка — через «Редактировать» (generic array-field static_routes).
+function StaticRoutesTable({ routes }: { routes: StaticRoute[] }) {
+  if (routes.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        Статических маршрутов нет.
+      </div>
+    );
   }
   return (
-    <span style={{ display: "inline-flex", flexDirection: "column", gap: 6 }}>
-      {routes.map((r, i) => (
-        <span key={i} style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
-          {r.destination_prefix || "—"}
-          <span style={{ opacity: 0.55, margin: "0 8px" }}>→</span>
-          {r.next_hop_address || r.gateway_id || "—"}
-        </span>
-      ))}
-    </span>
+    <div className="rounded-lg border border-border overflow-hidden bg-card">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-xs uppercase tracking-wide">
+          <tr>
+            <th className="text-left px-3 py-2">Префикс назначения</th>
+            <th className="text-left px-3 py-2">Next hop</th>
+          </tr>
+        </thead>
+        <tbody>
+          {routes.map((r, i) => (
+            <tr key={i} className="border-t border-border hover:bg-muted/20">
+              <td className="px-3 py-2 font-mono text-xs">{r.destination_prefix || "—"}</td>
+              <td className="px-3 py-2 font-mono text-xs">{r.next_hop_address || r.gateway_id || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -271,8 +297,8 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
           dash
         ),
       },
-      { label: "IPv4 CIDR-блоки", value: chipsCol(getByPath<string[]>(data, "v4_cidr_blocks"), "blue") },
-      { label: "IPv6 CIDR-блоки", value: chipsCol(getByPath<string[]>(data, "v6_cidr_blocks"), "geekblue") },
+      { label: "IPv4 CIDR-блоки", value: cidrTags(getByPath<string[]>(data, "v4_cidr_blocks")) },
+      { label: "IPv6 CIDR-блоки", value: cidrTags(getByPath<string[]>(data, "v6_cidr_blocks")) },
     ],
   },
 
@@ -282,12 +308,24 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
         label: "Сеть",
         value: <RefNameLink specId="networks" refId={getByPath<string>(data, "network_id")} maxChars={42} />,
       },
-      {
-        // static_routes — PROP таблицы, не смежный ресурс → в Обзор.
-        label: "Статические маршруты",
-        value: routesList(getByPath<StaticRoute[]>(data, "static_routes")),
-      },
     ],
+    // Статические маршруты — отдельная таблица с подписью под Обзором.
+    overviewBelow: ({ data, detailBase, navigate }) => {
+      const routes = (getByPath<StaticRoute[]>(data, "static_routes") ?? []) as StaticRoute[];
+      return (
+        <div style={{ marginTop: 24 }}>
+          <SectionHeader
+            title={<>Статические маршруты <Tag style={{ marginLeft: 4 }}>{routes.length}</Tag></>}
+            right={
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
+                Добавить маршрут
+              </Button>
+            }
+          />
+          <StaticRoutesTable routes={routes} />
+        </div>
+      );
+    },
   },
 
   "security-groups": {
@@ -332,13 +370,28 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
   },
 
   addresses: {
-    overviewExtra: ({ data }) => {
+    overviewExtra: ({ data, projectId }) => {
       const info = addressInfo(data);
+      const usedBy = (getByPath<{ referrer?: { type?: string; id?: string } }[]>(data, "used_by") ?? []);
+      const used = getByPath<boolean>(data, "used") ?? usedBy.length > 0;
       return [
         { label: "IP-адрес", value: mono(info.ip) },
         { label: "Версия", value: txt(info.family) },
         { label: "Вид", value: txt(info.kind) },
-        { label: "Используется", value: txt(getByPath<string>(data, "used_by") || "") },
+        { label: "Используется", value: boolTag(used) },
+        {
+          label: "Потребители",
+          value:
+            usedBy.length === 0 ? (
+              dash
+            ) : (
+              <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                {usedBy.map((u, i) => (
+                  <ReferrerLink key={i} projectId={projectId} referrer={u.referrer} />
+                ))}
+              </span>
+            ),
+        },
         { label: "Защита от удаления", value: boolTag(getByPath<boolean>(data, "deletion_protection")) },
       ];
     },

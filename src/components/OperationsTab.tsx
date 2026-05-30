@@ -49,7 +49,14 @@ export function OperationsTab({ spec, resourceId }: Props) {
   // Хуки — ВСЕГДА до раннего return (Rules of Hooks).
   const ops = useMemo(() => {
     const raw = data?.operations ?? [];
-    return raw.map((o) => ({ ...o, resource_id: o.resource_id ?? resourceId }));
+    return raw
+      .map((o) => ({ ...o, resource_id: o.resource_id ?? resourceId }))
+      // новое сверху — сортировка по дате создания desc.
+      .sort((a, b) => {
+        const ta = a.created_at ? Date.parse(a.created_at) : 0;
+        const tb = b.created_at ? Date.parse(b.created_at) : 0;
+        return tb - ta;
+      });
   }, [data, resourceId]);
 
   const filtered = useMemo(() => {

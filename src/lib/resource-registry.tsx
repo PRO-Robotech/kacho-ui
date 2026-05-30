@@ -479,7 +479,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           <RefNameLink
             specId="route-tables"
             refId={row.route_table_id as string | undefined}
-            asTag
           />
         ),
       },
@@ -1115,7 +1114,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           const ref = ub?.referrer;
           if (!ref?.id) return <span className="text-muted-foreground">—</span>;
           if (ref.type === "compute_instance") {
-            return <RefNameLink specId="compute-instances" refId={ref.id} asTag />;
+            return <RefNameLink specId="compute-instances" refId={ref.id} />;
           }
           return <span className="font-mono text-xs">{ref.type ?? "?"}: {ref.id}</span>;
         },
@@ -1329,7 +1328,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // CreateSecurityGroupRequest.network_id; kacho-vpc допускает SG без сети).
         render: (row) => {
           const nid = row.network_id as string | undefined;
-          return nid ? <RefNameLink specId="networks" refId={nid} asTag /> : <span className="text-muted-foreground">—</span>;
+          return nid ? <RefNameLink specId="networks" refId={nid} /> : <span className="text-muted-foreground">—</span>;
         },
       },
       { header: "Status", path: "status", format: "status" },
@@ -1533,8 +1532,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         render: (row) => {
           const img = row.source_image_id as string | undefined;
           const snap = row.source_snapshot_id as string | undefined;
-          if (img) return <RefNameLink specId="compute-images" refId={img} asTag />;
-          if (snap) return <RefNameLink specId="compute-snapshots" refId={snap} asTag />;
+          if (img) return <RefNameLink specId="compute-images" refId={img} />;
+          if (snap) return <RefNameLink specId="compute-snapshots" refId={snap} />;
           return <span className="text-muted-foreground">—</span>;
         },
       },
@@ -1544,7 +1543,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         render: (row) => {
           const ids = (row.instance_ids as string[] | undefined) ?? [];
           if (ids.length === 0) return <span className="text-muted-foreground">—</span>;
-          return <RefNameLink specId="compute-instances" refId={ids[0]} asTag />;
+          return <RefNameLink specId="compute-instances" refId={ids[0]} />;
         },
       },
       { header: "Дата создания", path: "created_at", format: "datetime" },
@@ -1719,7 +1718,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         header: "Исходный диск",
         path: "source_disk_id",
-        render: (row) => <RefNameLink specId="compute-disks" refId={row.source_disk_id as string | undefined} asTag />,
+        render: (row) => <RefNameLink specId="compute-disks" refId={row.source_disk_id as string | undefined} />,
       },
       {
         header: "Размер диска",
@@ -1793,7 +1792,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         path: "boot_disk.disk_id",
         render: (row) => {
           const bd = (row.boot_disk as { disk_id?: string } | undefined)?.disk_id;
-          return <RefNameLink specId="compute-disks" refId={bd} asTag />;
+          return <RefNameLink specId="compute-disks" refId={bd} />;
         },
       },
       { header: "Дата создания", path: "created_at", format: "datetime" },
