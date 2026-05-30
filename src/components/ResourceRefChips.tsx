@@ -87,6 +87,20 @@ export function ResourceRefChips({
 
   const CREATE_SENTINEL = "__create__";
 
+  // Лейбл ресурса: для addresses — «name: ip» (доп-алиас IP), иначе name.
+  const labelFor = (r: Record<string, unknown> | undefined, id: string): string => {
+    const name = ((r?.name as string) || id) ?? id;
+    if (refResource !== "addresses" || !r) return name;
+    const pick = (k: string) => (r[k] as { address?: string } | undefined)?.address;
+    const ip =
+      pick("external_ipv4_address") ||
+      pick("internal_ipv4_address") ||
+      pick("external_ipv6_address") ||
+      pick("internal_ipv6_address") ||
+      "";
+    return ip ? `${name}: ${ip}` : name;
+  };
+
   // Options для dropdown — только те, что ещё не добавлены. KAC-101: при
   // createResource добавляем sentinel-опцию «+ Создать <singular>…».
   const options = useMemo(() => {
@@ -94,7 +108,7 @@ export function ResourceRefChips({
       .filter((r) => !value.includes((r.id as string) ?? ""))
       .map((r) => ({
         value: (r.id as string) ?? "",
-        label: ((r.name as string) || (r.id as string)) ?? "",
+        label: labelFor(r, (r.id as string) ?? ""),
       }));
     if (createSpec) {
       base.push({
@@ -157,7 +171,7 @@ export function ResourceRefChips({
             <Space size={[6, 6]} wrap>
               {value.map((id) => {
                 const row = byId.get(id);
-                const name = (row?.name as string) || id;
+                const name = labelFor(row, id);
                 return (
                   <Tag
                     key={id}

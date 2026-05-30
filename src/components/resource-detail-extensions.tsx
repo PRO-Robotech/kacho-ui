@@ -88,13 +88,13 @@ function cidrTags(items: string[] | undefined): ReactNode {
   );
 }
 
-// Ссылки на ресурсы тегами, друг под другом (RefNameLink asTag — имя + клик).
+// Ссылки на ресурсы (иконка + имя), друг под другом — единый вид как везде.
 function refLinks(ids: string[] | undefined, specId: string): ReactNode {
   if (!ids || ids.length === 0) return dash;
   return (
     <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
       {ids.map((id) => (
-        <RefNameLink key={id} specId={specId} refId={id} asTag maxChars={28} />
+        <RefNameLink key={id} specId={specId} refId={id} maxChars={28} />
       ))}
     </span>
   );
@@ -239,19 +239,24 @@ function AddressRefTag({ id, projectId }: { id: string; projectId: string | null
   });
   const name = (data ? getByPath<string>(data, "name") : "") || id.slice(0, 12);
   const ip = data ? addressInfo(data).ip : "";
-  const tag = (
-    <Tag style={{ margin: 0, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", display: "inline-flex", alignItems: "center", gap: 6 }}>
+  // Единый вид ссылки на ресурс: иконка + имя (+ доп-алиас IP), не тег.
+  const content = (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       <ResourceIcon specId="addresses" />
       {name}
-      {ip && <span style={{ fontFamily: "ui-monospace, monospace", opacity: 0.8 }}> · {ip}</span>}
-    </Tag>
+      {ip && <span style={{ fontFamily: "ui-monospace, monospace", opacity: 0.85 }}> · {ip}</span>}
+    </span>
   );
   return projectId ? (
-    <Link to={`/projects/${projectId}/vpc/addresses/${id}`} style={{ lineHeight: 1 }}>
-      {tag}
+    <Link
+      to={`/projects/${projectId}/vpc/addresses/${id}`}
+      onClick={(e) => e.stopPropagation()}
+      className="text-primary hover:underline"
+    >
+      {content}
     </Link>
   ) : (
-    tag
+    <span className="text-foreground">{content}</span>
   );
 }
 
