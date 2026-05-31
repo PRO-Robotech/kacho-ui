@@ -1002,6 +1002,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         name: "static_routes",
         label: "Статические маршруты",
         type: "array",
+        // KAC-239: маршруты редактируются отдельно (RoutesPanel в detail),
+        // не в форме ресурса. В Create оставляем, в Edit скрыто.
+        editHidden: true,
         itemLabel: "маршрут",
         description:
           "При обновлении список заменяется целиком (full-replace).",

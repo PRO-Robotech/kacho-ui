@@ -20,6 +20,7 @@ import type { DetailTab } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { RefNameLink } from "@/components/RefNameLink";
 import { SgRulesPanel, type SgRule } from "@/components/SgRulesPanel";
+import { RoutesPanel } from "@/components/RoutesPanel";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";
@@ -111,14 +112,10 @@ interface StaticRoute {
 // Статические маршруты — PROP таблицы маршрутизации (не смежный ресурс).
 // Показываем ОТДЕЛЬНОЙ таблицей с подписью под Обзором (overviewBelow);
 // добавление/правка — через «Редактировать» (generic array-field static_routes).
-function StaticRoutesTable({ routes }: { routes: StaticRoute[] }) {
-  if (routes.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        Статических маршрутов нет.
-      </div>
-    );
-  }
+
+// ── Address: вычисление IP/семейства/вида ──
+function addressInfo(data: Record<string, unknown>): { ip: string; family: string; kind: string } {
+  const ext4 = getByPath<{ address?: string }>(data, "external_ipv4_address");
   const int4 = getByPath<{ address?: string }>(data, "internal_ipv4_address");
   const ext6 = getByPath<{ address?: string }>(data, "external_ipv6_address");
   const int6 = getByPath<{ address?: string }>(data, "internal_ipv6_address");
@@ -218,21 +215,12 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
       },
     ],
     // Статические маршруты — отдельная таблица с подписью под Обзором.
-    overviewBelow: ({ data, detailBase, navigate }) => {
+    overviewBelow: ({ data, projectId }) => {
+      // KAC-239: маршруты управляются отдельно от ресурса — RoutesPanel
+      // (Добавить / чекбоксы + bulk-delete), не правкой всего RT.
       const routes = (getByPath<StaticRoute[]>(data, "static_routes") ?? []) as StaticRoute[];
-      return (
-        <div style={{ marginTop: 24 }}>
-          <SectionHeader
-            title={<>Статические маршруты <Tag style={{ marginLeft: 4 }}>{routes.length}</Tag></>}
-            right={
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
-                Добавить маршрут
-              </Button>
-            }
-          />
-          <StaticRoutesTable routes={routes} />
-        </div>
-      );
+      const rtId = getByPath<string>(data, "id") ?? "";
+      return <RoutesPanel routeTableId={rtId} projectId={projectId} routes={routes} />;
     },
   },
 
@@ -266,24 +254,18 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
       ];
     },
     extraTabs: ({ data, projectId }) => {
-      // KAC-239: правила — PROP группы безопасности, управляются ПО ОДНОМУ
-      // (per-row ⋮ Редактировать/Удалить + single-rule editor) через SgRulesPanel,
-      // а не правкой всего ресурса SG. Бэкенд — UpdateRules по стабильным id.
+      // KAC-239: один таб «Правила» (INGRESS+EGRESS вместе, направление — первый
+      // столбец). Управление по одному через SgRulesPanel (чекбоксы/⋮/редактор),
+      // не правкой всего SG. Бэкенд — UpdateRules по стабильным id.
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const sgId = getByPath<string>(data, "id") ?? "";
-      const ingress = all.filter((r) => (r.direction ?? "INGRESS").toUpperCase() === "INGRESS");
-      const egress = all.filter((r) => (r.direction ?? "").toUpperCase() === "EGRESS");
-      const tab = (id: string, label: string, dir: "INGRESS" | "EGRESS", n: number): DetailTab => ({
-        id,
-        label,
-        count: n,
-        render: () => (
-          <SgRulesPanel sgId={sgId} projectId={projectId} direction={dir} title={label} allRules={all} />
-        ),
-      });
       return [
-        tab("ingress", "Входящий трафик", "INGRESS", ingress.length),
-        tab("egress", "Исходящий трафик", "EGRESS", egress.length),
+        {
+          id: "rules",
+          label: "Правила",
+          count: all.length,
+          render: () => <SgRulesPanel sgId={sgId} projectId={projectId} rules={all} />,
+        },
       ];
     },
   },
