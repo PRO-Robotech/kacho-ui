@@ -42,8 +42,17 @@ export function useInvalidateResourceList() {
     qc.invalidateQueries({ queryKey: [resourceId, "list"] });
     // Detail этого ресурса (если открыт).
     qc.invalidateQueries({ queryKey: [resourceId, "detail"] });
-    // RefNameLink lookup-кэш.
-    qc.invalidateQueries({ queryKey: ["ref-name", resourceId] });
+    // KAC-239 (#3): RefNameLink резолвит имя по списку владельца. Инвалидируем
+    // ВСЕ ref-name кэши (не только этого ресурса) — чтобы имя только что
+    // созданного ресурса, включая порождённый side-effect'ом default-SG,
+    // показывалось сразу, а не его id (рендер опережал резолв имени).
+    qc.invalidateQueries({ queryKey: ["ref-name"] });
+    // KAC-239 (#2): Network.Create side-effect'ом создаёт default Security Group
+    // → обновить и список SG, иначе он не виден до собственного поллинга списка.
+    if (resourceId === "networks") {
+      qc.invalidateQueries({ queryKey: ["security-groups", "list"] });
+      qc.invalidateQueries({ queryKey: ["security-groups", "detail"] });
+    }
     // Breadcrumb pills (Account/Project dropdowns).
     qc.invalidateQueries({ queryKey: ["accounts-crumb"] });
     qc.invalidateQueries({ queryKey: ["projects-crumb"] });
