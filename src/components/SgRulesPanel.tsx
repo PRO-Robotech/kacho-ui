@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Dropdown, Modal, Space, Typography } from "antd";
+import { Button, Checkbox, Dropdown, Modal, Space, Typography } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -82,6 +82,7 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
   // mode: null = список; иначе редактор одного правила (obj = {rules:[rule]}).
   const [editObj, setEditObj] = useState<Record<string, unknown> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null); // null = добавление
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const mutation = useMutation({
     mutationFn: (payload: unknown) => api.update(`${sgSpec.apiPath}/${sgId}/rules`, payload),
@@ -114,6 +115,40 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
     });
   };
 
+  // Только правила с id выбираемы/удаляемы (id-less в backfill-эпоху не бывает).
+  const selectableIds = rules.map((r) => r.id).filter(Boolean) as string[];
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
+  const someSelected = selectableIds.some((id) => selected.has(id));
+
+  const toggleOne = (id: string, on: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+  const toggleAll = (on: boolean) => {
+    setSelected(on ? new Set(selectableIds) : new Set());
+  };
+
+  const confirmDeleteSelected = () => {
+    const ids = selectableIds.filter((id) => selected.has(id));
+    if (ids.length === 0) return;
+    Modal.confirm({
+      title: `Удалить выбранные правила (${ids.length})`,
+      icon: <ExclamationCircleFilled />,
+      content: "Действие необратимо.",
+      okText: "Удалить",
+      okButtonProps: { danger: true },
+      cancelText: "Отмена",
+      onOk: async () => {
+        await runOp({ deletion_rule_ids: ids }, `Удаление правил группы безопасности (${ids.length})`);
+        setSelected(new Set());
+      },
+    });
+  };
+
   const startAdd = () => {
     setEditingId(null);
     setEditObj({ rules: [{ direction }] });
@@ -129,19 +164,28 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
 
   const saveEdit = async () => {
     const arr = (editObj?.rules as SgRule[] | undefined) ?? [];
-    const raw = arr[0];
-    if (!raw) {
+    if (arr.length === 0) {
       cancelEdit();
       return;
     }
-    const clean = sanitizeSgRule({ ...raw, direction });
-    delete clean.id;
+    // Edit-режим — ровно одно правило (delete старого id + add). Add-режим —
+    // СКОЛЬКО УГОДНО правил из редактора (раньше слалось только arr[0] → терялись).
+    const specs = (editingId ? arr.slice(0, 1) : arr).map((raw) => {
+      const clean = sanitizeSgRule({ ...raw, direction });
+      delete clean.id;
+      return clean;
+    });
     const payload: { deletion_rule_ids?: string[]; addition_rule_specs?: unknown[] } = {
-      addition_rule_specs: [clean],
+      addition_rule_specs: specs,
     };
     if (editingId) payload.deletion_rule_ids = [editingId]; // edit = delete+add по id
     cancelEdit();
-    await runOp(payload, editingId ? "Изменение правила группы безопасности" : "Добавление правила группы безопасности");
+    await runOp(
+      payload,
+      editingId
+        ? "Изменение правила группы безопасности"
+        : `Добавление правил группы безопасности (${specs.length})`,
+    );
   };
 
   // ── режим редактора одного правила ──
@@ -174,9 +218,19 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
       <SectionHeader
         title={<>{title} <Typography.Text type="secondary">({rules.length})</Typography.Text></>}
         right={
-          <Button type="primary" icon={<PlusOutlined />} onClick={startAdd}>
-            Добавить правило
-          </Button>
+          <Space>
+            <Button type="primary" icon={<PlusOutlined />} onClick={startAdd}>
+              Добавить правило
+            </Button>
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              disabled={!someSelected}
+              onClick={confirmDeleteSelected}
+            >
+              Удалить{someSelected ? ` (${selectableIds.filter((id) => selected.has(id)).length})` : ""}
+            </Button>
+          </Space>
         }
       />
       {rules.length === 0 ? (
@@ -188,6 +242,14 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-xs uppercase tracking-wide">
               <tr>
+                <th className="px-3 py-2" style={{ width: 36 }}>
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={someSelected && !allSelected}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    disabled={selectableIds.length === 0}
+                  />
+                </th>
                 <th className="text-left px-3 py-2">Протокол</th>
                 <th className="text-left px-3 py-2">Диапазон портов</th>
                 <th className="text-left px-3 py-2">Тип источника</th>
@@ -201,6 +263,13 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
                 const tgt = targetParts(r);
                 return (
                   <tr key={r.id ?? i} className="border-t border-border hover:bg-muted/20">
+                    <td className="px-3 py-2">
+                      <Checkbox
+                        checked={!!r.id && selected.has(r.id)}
+                        disabled={!r.id}
+                        onChange={(e) => r.id && toggleOne(r.id, e.target.checked)}
+                      />
+                    </td>
                     <td className="px-3 py-2">{protoLabel(r)}</td>
                     <td className="px-3 py-2">{portsLabel(r)}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{tgt.kind}</td>
