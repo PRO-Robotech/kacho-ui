@@ -78,7 +78,9 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
 
       const res = await api.update(`${rtSpec.apiPath}/${routeTableId}`, {
         static_routes: next,
-        update_mask: "static_routes",
+        // FieldMask JSON-пути — camelCase (googleapis FieldMask mapping);
+        // protojson на бэкенде отвергает snake_case "static_routes".
+        update_mask: "staticRoutes",
       });
 
       const operationId = extractOperationId(res);
