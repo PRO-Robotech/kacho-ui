@@ -262,6 +262,11 @@ export function computeUpdateMask(
     // в update_mask (например, sg-rules управляются через спец-RPC, и backend
     // отвергает `rules` в Update mask с reason="unknown field").
     if (f.editHidden) continue;
+    // createOnly — поле задаётся только при Create (нет Update-семантики на
+    // бэкенде), напр. networks.create_default_security_group. В edit-форме оно
+    // скрыто, но в update_mask попадать НЕ должно — иначе backend отвергает
+    // `unknown field in update_mask` (KAC-239).
+    if (f.createOnly) continue;
     if (f.name.startsWith("_")) continue;
     const o = getByPath(original, f.name);
     const c = getByPath(current, f.name);
