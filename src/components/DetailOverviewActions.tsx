@@ -1,25 +1,21 @@
 // DetailOverviewActions — действия в шапке таба «Обзор» detail-страницы
-// (ResourceShell): Редактировать / Переместить / Удалить + ext-actions.
+// (ResourceShell): Редактировать (кнопка) + ⋮-меню (Удалить) + ext-actions.
 //
-// Зеркалит RowActionsMenu (kebab в таблицах), но как кнопки в шапке Обзора,
-// переиспользуя те же контролируемые диалоги (DeleteDialog/MoveStubDialog) и
-// те же правила гейтинга (ops.update, moveCapable allowlist, ops.delete +
-// not-default-SG). После удаления — переход на список ресурса.
+// По требованию: «Переместить» в Обзоре НЕ показываем; «Удалить» спрятано за
+// kebab-меню (три точки) как actions. Гейтинг как в RowActionsMenu
+// (ops.update / ops.delete & not-default-SG). После удаления — переход на список.
 
 import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "antd";
-import { EditOutlined, DragOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Button, Dropdown } from "antd";
+import type { MenuProps } from "antd";
+import { EditOutlined, DeleteOutlined, MoreOutlined } from "@ant-design/icons";
 import { DeleteDialog } from "@/components/DeleteDialog";
-import { MoveStubDialog } from "@/components/MoveStubDialog";
 import {
   getByPath,
   resourceProjectPath,
   type ResourceSpec,
 } from "@/lib/resource-registry";
-
-// Ресурсы, для которых Move неприменим (зеркало RowActionsMenu.moveCapable).
-const MOVE_INCAPABLE = ["accounts", "projects", "regions", "zones", "address-pools"];
 
 interface Props {
   spec: ResourceSpec;
@@ -32,7 +28,6 @@ interface Props {
 
 export function DetailOverviewActions({ spec, data, projectId, detailBase, extActions }: Props) {
   const navigate = useNavigate();
-  const [moveOpen, setMoveOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   const id = getByPath<string>(data, "id") ?? "";
@@ -40,10 +35,21 @@ export function DetailOverviewActions({ spec, data, projectId, detailBase, extAc
   const apiPath = `${spec.apiPath}/${id}`;
   const listPath = resourceProjectPath(spec.id, projectId) ?? `/${spec.route}`;
 
-  const moveCapable = !MOVE_INCAPABLE.includes(spec.id);
   const isDefaultSg =
     spec.id === "security-groups" && Boolean(getByPath<boolean>(data, "default_for_network"));
   const showDelete = spec.ops.delete && !isDefaultSg;
+
+  const menuItems: MenuProps["items"] = showDelete
+    ? [
+        {
+          key: "delete",
+          icon: <DeleteOutlined />,
+          label: "Удалить",
+          danger: true,
+          onClick: () => setDeleteOpen(true),
+        },
+      ]
+    : [];
 
   return (
     <>
@@ -53,26 +59,12 @@ export function DetailOverviewActions({ spec, data, projectId, detailBase, extAc
           Редактировать
         </Button>
       )}
-      {moveCapable && (
-        <Button icon={<DragOutlined />} onClick={() => setMoveOpen(true)}>
-          Переместить
-        </Button>
-      )}
-      {showDelete && (
-        <Button danger icon={<DeleteOutlined />} onClick={() => setDeleteOpen(true)}>
-          Удалить
-        </Button>
+      {menuItems.length > 0 && (
+        <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
+          <Button type="text" icon={<MoreOutlined />} aria-label="Действия" />
+        </Dropdown>
       )}
 
-      {moveCapable && (
-        <MoveStubDialog
-          open={moveOpen}
-          onOpenChange={setMoveOpen}
-          resourceLabel={spec.singular}
-          name={name}
-          apiPath={apiPath}
-        />
-      )}
       {showDelete && (
         <DeleteDialog
           open={deleteOpen}
