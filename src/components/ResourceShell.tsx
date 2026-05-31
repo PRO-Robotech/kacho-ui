@@ -44,6 +44,7 @@ import { REGISTRY, getByPath, resourceProjectPath, type ResourceSpec } from "@/l
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
 import { useInvalidateResourceList } from "@/lib/use-operation";
+import { DetailOverviewActions } from "@/components/DetailOverviewActions";
 
 export type ResourceShellMode = "edit" | "child-create";
 
@@ -259,14 +260,13 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
           <SectionHeader
             title="Обзор"
             right={
-              <>
-                {ext?.headerActions?.(extCtx)}
-                {spec.ops.update && (
-                  <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
-                    Редактировать
-                  </Button>
-                )}
-              </>
+              <DetailOverviewActions
+                spec={spec}
+                data={data}
+                projectId={projectId ?? null}
+                detailBase={detailBase}
+                extActions={ext?.headerActions?.(extCtx)}
+              />
             }
           />
           <Descriptions
