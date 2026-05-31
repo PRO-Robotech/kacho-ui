@@ -3,15 +3,13 @@
 //   • OperationsTab (per-resource detail-page)
 //   • OperationsPage (global project-level)
 //
-// Колонки: Идентификатор / Статус (icon+string) / Пользователь (plain email) /
+// Колонки: Идентификатор / Статус (icon+string) / Пользователь (email) /
 //          Операция / Дата начала / Дата изменения / Сообщение об ошибке /
 //          Идентификатор ресурса.
 //
-// «Пользователь» — просто строковое значение (почта), без иконок/тултипов/доп-
-// инфы по принципалу (требование UX).
-//
-// Фильтры — приходят сверху (по id и status; глобальная страница добавляет
-// фильтр по типу ресурса).
+// «Пользователь» — email инициатора. created_by приходит как user-id; KAC-239 (#4)
+// резолвим его в email через глобальный справочник /iam/v1/users (scope:global).
+// Фоллбэк (нет матча / справочник не загрузился) — created_by/principal как есть.
 
 import { Empty, Space, Table, Typography } from "antd";
 import {
@@ -21,6 +19,8 @@ import {
   MinusCircleFilled,
 } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/api/client";
 import { CopyableId } from "@/components/CopyableId";
 
 export type OperationStatus = "running" | "done" | "error" | "cancelled";
@@ -38,18 +38,20 @@ export interface Op {
   resource_id?: string;
   /** Тип ресурса (registry id). Заполняется при aggregation в global-странице. */
   resource_kind?: string;
-  /** IAM principal — поля operation.proto (sub-phase 2.0 IAM E0, KAC-105).
-   *  На E0 заполняются stub-значениями ("system"/"bootstrap"), на E2+ — реальными
-   *  values из auth-interceptor. См. proto/kacho/cloud/operation/operation.proto §55. */
+  /** IAM principal — поля operation.proto (sub-phase 2.0 IAM E0, KAC-105). */
   principal_type?: string;
   principal_id?: string;
   principal_display_name?: string;
 }
 
-/** userOf — почта пользователя-инициатора операции (plain string). На E0 может
- *  быть "anonymous"/"system"; на E2+ — реальный email из auth-interceptor.
- *  Берём created_by, fallback на principal_display_name/principal_id. */
-function userOf(op: Op): string {
+interface IamUser {
+  id: string;
+  email?: string;
+  display_name?: string;
+}
+
+/** userFallback — что показать без справочника: created_by/principal как есть. */
+function userFallback(op: Op): string {
   return op.created_by || op.principal_display_name || op.principal_id || "";
 }
 
@@ -114,6 +116,19 @@ interface Props {
 }
 
 export function OperationsTable({ rows, loading, showResourceKind, empty }: Props) {
+  // KAC-239 (#4): справочник пользователей для резолва created_by(id) → email.
+  // /iam/v1/users — scope:global, грузится один раз и дедуплицируется TanStack.
+  const { data: usersData } = useQuery({
+    queryKey: ["ops-users"],
+    queryFn: () =>
+      api.list<{ users?: IamUser[] }>("/iam/v1/users", { pageSize: "1000" }),
+    staleTime: 60_000,
+  });
+  const userEmail = (op: Op): string => {
+    const u = (usersData?.users ?? []).find((x) => x.id === op.created_by);
+    return u?.email || u?.display_name || userFallback(op);
+  };
+
   const columns: ColumnsType<Op> = [
     {
       title: "Идентификатор",
@@ -133,7 +148,7 @@ export function OperationsTable({ rows, loading, showResourceKind, empty }: Prop
       key: "user",
       width: 240,
       render: (_v, op) => {
-        const email = userOf(op);
+        const email = userEmail(op);
         return email ? (
           <span>{email}</span>
         ) : (
