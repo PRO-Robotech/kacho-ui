@@ -119,31 +119,6 @@ function StaticRoutesTable({ routes }: { routes: StaticRoute[] }) {
       </div>
     );
   }
-  return (
-    <div className="rounded-lg border border-border overflow-hidden bg-card">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-xs uppercase tracking-wide">
-          <tr>
-            <th className="text-left px-3 py-2">Префикс назначения</th>
-            <th className="text-left px-3 py-2">Next hop</th>
-          </tr>
-        </thead>
-        <tbody>
-          {routes.map((r, i) => (
-            <tr key={i} className="border-t border-border hover:bg-muted/20">
-              <td className="px-3 py-2 font-mono text-xs">{r.destination_prefix || "—"}</td>
-              <td className="px-3 py-2 font-mono text-xs">{r.next_hop_address || r.gateway_id || "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-// ── Address: вычисление IP/семейства/вида ──
-function addressInfo(data: Record<string, unknown>): { ip: string; family: string; kind: string } {
-  const ext4 = getByPath<{ address?: string }>(data, "external_ipv4_address");
   const int4 = getByPath<{ address?: string }>(data, "internal_ipv4_address");
   const ext6 = getByPath<{ address?: string }>(data, "external_ipv6_address");
   const int6 = getByPath<{ address?: string }>(data, "internal_ipv6_address");

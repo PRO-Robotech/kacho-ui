@@ -1,20 +1,16 @@
-// SgRulesPanel — управление правилами Security Group по одному (KAC-239).
+// SgRulesPanel — управление правилами Security Group (KAC-239).
 //
-// Заменяет read-only RulesTable в табах «Входящий/Исходящий трафик» SG detail.
-// Режимы: list (таблица с per-row ⋮ Редактировать/Удалить + «Добавить правило»)
-// ↔ edit (редактор ОДНОГО правила через SgRulesEditor).
-//
-// Бэкенд: PATCH /vpc/v1/securityGroups/<id>/rules (UpdateRules) с
-// { deletion_rule_ids, addition_rule_specs }. Каждая операция — над одним
-// правилом (правила имеют стабильный id после KAC-239 backend-фикса):
-//   • add    → { addition_rule_specs: [spec] }
+// Один таб «Правила» (INGRESS+EGRESS вместе; направление — первый столбец).
+// Режимы: list (таблица: чекбоксы + per-row ⋮ Редактировать/Удалить + bulk-delete)
+// ↔ edit (редактор правил через SgRulesEditor; direction выбирается в самом
+// правиле). Каждая операция — UpdateRules по стабильному id:
+//   • add    → { addition_rule_specs: [...] }
 //   • edit   → { deletion_rule_ids: [id], addition_rule_specs: [spec] }
-//   • delete → { deletion_rule_ids: [id] }
-// Это правка ОДНОГО правила, а не всего ресурса SG.
+//   • delete → { deletion_rule_ids: [...] }
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Checkbox, Dropdown, Modal, Space, Typography } from "antd";
+import { Button, Checkbox, Dropdown, Modal, Space, Tag, Typography } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -40,14 +36,13 @@ export interface SgRule {
 interface Props {
   sgId: string;
   projectId: string | null;
-  /** "INGRESS" | "EGRESS" — направление этого таба. */
-  direction: "INGRESS" | "EGRESS";
-  /** Заголовок таба («Входящий трафик» / «Исходящий трафик»). */
-  title: string;
-  /** Все правила SG (из detail). Фильтруются по direction. */
-  allRules: SgRule[];
+  /** Все правила SG (из detail) — оба направления в одной таблице. */
+  rules: SgRule[];
 }
 
+function dirOf(r: SgRule): "INGRESS" | "EGRESS" {
+  return (r.direction ?? "INGRESS").toUpperCase() === "EGRESS" ? "EGRESS" : "INGRESS";
+}
 function protoLabel(r: SgRule): string {
   if (r.protocol_name) return r.protocol_name;
   if (typeof r.protocol_number === "number") return `proto ${r.protocol_number}`;
@@ -72,14 +67,10 @@ function targetParts(r: SgRule): { kind: string; value: string } {
   return { kind: "—", value: "—" };
 }
 
-export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Props) {
+export function SgRulesPanel({ sgId, projectId, rules }: Props) {
   const sgSpec = REGISTRY["security-groups"];
   const qc = useQueryClient();
-  const rules = allRules.filter(
-    (r) => (r.direction ?? "INGRESS").toUpperCase() === direction,
-  );
 
-  // mode: null = список; иначе редактор одного правила (obj = {rules:[rule]}).
   const [editObj, setEditObj] = useState<Record<string, unknown> | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null); // null = добавление
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -87,10 +78,12 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
   const mutation = useMutation({
     mutationFn: (payload: unknown) => api.update(`${sgSpec.apiPath}/${sgId}/rules`, payload),
   });
-
   const refresh = () => qc.invalidateQueries({ queryKey: [sgSpec.id] });
 
-  const runOp = async (payload: { deletion_rule_ids?: string[]; addition_rule_specs?: unknown[] }, opTitle: string) => {
+  const runOp = async (
+    payload: { deletion_rule_ids?: string[]; addition_rule_specs?: unknown[] },
+    opTitle: string,
+  ) => {
     try {
       const resp = await mutation.mutateAsync(payload);
       const opId = extractOperationId(resp as Parameters<typeof extractOperationId>[0]);
@@ -102,35 +95,20 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
     }
   };
 
-  const confirmDelete = (r: SgRule) => {
-    if (!r.id) return;
-    Modal.confirm({
-      title: "Удалить правило",
-      icon: <ExclamationCircleFilled />,
-      content: `${protoLabel(r)} · ${targetParts(r).value}`,
-      okText: "Удалить правило",
-      okButtonProps: { danger: true },
-      cancelText: "Отмена",
-      onOk: () => runOp({ deletion_rule_ids: [r.id as string] }, "Удаление правила группы безопасности"),
-    });
-  };
-
-  // Только правила с id выбираемы/удаляемы (id-less в backfill-эпоху не бывает).
+  // Выбор — только правила с id (после backfill id есть у всех).
   const selectableIds = rules.map((r) => r.id).filter(Boolean) as string[];
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
   const someSelected = selectableIds.some((id) => selected.has(id));
+  const selCount = selectableIds.filter((id) => selected.has(id)).length;
 
-  const toggleOne = (id: string, on: boolean) => {
+  const toggleOne = (id: string, on: boolean) =>
     setSelected((prev) => {
       const next = new Set(prev);
       if (on) next.add(id);
       else next.delete(id);
       return next;
     });
-  };
-  const toggleAll = (on: boolean) => {
-    setSelected(on ? new Set(selectableIds) : new Set());
-  };
+  const toggleAll = (on: boolean) => setSelected(on ? new Set(selectableIds) : new Set());
 
   const confirmDeleteSelected = () => {
     const ids = selectableIds.filter((id) => selected.has(id));
@@ -149,9 +127,22 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
     });
   };
 
+  const confirmDelete = (r: SgRule) => {
+    if (!r.id) return;
+    Modal.confirm({
+      title: "Удалить правило",
+      icon: <ExclamationCircleFilled />,
+      content: `${dirOf(r)} · ${protoLabel(r)} · ${targetParts(r).value}`,
+      okText: "Удалить правило",
+      okButtonProps: { danger: true },
+      cancelText: "Отмена",
+      onOk: () => runOp({ deletion_rule_ids: [r.id as string] }, "Удаление правила группы безопасности"),
+    });
+  };
+
   const startAdd = () => {
     setEditingId(null);
-    setEditObj({ rules: [{ direction }] });
+    setEditObj({ rules: [{ direction: "INGRESS" }] });
   };
   const startEdit = (r: SgRule) => {
     setEditingId(r.id ?? null);
@@ -168,17 +159,17 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
       cancelEdit();
       return;
     }
-    // Edit-режим — ровно одно правило (delete старого id + add). Add-режим —
-    // СКОЛЬКО УГОДНО правил из редактора (раньше слалось только arr[0] → терялись).
+    // Edit — ровно одно правило; Add — все из редактора. Direction берётся из
+    // самого правила (выбирается в SgRulesEditor), не навязывается вкладкой.
     const specs = (editingId ? arr.slice(0, 1) : arr).map((raw) => {
-      const clean = sanitizeSgRule({ ...raw, direction });
+      const clean = sanitizeSgRule({ ...raw });
       delete clean.id;
       return clean;
     });
     const payload: { deletion_rule_ids?: string[]; addition_rule_specs?: unknown[] } = {
       addition_rule_specs: specs,
     };
-    if (editingId) payload.deletion_rule_ids = [editingId]; // edit = delete+add по id
+    if (editingId) payload.deletion_rule_ids = [editingId];
     cancelEdit();
     await runOp(
       payload,
@@ -188,17 +179,17 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
     );
   };
 
-  // ── режим редактора одного правила ──
+  // ── режим редактора ──
   if (editObj) {
     return (
       <div>
-        <SectionHeader title={`${editingId ? "Редактирование" : "Добавление"} правила · ${title.toLowerCase()}`} />
+        <SectionHeader title={editingId ? "Редактирование правила" : "Добавление правил"} />
         <SgRulesEditor
           pathPrefix=""
           value={editObj}
           onChange={setEditObj}
           path="rules"
-          description="Direction зафиксирован по вкладке. Protocol/ports/target — по необходимости."
+          description="Направление (Входящий/Исходящий) выбирается в каждом правиле."
         />
         <Space style={{ marginTop: 16 }}>
           <Button type="primary" onClick={saveEdit} loading={mutation.isPending}>
@@ -216,19 +207,14 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
   return (
     <div>
       <SectionHeader
-        title={<>{title} <Typography.Text type="secondary">({rules.length})</Typography.Text></>}
+        title={<>Правила <Typography.Text type="secondary">({rules.length})</Typography.Text></>}
         right={
           <Space>
             <Button type="primary" icon={<PlusOutlined />} onClick={startAdd}>
               Добавить правило
             </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              disabled={!someSelected}
-              onClick={confirmDeleteSelected}
-            >
-              Удалить{someSelected ? ` (${selectableIds.filter((id) => selected.has(id)).length})` : ""}
+            <Button danger icon={<DeleteOutlined />} disabled={!someSelected} onClick={confirmDeleteSelected}>
+              Удалить{selCount > 0 ? ` (${selCount})` : ""}
             </Button>
           </Space>
         }
@@ -250,6 +236,7 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
                     disabled={selectableIds.length === 0}
                   />
                 </th>
+                <th className="text-left px-3 py-2">Направление</th>
                 <th className="text-left px-3 py-2">Протокол</th>
                 <th className="text-left px-3 py-2">Диапазон портов</th>
                 <th className="text-left px-3 py-2">Тип источника</th>
@@ -261,6 +248,7 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
             <tbody>
               {rules.map((r, i) => {
                 const tgt = targetParts(r);
+                const dir = dirOf(r);
                 return (
                   <tr key={r.id ?? i} className="border-t border-border hover:bg-muted/20">
                     <td className="px-3 py-2">
@@ -269,6 +257,11 @@ export function SgRulesPanel({ sgId, projectId, direction, title, allRules }: Pr
                         disabled={!r.id}
                         onChange={(e) => r.id && toggleOne(r.id, e.target.checked)}
                       />
+                    </td>
+                    <td className="px-3 py-2">
+                      <Tag color={dir === "INGRESS" ? "green" : "blue"}>
+                        {dir === "INGRESS" ? "Входящий" : "Исходящий"}
+                      </Tag>
                     </td>
                     <td className="px-3 py-2">{protoLabel(r)}</td>
                     <td className="px-3 py-2">{portsLabel(r)}</td>
