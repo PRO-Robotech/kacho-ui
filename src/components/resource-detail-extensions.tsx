@@ -13,11 +13,11 @@
 import { type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Tag, Typography } from "antd";
-import { PlusOutlined } from "@ant-design/icons";
+import { Tag, Typography } from "antd";
+
 import { toast } from "@/lib/toast";
 import type { DetailTab } from "@/components/DetailShell";
-import { SectionHeader } from "@/components/SectionHeader";
+
 import { RefNameLink } from "@/components/RefNameLink";
 import { SgRulesPanel, type SgRule } from "@/components/SgRulesPanel";
 import { RoutesPanel } from "@/components/RoutesPanel";
