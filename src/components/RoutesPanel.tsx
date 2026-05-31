@@ -147,7 +147,7 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
       </Button>
     </Space>
   ) : (
-    <Button type="primary" icon={<EditOutlined />} onClick={startEdit}>
+    <Button icon={<EditOutlined />} onClick={startEdit}>
       Редактировать
     </Button>
   );
@@ -171,8 +171,8 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
           <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
             {/* Фиксированные ширины колонок — идентичны в read и edit, без горизонтального прыжка. */}
             <colgroup>
-              <col />
-              <col />
+              <col style={{ width: "calc((100% - 48px) / 2)" }} />
+              <col style={{ width: "calc((100% - 48px) / 2)" }} />
               <col style={{ width: 48 }} />
             </colgroup>
             <thead>
