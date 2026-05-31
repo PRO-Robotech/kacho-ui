@@ -40,8 +40,11 @@ export function useInvalidateResourceList() {
     void _projectId;
     // Все list-варианты этого ресурса (любой parent-фильтр).
     qc.invalidateQueries({ queryKey: [resourceId, "list"] });
-    // Detail этого ресурса (если открыт).
-    qc.invalidateQueries({ queryKey: [resourceId, "detail"] });
+    // Detail этого ресурса (если открыт). ВНИМАНИЕ: реальный ключ —
+    // ["detail", spec.id, projectId, id] (см. use-resource-detail.ts), поэтому
+    // префикс инвалидации обязан начинаться с "detail", а не с resourceId —
+    // иначе Обзор не обновляется после операции (показывает старое состояние).
+    qc.invalidateQueries({ queryKey: ["detail", resourceId] });
     // KAC-239 (#3): RefNameLink резолвит имя по списку владельца. Инвалидируем
     // ВСЕ ref-name кэши (не только этого ресурса) — чтобы имя только что
     // созданного ресурса, включая порождённый side-effect'ом default-SG,
@@ -51,7 +54,7 @@ export function useInvalidateResourceList() {
     // → обновить и список SG, иначе он не виден до собственного поллинга списка.
     if (resourceId === "networks") {
       qc.invalidateQueries({ queryKey: ["security-groups", "list"] });
-      qc.invalidateQueries({ queryKey: ["security-groups", "detail"] });
+      qc.invalidateQueries({ queryKey: ["detail", "security-groups"] });
     }
     // Breadcrumb pills (Account/Project dropdowns).
     qc.invalidateQueries({ queryKey: ["accounts-crumb"] });
