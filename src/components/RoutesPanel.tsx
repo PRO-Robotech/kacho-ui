@@ -147,7 +147,7 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
   const showTable = editing || routes.length > 0;
 
   return (
-    <div style={{ marginTop: 24 }}>
+    <div style={{ marginTop: 24, maxWidth: 760 }}>
       <SectionHeader
         title={
           <span>
