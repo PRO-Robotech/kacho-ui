@@ -19,7 +19,7 @@ import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Spin, Tag, Typography } from "antd";
-import { EditOutlined, PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
