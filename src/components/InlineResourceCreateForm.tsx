@@ -6,15 +6,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Form, Space, Tooltip, Typography } from "antd";
-import { QuestionCircleOutlined } from "@ant-design/icons";
-import { FormFieldRenderer } from "@/components/form/FormField";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
-import { DopplerButton } from "@/components/DopplerButton";
+import { Alert } from "antd";
 import { extractOperationId } from "@/components/OperationDialog";
+import { ResourceFormBody } from "@/components/form/ResourceFormBody";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
-import { getByPath, setByPath } from "@/lib/path";
+import { setByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 
@@ -149,116 +146,18 @@ export function InlineResourceCreateForm({
   }
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId={spec.id} />
-        {title ?? `Создание: ${spec.singular}`}
-      </Typography.Title>
-
-      <Form
-        layout="horizontal"
-        labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
-        labelAlign="left"
-        colon={false}
-        size="middle"
-      >
-        {fields
-          .filter((f) => {
-            if (lockedPathsRef.current.has(f.name)) return false;
-            if (f.hidden) return false;
-            if (f.visibleWhen) {
-              const cur = getByPath(obj, f.visibleWhen.field) as string | undefined;
-              const want = f.visibleWhen.equals;
-              const matched = Array.isArray(want)
-                ? want.includes(cur ?? "")
-                : cur === want;
-              if (!matched) return false;
-            }
-            return true;
-          })
-          .map((f) => {
-            const allowed = fieldOptionsFilter?.[f.name];
-            const field =
-              allowed && f.type === "enum"
-                ? {
-                    ...f,
-                    options: allowed
-                      .map((v) => f.options.find((o) => o.value === v))
-                      .filter((o): o is { value: string; label: string } => !!o),
-                  }
-                : f;
-            // sg-rules/array/custom — рендерят свой собственный header/box во
-            // всю ширину формы (без бокового label). labels — оборачиваем в
-            // Form.Item с label="Метки" (как Subnet Create) — editor справа.
-            const fullWidth =
-              field.type === "sg-rules" ||
-              field.type === "array" ||
-              field.type === "custom";
-            const inner = (
-              <FormFieldRenderer
-                field={field}
-                pathPrefix=""
-                value={obj}
-                onChange={setObj}
-                hideLabel={!fullWidth}
-              />
-            );
-            if (fullWidth) {
-              return (
-                <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
-                  {inner}
-                </Form.Item>
-              );
-            }
-            return (
-              <Form.Item
-                key={f.name}
-                label={
-                  field.description ? (
-                    <Space size={4}>
-                      {field.label}
-                      <Tooltip title={field.description}>
-                        <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
-                      </Tooltip>
-                    </Space>
-                  ) : (
-                    field.label
-                  )
-                }
-                required={!!field.required}
-              >
-                {inner}
-              </Form.Item>
-            );
-          })}
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <DopplerButton
-              type="primary"
-              onClick={submit}
-              pulsing={mutation.isPending || pendingOpId !== null}
-            >
-              Создать {spec.singular.toLowerCase()}
-            </DopplerButton>
-            <Button
-              onClick={onCancel}
-              disabled={mutation.isPending || pendingOpId !== null}
-            >
-              Отменить
-            </Button>
-          </Space>
-        </Form.Item>
-      </Form>
-    </div>
+    <ResourceFormBody
+      spec={spec}
+      mode="create"
+      obj={obj}
+      onChange={setObj}
+      lockedPaths={lockedPathsRef.current}
+      fieldOptionsFilter={fieldOptionsFilter}
+      title={title}
+      submitLabel={`Создать ${spec.singular.toLowerCase()}`}
+      submitting={mutation.isPending || pendingOpId !== null}
+      onSubmit={submit}
+      onCancel={onCancel}
+    />
   );
 }
