@@ -4,12 +4,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Alert, Button, Card, Space, Spin, Typography } from "antd";
+import { Alert, Button, Space, Spin, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { ErrorResult } from "@/components/ErrorResult";
-import { FormFieldRenderer } from "@/components/form/FormField";
+import { ResourceFormBody } from "@/components/form/ResourceFormBody";
 import { extractOperationId } from "@/components/OperationDialog";
-import { DopplerButton } from "@/components/DopplerButton";
 import { computeUpdateMask, snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
@@ -200,39 +199,17 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
               {name}
             </Button>
           </Link>
-          <Typography.Title level={3} style={{ margin: "4px 0 0 0" }}>
-            Изменение {spec.singular.toLowerCase()}
-          </Typography.Title>
         </div>
-
-        <Card size="small">
-          <Space direction="vertical" size={16} style={{ width: "100%" }}>
-            {fields.map((f) => (
-              <FormFieldRenderer
-                key={f.name}
-                field={f}
-                pathPrefix=""
-                value={obj}
-                onChange={setObj}
-                editMode
-              />
-            ))}
-          </Space>
-        </Card>
-
-
-        <Space>
-          <DopplerButton
-            type="primary"
-            onClick={submit}
-            pulsing={mutation.isPending || pendingOpId !== null}
-          >
-            Сохранить
-          </DopplerButton>
-          <Link to={backHref}>
-            <Button>Отменить</Button>
-          </Link>
-        </Space>
+        <ResourceFormBody
+          spec={spec}
+          mode="edit"
+          obj={obj}
+          onChange={setObj}
+          submitLabel="Сохранить"
+          submitting={mutation.isPending || pendingOpId !== null}
+          onSubmit={submit}
+          onCancel={() => navigate(backHref)}
+        />
       </Space>
     </div>
   );
