@@ -36,4 +36,45 @@ describe("ResourceFormBody", () => {
     expect(screen.getByText("enpXYZ")).toBeInTheDocument();
     expect(screen.getByLabelText("immutable-lock")).toBeInTheDocument();
   });
+
+  it("hides editHidden field in edit mode but shows normal fields", () => {
+    const specWithSecret = {
+      id: "things",
+      singular: "Вещь",
+      fields: [
+        { name: "name", label: "Имя", type: "string" },
+        { name: "secret", label: "Секрет", type: "string", editHidden: true },
+      ],
+    } as unknown as ResourceSpec;
+
+    render(
+      <ResourceFormBody
+        spec={specWithSecret} mode="edit" obj={{ name: "n", secret: "x" }} onChange={() => {}}
+        submitLabel="Сохранить" submitting={false} onSubmit={() => {}} onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Секрет")).not.toBeInTheDocument();
+    expect(screen.getByText("Имя")).toBeInTheDocument();
+  });
+
+  it("hides visibleWhen field when discriminator does not match", () => {
+    const specWithGated = {
+      id: "addresses",
+      singular: "Адрес",
+      fields: [
+        { name: "_kind", label: "Тип", type: "enum", options: [{ value: "external", label: "Внешний" }, { value: "internal", label: "Внутренний" }] },
+        { name: "subnet_id", label: "Подсеть", type: "string", visibleWhen: { field: "_kind", equals: "internal" } },
+      ],
+    } as unknown as ResourceSpec;
+
+    // _kind = "external" → visibleWhen({ field: "_kind", equals: "internal" }) is false → Подсеть hidden
+    render(
+      <ResourceFormBody
+        spec={specWithGated} mode="create" obj={{ _kind: "external" }} onChange={() => {}}
+        submitLabel="Создать адрес" submitting={false} onSubmit={() => {}} onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByText("Подсеть")).not.toBeInTheDocument();
+    expect(screen.getByText("Тип")).toBeInTheDocument();
+  });
 });

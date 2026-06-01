@@ -209,6 +209,7 @@ export function ResourceEditPage({ spec, paramKey = "uid" }: Props) {
           submitting={mutation.isPending || pendingOpId !== null}
           onSubmit={submit}
           onCancel={() => navigate(backHref)}
+          stickyFooter
         />
       </Space>
     </div>
