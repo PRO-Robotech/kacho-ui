@@ -1,6 +1,6 @@
 // InlineResourceEditForm — generic inline-форма редактирования ресурса,
 // встраиваемая в правую панель ResourceDetailPage вместо "Общее"-Descriptions.
-// Использует FormFieldRenderer (editMode=true → immutable-поля disabled),
+// Делегирует рендер ResourceFormBody (editMode → immutable-поля через ImmutableField),
 // PATCH с computeUpdateMask и Operation-banner на onSuccess.
 //
 // Применяется по умолчанию ко всем ресурсам, у которых есть spec.fields. Для
