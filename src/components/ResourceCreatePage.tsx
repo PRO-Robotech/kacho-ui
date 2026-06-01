@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+import { Alert, Button, Space, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
-import { FormFieldRenderer } from "@/components/form/FormField";
-import { DopplerButton } from "@/components/DopplerButton";
+import { ResourceFormBody } from "@/components/form/ResourceFormBody";
 import { extractOperationId } from "@/components/OperationDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
-import { applyFieldDefaults, getByPath, type ResourceSpec } from "@/lib/resource-registry";
+import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
 import { setByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -188,71 +187,27 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   }
 
   return (
-    <>
-      <div style={{ maxWidth: 760 }}>
-        <Space direction="vertical" size={20} style={{ width: "100%" }}>
-          <div>
-            <Link to={backHref}>
-              <Button type="text" size="small" icon={<ArrowLeftOutlined />} style={{ marginLeft: -8 }}>
-                {spec.plural}
-              </Button>
-            </Link>
-            <Typography.Title level={3} style={{ margin: "4px 0 0 0" }}>
-              Создать {spec.singular.toLowerCase()}
-            </Typography.Title>
-          </div>
-
-          {Object.keys(presetFields).length > 0 && (
-            <Alert
-              type="info"
-              message={
-                <span>
-                  Предзаполнено из контекста:{" "}
-                  {Object.entries(presetFields).map(([k, v]) => (
-                    <Tag key={k} style={{ fontFamily: "monospace", marginRight: 4 }}>
-                      {k}={String(v)}
-                    </Tag>
-                  ))}
-                </span>
-              }
-            />
-          )}
-
-          <Card size="small">
-            <Space direction="vertical" size={16} style={{ width: "100%" }}>
-              {fields.map((f) => (
-                <FormFieldRenderer
-                  key={f.name}
-                  field={lockedPathsRef.current.has(f.name) ? { ...f, immutable: true } : f}
-                  pathPrefix=""
-                  value={obj}
-                  onChange={setObj}
-                  editMode={lockedPathsRef.current.has(f.name)}
-                />
-              ))}
-            </Space>
-          </Card>
-
-
-          <Space>
-            <DopplerButton
-              type="primary"
-              onClick={submit}
-              pulsing={mutation.isPending || pendingOpId !== null}
-            >
-              Создать {spec.singular.toLowerCase()}
-            </DopplerButton>
-            <Link to={backHref}>
-              <Button disabled={mutation.isPending || pendingOpId !== null}>
-                Отменить
-              </Button>
-            </Link>
-          </Space>
-        </Space>
-      </div>
-    </>
+    <div style={{ maxWidth: 760 }}>
+      <Space direction="vertical" size={20} style={{ width: "100%" }}>
+        <div>
+          <Link to={backHref}>
+            <Button type="text" size="small" icon={<ArrowLeftOutlined />} style={{ marginLeft: -8 }}>
+              {spec.plural}
+            </Button>
+          </Link>
+        </div>
+        <ResourceFormBody
+          spec={spec}
+          mode="create"
+          obj={obj}
+          onChange={setObj}
+          lockedPaths={lockedPathsRef.current}
+          submitLabel={`Создать ${spec.singular.toLowerCase()}`}
+          submitting={mutation.isPending || pendingOpId !== null}
+          onSubmit={submit}
+          onCancel={() => navigate(backHref)}
+        />
+      </Space>
+    </div>
   );
-
-  // Suppress unused getByPath import
-  void getByPath;
 }
