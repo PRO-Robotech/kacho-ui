@@ -24,8 +24,6 @@ export interface ResourceFormBodyProps {
   fieldOptionsFilter?: Record<string, string[]>;
   /** title override (default "Создание/Редактирование: <singular>"). */
   title?: string;
-  /** optional banner above the form (e.g. page-create context note). */
-  notice?: React.ReactNode;
   submitLabel: string;
   submitting: boolean;
   onSubmit: () => void;
@@ -62,7 +60,6 @@ export function ResourceFormBody({
   lockedPaths,
   fieldOptionsFilter,
   title,
-  notice,
   submitLabel,
   submitting,
   onSubmit,
@@ -83,13 +80,12 @@ export function ResourceFormBody({
 
   const visible = fields.filter((f) => {
     if (f.hidden) return false;
-    if (editMode && (f.editHidden || (f as any).createOnly)) return false;
+    if (editMode && (f.editHidden || f.createOnly)) return false;
     return matchesVisibleWhen(obj, f.visibleWhen);
   });
 
   return (
     <FormShell specId={spec.id} mode={mode} singular={spec.singular} title={title}>
-      {notice}
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}

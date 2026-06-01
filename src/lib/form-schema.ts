@@ -31,6 +31,8 @@ interface BaseField {
   // Используется когда поле управляется отдельным action'ом на DetailPage
   // (например, Subnet.v4_cidr_blocks → :add-cidr-blocks/:remove-cidr-blocks).
   editHidden?: boolean;
+  // поле задаётся только при Create; скрыто в Edit-форме
+  createOnly?: boolean;
   // Условная видимость поля по значению другого поля формы (top-level path).
   // Используется для proto oneof: discriminator-enum (`_address_kind`) скрывает
   // неактивную ветку (external_* vs internal_*). Поле всё ещё может присутствовать
