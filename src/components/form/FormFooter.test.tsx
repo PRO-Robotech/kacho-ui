@@ -12,8 +12,14 @@ describe("FormFooter", () => {
     expect(onSubmit).toHaveBeenCalledOnce();
   });
 
-  it("disables both actions while submitting", () => {
-    render(<FormFooter submitLabel="Создать сеть" submitting onSubmit={() => {}} onCancel={() => {}} />);
+  it("blocks resubmit and disables cancel while submitting", async () => {
+    const onSubmit = vi.fn();
+    render(
+      <FormFooter submitLabel="Создать сеть" submitting onSubmit={onSubmit} onCancel={() => {}} />,
+    );
+    // antd Button with loading suppresses onClick → double-submit prevented.
+    await userEvent.click(screen.getByRole("button", { name: /Создать сеть/ }));
+    expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Отменить" })).toBeDisabled();
   });
 });
