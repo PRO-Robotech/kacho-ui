@@ -149,9 +149,8 @@ function RelatedTable({
           <>
             <TableSearch value={search} onChange={setSearch} />
             <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(createPath)}>
-              {createLabel}
-            </Button>
+            {/* «Создать <child>» — в ШАПКЕ страницы (ResourceShell header, KAC-242),
+                не в заголовке таблицы. createPath/createLabel ещё нужны empty-state. */}
           </>
         }
       />
@@ -230,13 +229,27 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   }, [spec.serviceTitle, spec.plural, listHref, detailBase, name, mode, childRoute]);
   useBreadcrumb(breadcrumb);
 
-  // KAC-242: действия ресурса (Редактировать / ⋮ Удалить + ext-actions) живут в
-  // ШАПКЕ страницы (правый слот хедера, рядом с хлебными крошками), а не в табе
-  // «Обзор». Только во view-режиме: при edit/child-create форма уже в зоне 3 —
-  // кнопки скрыты (headerActions = null).
-  const headerActions = useMemo(
-    () =>
-      !mode && data ? (
+  // KAC-242: действия в ШАПКЕ страницы — КОНТЕКСТНЫЕ по активному табу (не
+  // глобальные на всех табах):
+  //   • «Обзор»        → Редактировать + ⋮Удалить ресурса (DetailOverviewActions)
+  //   • related-child  → «Создать <child>» (подсеть / таблица маршрутизации / SG / …);
+  //                       удаление ребёнка — per-row в таблице (RowActionsMenu)
+  //   • прочие табы (операции / JSON / ext) → нет
+  // Скрыто в edit/child-create (форма уже в зоне 3). Активный таб берём из URL ДО
+  // early-return (без `data`); сам набор кнопок мемоизируем.
+  const headerTabFromUrl = location.pathname.startsWith(detailBase)
+    ? location.pathname.slice(detailBase.length).replace(/^\/+/, "").split("/")[0]
+    : "";
+  const headerTabId =
+    mode === "child-create" && childRoute
+      ? childRoute
+      : mode === "edit"
+        ? "overview"
+        : headerTabFromUrl || "overview";
+  const headerActions = useMemo(() => {
+    if (mode) return null;
+    if (headerTabId === "overview") {
+      return data ? (
         <DetailOverviewActions
           spec={spec}
           data={data}
@@ -244,9 +257,23 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
           detailBase={detailBase}
           extActions={ext?.headerActions?.({ data, projectId: projectId ?? null, detailBase, navigate })}
         />
-      ) : null,
-    [mode, data, spec, projectId, detailBase, ext, navigate],
-  );
+      ) : null;
+    }
+    const rel = (spec.related ?? []).find((r) => REGISTRY[r.childId]?.route === headerTabId);
+    const childSpec = rel ? REGISTRY[rel.childId] : undefined;
+    if (childSpec) {
+      return (
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => navigate(`${detailBase}/${childSpec.route}/create`)}
+        >
+          Создать {childSpec.singular.toLowerCase()}
+        </Button>
+      );
+    }
+    return null;
+  }, [mode, headerTabId, data, spec, projectId, detailBase, ext, navigate]);
   useHeaderRight(headerActions);
 
   if (isLoading && !data) {
