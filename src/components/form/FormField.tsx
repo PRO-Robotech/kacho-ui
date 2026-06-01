@@ -56,6 +56,9 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
   if (field.type === "array") return <ArrayFieldRenderer field={field} pathPrefix={pathPrefix} value={value} onChange={onChange} editMode={editMode} disabled={disabled} hideLabel={hideLabel} />;
   if (field.type === "sg-rules") {
     const path = pathPrefix ? `${pathPrefix}.${field.name}` : field.name;
+    // KAC-243 (scenario 18): создаваемая SG принадлежит сети из поля network_id
+    // той же формы — SG-target rule может ссылаться только на SG этой сети.
+    const editingNetworkId = getByPath(value, "network_id") as string | undefined;
     return (
       <SgRulesEditor
         pathPrefix={pathPrefix}
@@ -63,6 +66,7 @@ export function FormFieldRenderer({ field, pathPrefix, value, onChange, editMode
         onChange={onChange}
         path={path}
         description={field.description}
+        editingNetworkId={editingNetworkId || undefined}
       />
     );
   }

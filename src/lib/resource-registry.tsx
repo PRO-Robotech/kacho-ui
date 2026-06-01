@@ -1338,8 +1338,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         header: "Network",
         path: "network_id",
-        // network_id у SG теперь опционален (kacho-proto снял (required) с
-        // CreateSecurityGroupRequest.network_id; kacho-vpc допускает SG без сети).
+        // KAC-243: network_id у SG — обязателен и неизменяем (kacho-proto вернул
+        // (required) на CreateSecurityGroupRequest.network_id). Бессетевых SG
+        // больше нет; «—» остаётся только для legacy-строк до backfill-миграции.
         render: (row) => {
           const nid = row.network_id as string | undefined;
           return nid ? <RefNameLink specId="networks" refId={nid} /> : <span className="text-muted-foreground">—</span>;
@@ -1358,9 +1359,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "ref",
         refResource: "networks",
         refProjectScoped: true,
-        // Опционально: SG можно создать без привязки к сети (kacho-vpc).
-        placeholder: "— без сети —",
-        description: "Опционально. Если не задано — группа безопасности не привязана к сети.",
+        // KAC-243: network_id обязателен при Create и неизменяем после.
+        // На табе сети «Группы безопасности» preset+locked (см. ResourceFormBody
+        // ImmutableField); standalone-create — обязателен выбор сети.
+        required: true,
+        placeholder: "Выберите сеть",
+        description:
+          "Сеть, которой принадлежит группа безопасности. Обязательна и неизменяема после создания. " +
+          "SG→SG-правила допустимы только между группами одной сети.",
       },
       FIELD_LABELS,
       FIELD_DESCRIPTION,
@@ -1385,7 +1391,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     }),
     // Чистит UI-дискриминаторы (_protocol_mode/_ports_any/_target_kind) и
     // неактивные ветки oneof перед PATCH/POST. См. SgRulesEditor.
-    // Пустой network_id выбрасываем — SG может быть без привязки к сети.
+    // network_id обязателен (KAC-243); пустой выбрасываем только чтобы не слать
+    // "" — backend всё равно отвергнет Create без сети (INVALID_ARGUMENT).
     sanitize: (obj) => {
       const out: Record<string, unknown> = { ...obj };
       if (!out["network_id"]) delete out["network_id"];

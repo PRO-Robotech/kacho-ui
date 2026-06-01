@@ -259,12 +259,17 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
       // не правкой всего SG. Бэкенд — UpdateRules по стабильным id.
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const sgId = getByPath<string>(data, "id") ?? "";
+      // KAC-243 (scenario 18): network_id редактируемой SG → SG-target picker в
+      // редакторе правил фильтрует кандидатов по той же сети.
+      const networkId = getByPath<string>(data, "network_id") ?? "";
       return [
         {
           id: "rules",
           label: "Правила",
           count: all.length,
-          render: () => <SgRulesPanel sgId={sgId} projectId={projectId} rules={all} />,
+          render: () => (
+            <SgRulesPanel sgId={sgId} projectId={projectId} rules={all} networkId={networkId} />
+          ),
         },
       ];
     },

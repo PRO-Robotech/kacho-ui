@@ -38,6 +38,9 @@ interface Props {
   projectId: string | null;
   /** Все правила SG (из detail) — оба направления в одной таблице. */
   rules: SgRule[];
+  /** KAC-243 (scenario 18): network_id редактируемой SG. SG-target picker в
+   *  редакторе правил показывает только SG из этой же сети. */
+  networkId?: string;
 }
 
 function dirOf(r: SgRule): "INGRESS" | "EGRESS" {
@@ -67,7 +70,7 @@ function targetParts(r: SgRule): { kind: string; value: string } {
   return { kind: "—", value: "—" };
 }
 
-export function SgRulesPanel({ sgId, projectId, rules }: Props) {
+export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   const sgSpec = REGISTRY["security-groups"];
   const qc = useQueryClient();
 
@@ -190,6 +193,7 @@ export function SgRulesPanel({ sgId, projectId, rules }: Props) {
           onChange={setEditObj}
           path="rules"
           description="Направление (Входящий/Исходящий) выбирается в каждом правиле."
+          editingNetworkId={networkId || undefined}
         />
         <Space style={{ marginTop: 16 }}>
           <Button type="primary" onClick={saveEdit} loading={mutation.isPending}>

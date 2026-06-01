@@ -28,6 +28,7 @@ import {
   PlusOutlined,
 } from "@ant-design/icons";
 import { Label } from "@/components/ui/input";
+import { RefSelect } from "@/components/form/RefSelect";
 import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 
 type ProtocolMode = "any" | "name" | "number";
@@ -54,6 +55,12 @@ interface Props {
   onChange: (next: Record<string, unknown>) => void;
   path: string;
   description?: string;
+  // KAC-243 (scenario 18): network_id редактируемой SG. SG-target rule может
+  // ссылаться только на SG из ТОЙ ЖЕ сети (SG на разных сетях физически
+  // изолированы). Picker target-SG фильтрует список по
+  // networkId === editingNetworkId. Если не задан (нет контекста сети) —
+  // picker деградирует до ручного ввода UUID.
+  editingNetworkId?: string;
 }
 
 function inferProtocolMode(r: RuleExt): ProtocolMode {
@@ -116,7 +123,7 @@ function ruleSummary(r: RuleExt): string {
   return parts.join(" · ");
 }
 
-export function SgRulesEditor({ value, onChange, path, description }: Props) {
+export function SgRulesEditor({ value, onChange, path, description, editingNetworkId }: Props) {
   const rules = (getByPath(value, path) as RuleExt[] | undefined) ?? [];
   // Активные (открытые) панели Collapse. По умолчанию все свёрнуты.
   // Новое правило открывается автоматически.
@@ -207,7 +214,11 @@ export function SgRulesEditor({ value, onChange, path, description }: Props) {
               />
             ),
             children: (
-              <RuleBody rule={r} onChange={(next) => setRule(idx, next)} />
+              <RuleBody
+                rule={r}
+                onChange={(next) => setRule(idx, next)}
+                editingNetworkId={editingNetworkId}
+              />
             ),
           }))}
         />
@@ -219,9 +230,11 @@ export function SgRulesEditor({ value, onChange, path, description }: Props) {
 function RuleBody({
   rule,
   onChange,
+  editingNetworkId,
 }: {
   rule: RuleExt;
   onChange: (next: RuleExt) => void;
+  editingNetworkId?: string;
 }) {
   const protoMode = inferProtocolMode(rule);
   const portsAny = inferPortsAny(rule);
@@ -403,11 +416,27 @@ function RuleBody({
         </Field>
         <div>
           {targetKind === "sg" && (
-            <AntInput
-              placeholder="UUID другой SG"
-              value={rule.security_group_id ?? ""}
-              onChange={(e) => set({ security_group_id: e.target.value })}
-            />
+            // KAC-243 (scenario 18): выбор target-SG только из ТОЙ ЖЕ сети.
+            // refFilter оставляет лишь SG с networkId === editingNetworkId —
+            // cross-network SG не selectable (физически изолированы). Если
+            // network-контекст недоступен (editingNetworkId пуст) — fallback на
+            // ручной ввод UUID, чтобы не блокировать редактор.
+            editingNetworkId ? (
+              <RefSelect
+                refResource="security-groups"
+                refProjectScoped
+                value={rule.security_group_id ?? ""}
+                onChange={(uid) => set({ security_group_id: uid })}
+                placeholder="Группа безопасности (та же сеть)"
+                refFilter={(row) => row.network_id === editingNetworkId}
+              />
+            ) : (
+              <AntInput
+                placeholder="UUID другой SG"
+                value={rule.security_group_id ?? ""}
+                onChange={(e) => set({ security_group_id: e.target.value })}
+              />
+            )
           )}
           {targetKind === "predefined" && (
             <AntSelect
