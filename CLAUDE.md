@@ -42,7 +42,13 @@ src/
 │     ├─ LabelsEditor.tsx     wrapper над общим LabelsEditor для FormFieldRenderer
 │     ├─ SgRulesEditor.tsx    AntD Collapse + Card+Tag CIDR — компактный SG rules
 │     ├─ RefSelect.tsx        dropdown ресурса (name + extra-info)
-│     └─ ResourceIcon.tsx     AntD Outlined-иконки ресурсов (sync с сайдбаром)
+│     ├─ ResourceIcon.tsx     AntD Outlined-иконки ресурсов (sync с сайдбаром)
+│     ├─ ResourceFormBody.tsx единый рендер тела Create/Edit формы (modal+page)
+│     ├─ FormShell.tsx        заголовок (level=4 + ResourceIcon + verb) + контейнер
+│     ├─ FormSection.tsx      группа полей с заголовком + divider, опц. collapsible
+│     ├─ FieldLabel.tsx       label + опц. info-tooltip (QuestionCircleOutlined)
+│     ├─ FormFooter.tsx       primary DopplerButton + Отменить, pending-guard
+│     └─ ImmutableField.tsx   read-only значение + 🔒 + reason-tooltip
 └─ lib/
    ├─ resource-registry.tsx   ИСТОЧНИК ИСТИНЫ: spec, fields, columns, template, sanitize, hydrate
    ├─ form-schema.ts          типы FormField, ArrayField, ResourceSpec, …
@@ -52,8 +58,13 @@ src/
 
 ## 3. Modal-flow Create/Edit (обязательно)
 
-**Все** Create/Edit ресурсов — модалки. Никаких отдельных страниц `/<route>/create`,
-`/<id>/edit`, и никаких inline-форм вместо «Общее»-блока на detail-странице.
+**VPC** Create/Edit — модалки (`?modal=<spec.id>-create|edit`). **Compute / NLB / System /
+project-edit** используют full-page формы, но и модалка, и страница рендерят **единый
+`ResourceFormBody`** (`src/components/form/ResourceFormBody.tsx`) → визуальный паритет
+create==edit==modal==page. Запрет на новые `/<route>/create` остаётся **для VPC**; не-VPC
+page-формы допустимы, но обязаны рендерить `ResourceFormBody`.
+
+Никаких inline-форм вместо «Общее»-блока на detail-странице.
 
 ### 3.1 Открытие
 
@@ -430,8 +441,9 @@ kubectl -n kacho rollout status deploy/ui --timeout=120s
 
 ## 15. Запреты
 
-1. **Не вводить отдельный `/<route>/create` или `/<route>/<id>/edit` route.**
-   Только `?modal=<spec>-create|edit` поверх current page.
+1. **Для VPC — не вводить отдельный `/<route>/create` или `/<route>/<id>/edit` route.**
+   Только `?modal=<spec>-create|edit` поверх current page. Не-VPC page-формы (Compute /
+   NLB / System / project-edit) допустимы, но обязаны рендерить `ResourceFormBody`.
 2. **Не дублировать `<ResourceFormModal/>` на каждой странице.** `<GlobalResourceFormModal/>`
    уже в Layout — он покрывает все маршруты.
 3. **Не использовать vertical-only Tailwind label-input-stack.** Только AntD
