@@ -19,7 +19,20 @@ export function FormSection({ title, collapsible, defaultOpen = true, children }
   return (
     <div style={{ marginBottom: 8 }}>
       <div
+        role={collapsible ? "button" : undefined}
+        tabIndex={collapsible ? 0 : undefined}
+        aria-expanded={collapsible ? open : undefined}
         onClick={toggle}
+        onKeyDown={
+          collapsible
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggle();
+                }
+              }
+            : undefined
+        }
         style={{
           display: "flex",
           alignItems: "center",

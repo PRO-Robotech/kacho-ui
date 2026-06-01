@@ -11,6 +11,7 @@ import { FormFooter } from "@/components/form/FormFooter";
 import { ImmutableField } from "@/components/form/ImmutableField";
 import { getByPath } from "@/lib/path";
 import type { ResourceSpec } from "@/lib/resource-registry";
+import type { FormField } from "@/lib/form-schema";
 
 export interface ResourceFormBodyProps {
   spec: ResourceSpec;
@@ -44,10 +45,10 @@ function matchesVisibleWhen(
   return Array.isArray(vw.equals) ? vw.equals.includes(cur ?? "") : cur === vw.equals;
 }
 
-function displayValue(obj: Record<string, unknown>, field: any): React.ReactNode {
+function displayValue(obj: Record<string, unknown>, field: FormField): React.ReactNode {
   const raw = getByPath(obj, field.name);
-  if (field.type === "enum" && Array.isArray(field.options)) {
-    const opt = field.options.find((o: { value: string }) => o.value === raw);
+  if (field.type === "enum") {
+    const opt = field.options.find((o) => o.value === raw);
     if (opt) return opt.label;
   }
   return raw == null ? "" : String(raw);
@@ -98,7 +99,7 @@ export function ResourceFormBody({
         size="middle"
       >
         {visible.map((f) => {
-          const isLocked = locked.has(f.name) || (editMode && (f as any).immutable);
+          const isLocked = locked.has(f.name) || (editMode && !!f.immutable);
           const fullWidth = FULL_WIDTH.has(f.type as string);
 
           // Locked scalar/ref → read-only affordance (not hidden, not silent-disabled).
@@ -119,14 +120,14 @@ export function ResourceFormBody({
               ? {
                   ...f,
                   options: allowed
-                    .map((v) => (f as any).options.find((o: { value: string }) => o.value === v))
-                    .filter(Boolean),
+                    .map((v) => f.options.find((o) => o.value === v))
+                    .filter((o): o is { value: string; label: string } => !!o),
                 }
               : f;
 
           const inner = (
             <FormFieldRenderer
-              field={field as any}
+              field={field}
               pathPrefix=""
               value={obj}
               onChange={onChange}
