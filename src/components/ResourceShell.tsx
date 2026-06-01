@@ -37,7 +37,7 @@ import {
   useHiddenColumns,
   type ToggleCol,
 } from "@/components/TableToolbar";
-import { useBreadcrumb } from "@/components/PageHeaderSlot";
+import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { detailExtension, type DescItem } from "@/components/resource-detail-extensions";
 import { api } from "@/api/client";
 import { REGISTRY, getByPath, resourceProjectPath, type ResourceSpec } from "@/lib/resource-registry";
@@ -230,6 +230,25 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   }, [spec.serviceTitle, spec.plural, listHref, detailBase, name, mode, childRoute]);
   useBreadcrumb(breadcrumb);
 
+  // KAC-242: действия ресурса (Редактировать / ⋮ Удалить + ext-actions) живут в
+  // ШАПКЕ страницы (правый слот хедера, рядом с хлебными крошками), а не в табе
+  // «Обзор». Только во view-режиме: при edit/child-create форма уже в зоне 3 —
+  // кнопки скрыты (headerActions = null).
+  const headerActions = useMemo(
+    () =>
+      !mode && data ? (
+        <DetailOverviewActions
+          spec={spec}
+          data={data}
+          projectId={projectId ?? null}
+          detailBase={detailBase}
+          extActions={ext?.headerActions?.({ data, projectId: projectId ?? null, detailBase, navigate })}
+        />
+      ) : null,
+    [mode, data, spec, projectId, detailBase, ext, navigate],
+  );
+  useHeaderRight(headerActions);
+
   if (isLoading && !data) {
     return <div style={{ padding: 48, textAlign: "center" }}><Spin /></div>;
   }
@@ -257,18 +276,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "Обзор",
       render: () => (
         <div>
-          <SectionHeader
-            title="Обзор"
-            right={
-              <DetailOverviewActions
-                spec={spec}
-                data={data}
-                projectId={projectId ?? null}
-                detailBase={detailBase}
-                extActions={ext?.headerActions?.(extCtx)}
-              />
-            }
-          />
+          <SectionHeader title="Обзор" />
           <Descriptions
             column={1}
             size="small"
