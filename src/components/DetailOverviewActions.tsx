@@ -1,16 +1,14 @@
-// DetailOverviewActions — действия в ШАПКЕ detail-страницы (правый слот хедера,
-// рядом с хлебными крошками — ResourceShell через useHeaderRight; KAC-242, раньше
-// были в табе «Обзор»): Редактировать (кнопка) + ⋮-меню (Удалить) + ext-actions.
-//
-// По требованию: «Переместить» в Обзоре НЕ показываем; «Удалить» спрятано за
-// kebab-меню (три точки) как actions. Гейтинг как в RowActionsMenu
-// (ops.update / ops.delete & not-default-SG). После удаления — переход на список.
+// DetailOverviewActions — действия ресурса в ШАПКЕ detail-страницы на табе «Обзор»
+// (правый слот хедера — ResourceShell через useHeaderRight; KAC-242):
+//   • «Редактировать» — primary-кнопка (единый стиль с «Создать <child>» на child-табах);
+//   • «Удалить»       — видимая danger-кнопка (НЕ спрятана в ⋮-меню — KAC-242 правка);
+//   • extActions      — доменные действия расширения (ext.headerActions), рендерятся первыми.
+// Гейтинг: ops.update / ops.delete & not-default-SG. После удаления — переход на список.
 
 import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Dropdown } from "antd";
-import type { MenuProps } from "antd";
-import { EditOutlined, DeleteOutlined, MoreOutlined } from "@ant-design/icons";
+import { Button } from "antd";
+import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { DeleteDialog } from "@/components/DeleteDialog";
 import {
   getByPath,
@@ -40,30 +38,18 @@ export function DetailOverviewActions({ spec, data, projectId, detailBase, extAc
     spec.id === "security-groups" && Boolean(getByPath<boolean>(data, "default_for_network"));
   const showDelete = spec.ops.delete && !isDefaultSg;
 
-  const menuItems: MenuProps["items"] = showDelete
-    ? [
-        {
-          key: "delete",
-          icon: <DeleteOutlined />,
-          label: "Удалить",
-          danger: true,
-          onClick: () => setDeleteOpen(true),
-        },
-      ]
-    : [];
-
   return (
     <>
       {extActions}
       {spec.ops.update && (
-        <Button icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
+        <Button type="primary" icon={<EditOutlined />} onClick={() => navigate(`${detailBase}/edit`)}>
           Редактировать
         </Button>
       )}
-      {menuItems.length > 0 && (
-        <Dropdown menu={{ items: menuItems }} trigger={["click"]} placement="bottomRight">
-          <Button type="text" icon={<MoreOutlined />} aria-label="Действия" />
-        </Dropdown>
+      {showDelete && (
+        <Button danger icon={<DeleteOutlined />} onClick={() => setDeleteOpen(true)}>
+          Удалить
+        </Button>
       )}
 
       {showDelete && (
