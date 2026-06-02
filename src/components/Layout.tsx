@@ -96,7 +96,7 @@ function LayoutInner() {
         >
           {/* min-width: max-content гарантирует, что широкие таблицы не сжимают
               cells, а раздвигают page-level horizontal scrollbar. */}
-          <div style={{ minWidth: "max-content", padding: "20px 24px" }}>
+          <div style={{ minWidth: "max-content", padding: "16px 16px" }}>
             <Outlet />
           </div>
           {/* Глобальный mount модалок Create/Edit — для всех ресурсов. */}

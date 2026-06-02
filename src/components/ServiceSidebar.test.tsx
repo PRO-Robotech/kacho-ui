@@ -50,11 +50,8 @@ describe("ServiceSidebar — SidebarUserButton (anonymous)", () => {
       </MemoryRouter>,
     );
 
-    // KAC-246: сайдбар — узкий рейл, подписи/кнопки разворачиваются по hover.
-    // Наводим на nav, чтобы выйти в expanded-режим и кликнуть «Войти».
-    await userEvent.hover(await screen.findByLabelText("Навигация сервиса"));
-
-    // Войти button рендерится когда user=null и loading завершён.
+    // Войти button рендерится когда user=null и loading завершён (узкий рейл —
+    // подпись скрыта, но aria-label «Войти» есть всегда).
     const btn = await screen.findByLabelText("Войти");
 
     await userEvent.click(btn);

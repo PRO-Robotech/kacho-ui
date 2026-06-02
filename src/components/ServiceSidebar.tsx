@@ -11,7 +11,7 @@
 // Collapse-состояние приходит из Layout (persist в localStorage там), кнопка
 // сворачивания — внизу сайдбара.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, Dropdown, Spin, Tooltip, theme } from "antd";
 import { LoginOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
@@ -25,10 +25,9 @@ const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 232;
 
 export function ServiceSidebar() {
-  // KAC-246: узкий icon-rail; при наведении на сайдбар он разворачивается
-  // оверлеем с подписями (collapsed = !hovered). Узел мыши — снова рейл.
-  const [hovered, setHovered] = useState(false);
-  const collapsed = !hovered;
+  // KAC-246: статичный узкий icon-rail; подписи — тултипом при наведении на
+  // пункт (без выплывающей панели).
+  const collapsed = true;
   const navigate = useNavigate();
   const location = useLocation();
   const projectId = useContext((s) => s.project)?.id ?? null;
@@ -82,25 +81,12 @@ export function ServiceSidebar() {
 
   return (
     <nav
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       style={{
-        // Оверлей: узкий рейл в покое, разворот вправо поверх контента при hover.
-        position: "absolute",
-        left: 0,
-        top: 0,
-        height: "100%",
-        width: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH,
         display: "flex",
         flexDirection: "column",
+        height: "100%",
         paddingTop: 6,
         paddingBottom: 6,
-        background: token.colorBgLayout,
-        borderRight: `1px solid ${token.colorBorderSecondary}`,
-        boxShadow: collapsed ? "none" : "var(--kc-shadow-lg)",
-        transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
-        overflowX: "hidden",
-        zIndex: 30,
       }}
       aria-label="Навигация сервиса"
     >
