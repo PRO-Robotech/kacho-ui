@@ -124,11 +124,28 @@ export function ReferrerLink({
   );
 }
 
+// reorderNameIdFirst — KAC-245: во всех таблицах первые две колонки по умолчанию
+// Name (path="name"), затем ID (path="id"). Извлекаем эти колонки из spec (где бы
+// они ни стояли) и ставим первыми, СОХРАНЯЯ их объекты (а значит и кастомные
+// render — CopyableName/CopyableId); остальные колонки — в исходном порядке. Если
+// name-колонки нет (системные справочники disk-types/compute-zones) — id остаётся
+// первым (graceful). Идемпотентно для ресурсов, где порядок уже верный (VPC/compute).
+export function reorderNameIdFirst(columns: ResourceColumn[]): ResourceColumn[] {
+  const nameCol = columns.find((c) => c.path === "name");
+  const idCol = columns.find((c) => c.path === "id");
+  if (!nameCol && !idCol) return columns;
+  const lead: ResourceColumn[] = [];
+  if (nameCol) lead.push(nameCol);
+  if (idCol) lead.push(idCol);
+  const rest = columns.filter((c) => c !== nameCol && c !== idCol);
+  return [...lead, ...rest];
+}
+
 export function buildSpecColumns(
   spec: ResourceSpec,
   opts: FormatCellOpts = {},
 ): Column<Record<string, unknown>>[] {
-  return spec.columns.map((c) => ({
+  return reorderNameIdFirst(spec.columns).map((c) => ({
     header: c.header,
     className: c.className,
     cell: (row) => (c.render ? c.render(row) : formatCellByFormat(c, row, opts)),
