@@ -89,7 +89,7 @@ export function DetailShell({
     <div
       style={{
         display: "flex",
-        gap: 24,
+        gap: 16,
         marginTop: -8,
         alignItems: "stretch",
         // Высота под viewport: header h=48 + Content padding 20+20 + small.
@@ -102,13 +102,12 @@ export function DetailShell({
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
-          // KAC-246: область табов — отдельная поверхность-карточка (оттенок
-          // container поверх фона страницы), чтобы не сливалась с контентом.
+          // KAC-246: область табов — тихая интегрированная поверхность (лёгкий
+          // оттенок + мягкая рамка, без тени), чтобы выделялась, но не «плавала».
           background: "var(--kc-container)",
-          border: "1px solid var(--kc-border)",
-          borderRadius: 10,
+          border: "1px solid var(--kc-border-secondary)",
+          borderRadius: 8,
           padding: 6,
-          boxShadow: "var(--kc-shadow-sm)",
         }}
       >
         <div
