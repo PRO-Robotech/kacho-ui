@@ -131,6 +131,16 @@ export function buildTheme(mode: ThemeMode): ThemeConfig {
         borderColor: p.borderSecondary,
         headerColor: p.textSecondary,
       },
+      // KAC-246: горизонтальные табы (admin/iam) — чёткий active-цвет + ink-bar
+      // в accent, читаемый разделитель снизу, чтобы таб-полоса не сливалась.
+      Tabs: {
+        itemColor: p.textSecondary,
+        itemHoverColor: p.text,
+        itemSelectedColor: BRAND.primary,
+        itemActiveColor: BRAND.primary,
+        inkBarColor: BRAND.primary,
+        titleFontSize: 13,
+      },
       Modal: {
         contentBg: p.elevated,
         headerBg: p.elevated,

@@ -102,8 +102,13 @@ export function DetailShell({
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
-          borderRight: "1px solid var(--ant-color-border-secondary)",
-          paddingRight: 8,
+          // KAC-246: область табов — отдельная поверхность-карточка (оттенок
+          // container поверх фона страницы), чтобы не сливалась с контентом.
+          background: "var(--kc-container)",
+          border: "1px solid var(--kc-border)",
+          borderRadius: 10,
+          padding: 6,
+          boxShadow: "var(--kc-shadow-sm)",
         }}
       >
         <div
