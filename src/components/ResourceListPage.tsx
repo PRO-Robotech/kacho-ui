@@ -14,7 +14,7 @@ import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
-import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
+import { useBreadcrumb } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath, resourceServicePrefix } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
@@ -70,18 +70,18 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     spec.id === "address-pools";
   const listBase = location.pathname.endsWith("/") ? location.pathname.slice(0, -1) : location.pathname;
   const createTarget = panelForms ? `${listBase}/create` : `${listBase}?modal=${spec.id}-create`;
+  // KAC-246: CTA «Создать» переехала из header right-slot в page-toolbar
+  // (внутри surface-контейнера над таблицей).
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
     return (
       <Link to={createTarget}>
-        <Button type="primary" size="small" icon={<PlusOutlined />}>
+        <Button type="primary" icon={<PlusOutlined />}>
           Создать {spec.singular.toLowerCase()}
         </Button>
       </Link>
     );
   }, [spec, createTarget]);
-
-  useHeaderRight(cta);
 
   if (parentField && !filterValue) return <ProjectRequiredEmpty resource={spec.plural} />;
 
@@ -181,20 +181,39 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");
 
-  return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <div>
+  // Заголовок-toolbar: title + count-подзаголовок слева, CTA справа.
+  const titleBlock = (
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ minWidth: 0, flex: 1 }}>
         <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
           {spec.plural}
         </Typography.Title>
-        {spec.description && (
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-            {spec.description}
-          </Typography.Text>
-        )}
+        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+          {!isLoading && !isError
+            ? `${filteredItems.length} ${pluralCount(filteredItems.length)}`
+            : spec.description}
+          {spec.description && !isLoading && !isError ? ` · ${spec.description}` : ""}
+        </Typography.Text>
       </div>
+      {cta && <div style={{ flexShrink: 0 }}>{cta}</div>}
+    </div>
+  );
 
-      {!showWelcome && (
+  // Welcome (пустой список) — лёгкий layout без surface-обёртки таблицы.
+  if (showWelcome) {
+    return (
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        {titleBlock}
+        <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
+      </Space>
+    );
+  }
+
+  return (
+    <div className="kc-surface" style={{ padding: 20 }}>
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        {titleBlock}
+
         <Space size={12} wrap>
           <Input.Search
             placeholder="Фильтр по имени или идентификатору"
@@ -212,30 +231,37 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
             />
           )}
         </Space>
-      )}
 
-      {isError ? (
-        <ErrorResult error={error} />
-      ) : showWelcome ? (
-        <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
-      ) : (
-      <ResourceTable
-        rows={filteredItems}
-        loading={isLoading && items.length === 0}
-        rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
-        columns={columns}
-        onRowClick={(row) => {
-          const id = getByPath<string>(row, "id");
-          if (!id) return;
-          // childRoute шаблон: /projects/:id, ...
-          const target = spec.childRoute
-            ? spec.childRoute.replace(":id", id)
-            : `${basePath}/${id}`;
-          navigate(target);
-        }}
-      />
-      )}
-    </Space>
+        {isError ? (
+          <ErrorResult error={error} />
+        ) : (
+          <ResourceTable
+            rows={filteredItems}
+            loading={isLoading && items.length === 0}
+            rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+            columns={columns}
+            onRowClick={(row) => {
+              const id = getByPath<string>(row, "id");
+              if (!id) return;
+              // childRoute шаблон: /projects/:id, ...
+              const target = spec.childRoute
+                ? spec.childRoute.replace(":id", id)
+                : `${basePath}/${id}`;
+              navigate(target);
+            }}
+          />
+        )}
+      </Space>
+    </div>
   );
+}
+
+/** Русское склонение «запись/записи/записей» для счётчика. */
+function pluralCount(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "запись";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "записи";
+  return "записей";
 }
 

@@ -52,7 +52,7 @@ interface Props {
   onTabSelect?: (id: string) => void;
 }
 
-const SUB_PANE_WIDTH = 240;
+const SUB_PANE_WIDTH = 232;
 
 export function DetailShell({
   resourceLabel,
@@ -87,33 +87,33 @@ export function DetailShell({
 
   return (
     <div
+      className="kc-surface"
       style={{
         display: "flex",
-        gap: 16,
         marginTop: -8,
         alignItems: "stretch",
+        overflow: "hidden",
         // Высота под viewport: header h=48 + Content padding 20+20 + small.
         minHeight: "calc(100vh - 110px)",
       }}
     >
+      {/* KAC-246: рейл табов — часть единой detail-поверхности. Без своего
+          фона/рамки/радиуса/тени; от main отделён ТОЛЬКО вертикальным
+          border-secondary. «Встроен», а не «плавает». */}
       <aside
         style={{
           width: SUB_PANE_WIDTH,
           flexShrink: 0,
           display: "flex",
           flexDirection: "column",
-          // KAC-246: область табов — тихая интегрированная поверхность (лёгкий
-          // оттенок + мягкая рамка, без тени), чтобы выделялась, но не «плавала».
-          background: "var(--kc-container)",
-          border: "1px solid var(--kc-border-secondary)",
-          borderRadius: 8,
-          padding: 6,
+          borderRight: "1px solid var(--kc-border-secondary)",
+          padding: 10,
         }}
       >
         <div
           style={{
-            padding: "12px 8px",
-            borderBottom: "1px solid var(--ant-color-border-secondary)",
+            padding: "8px 8px 14px",
+            borderBottom: "1px solid var(--kc-border-secondary)",
             marginBottom: 8,
           }}
         >
@@ -143,6 +143,7 @@ export function DetailShell({
           mode="inline"
           selectedKeys={active ? [active.id] : []}
           onClick={({ key }) => setTab(key)}
+          className="kc-detail-rail-menu"
           style={{ borderRight: "none", background: "transparent" }}
           items={tabs.map((t) => ({
             key: t.id,
@@ -173,7 +174,7 @@ export function DetailShell({
             style={{
               marginTop: "auto",
               padding: "16px 8px 8px 8px",
-              borderTop: "1px solid var(--ant-color-border-secondary)",
+              borderTop: "1px solid var(--kc-border-secondary)",
             }}
           >
             <Typography.Text
@@ -214,7 +215,7 @@ export function DetailShell({
         )}
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0 }}>
+      <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
         {mainOverride ? (
           mainOverride
         ) : (
@@ -227,7 +228,7 @@ export function DetailShell({
                   flexWrap: "wrap",
                   marginBottom: 16,
                   paddingBottom: 12,
-                  borderBottom: "1px solid var(--ant-color-border-secondary)",
+                  borderBottom: "1px solid var(--kc-border-secondary)",
                 }}
               >
                 {secondaryActions}

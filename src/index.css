@@ -207,3 +207,51 @@ body.ant-modal-open {
   letter-spacing: 0.01em;
   color: var(--kc-text-secondary);
 }
+
+/*
+ * KAC-246: breadcrumb resource-сегмент (page-level slot после `Account › Project`).
+ * Сепаратор `›` + slot скрываются целиком, когда страница не задала breadcrumb
+ * (HeaderBreadcrumbSlot рендерит null → в группе остаётся только .kc-breadcrumb-sep).
+ * Показываем группу только если есть хоть один элемент ПОСЛЕ сепаратора.
+ */
+.kc-breadcrumb-resource:not(:has(> :nth-child(2))) {
+  display: none !important;
+}
+
+/*
+ * KAC-246: единая content page-surface (Linear-стиль). ResourceListPage и
+ * DetailShell оборачивают контент в .kc-surface — поверхность поверх фона
+ * страницы (container-фон + secondary-border + r12 + мягкая тень).
+ */
+.kc-surface {
+  background: var(--kc-container);
+  border: 1px solid var(--kc-border-secondary);
+  border-radius: 12px;
+  box-shadow: var(--kc-shadow-sm);
+}
+
+/*
+ * KAC-246: detail-рейл вертикальное меню табов — active-пункт = sidebar-active-bg
+ * tint + accent-текст + левый accent-бар, скруглённый item. Согласовано с
+ * расширенным сайдбаром.
+ */
+.kc-detail-rail-menu.ant-menu-inline .ant-menu-item {
+  border-radius: 8px;
+  margin-inline: 0;
+  width: 100%;
+  height: 34px;
+  line-height: 34px;
+}
+.kc-detail-rail-menu.ant-menu-inline .ant-menu-item-selected {
+  background: var(--sidebar-active-bg) !important;
+  color: var(--kc-primary) !important;
+  font-weight: 600;
+}
+.kc-detail-rail-menu.ant-menu-inline .ant-menu-item-selected::after {
+  inset-inline-end: auto;
+  inset-inline-start: 0;
+  border-inline-end: none;
+  border-inline-start: 2px solid var(--kc-primary);
+  transform: scaleY(1);
+  opacity: 1;
+}
