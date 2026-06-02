@@ -7,15 +7,15 @@ import { ContextBreadcrumb } from "@/components/ContextBreadcrumb";
 import { ServiceSidebar } from "@/components/ServiceSidebar";
 import { HeaderRightSlot, PageHeaderSlotProvider } from "@/components/PageHeaderSlot";
 import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
-import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
-// KAC-246 Фаза 2A: бренд переехал в ServiceSidebar (full/mark по collapse).
-// Top-bar: breadcrumb-контекст `Account › Project › Resource` (ContextBreadcrumb)
-// слева + переключатель темы + per-page right-slot справа.
+// KAC-246: full-height sidebar (логотип сверху = левый верхний угол), от самого
+// верха до самого низа. Header — внутри правого под-лейаута, только НАД контентом
+// (а не во всю ширину поверх сайдбара). Сворачиватель убран.
 
 const { Header, Sider, Content } = AntLayout;
 
-const SIDEBAR_RAIL = 56;
-const SIDEBAR_EXPANDED = 224;
+// KAC-246: узкий icon-rail; ServiceSidebar разворачивается оверлеем при наведении
+// (надписи только при hover), поэтому Sider резервирует только ширину рейла.
+const SIDEBAR_WIDTH = 56;
 const HEADER_HEIGHT = 48;
 
 export function Layout() {
@@ -29,71 +29,63 @@ export function Layout() {
 function LayoutInner() {
   const { token } = theme.useToken();
   const { mode, toggle } = useThemeMode();
-  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
-
-  const siderWidth = collapsed ? SIDEBAR_RAIL : SIDEBAR_EXPANDED;
 
   return (
-    <AntLayout style={{ minHeight: "100vh" }}>
+    <AntLayout style={{ minHeight: "100vh" }} hasSider>
       <ContextUrlSync />
 
-      <Header
+      {/* Сайдбар во всю высоту: от верха до низа, логотип в верхней части. */}
+      <Sider
+        width={SIDEBAR_WIDTH}
+        theme="dark"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          borderRight: `1px solid ${token.colorBorderSecondary}`,
           position: "sticky",
           top: 0,
-          zIndex: 20,
-          paddingInline: 12,
-          height: HEADER_HEIGHT,
-          lineHeight: `${HEADER_HEIGHT}px`,
+          height: "100vh",
+          overflow: "visible",
           background: token.colorBgLayout,
         }}
       >
-        {/* Центр-лево: breadcrumb-контекст Account › Project › Resource */}
-        <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1, overflow: "hidden" }}>
-          <ContextBreadcrumb />
-        </div>
+        <ServiceSidebar />
+      </Sider>
 
-        {/* Право: per-page right-slot + переключатель темы */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <HeaderRightSlot />
-          <Tooltip title={mode === "dark" ? "Светлая тема" : "Тёмная тема"}>
-            <Button
-              type="text"
-              size="small"
-              onClick={toggle}
-              aria-label={mode === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
-              icon={
-                mode === "dark" ? (
-                  <Sun size={16} strokeWidth={2} />
-                ) : (
-                  <Moon size={16} strokeWidth={2} />
-                )
-              }
-            />
-          </Tooltip>
-        </div>
-      </Header>
-
-      <AntLayout>
-        <Sider
-          width={siderWidth}
-          theme="dark"
+      {/* Правый под-лейаут: slim header над контентом + сам контент. */}
+      <AntLayout style={{ background: token.colorBgLayout }}>
+        <Header
           style={{
-            borderRight: `1px solid ${token.colorBorderSecondary}`,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
             position: "sticky",
-            top: HEADER_HEIGHT,
-            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-            overflow: "visible",
+            top: 0,
+            zIndex: 20,
+            paddingInline: 20,
+            height: HEADER_HEIGHT,
+            lineHeight: `${HEADER_HEIGHT}px`,
             background: token.colorBgLayout,
-            transition: "width 180ms cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
-          <ServiceSidebar collapsed={collapsed} onToggle={toggleCollapsed} />
-        </Sider>
+          {/* Слева: breadcrumb-контекст Account › Project › Resource. */}
+          <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1, overflow: "hidden" }}>
+            <ContextBreadcrumb />
+          </div>
+
+          {/* Справа: per-page right-slot + переключатель темы. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <HeaderRightSlot />
+            <Tooltip title={mode === "dark" ? "Светлая тема" : "Тёмная тема"}>
+              <Button
+                type="text"
+                size="small"
+                onClick={toggle}
+                aria-label={mode === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+                icon={mode === "dark" ? <Sun size={16} strokeWidth={2} /> : <Moon size={16} strokeWidth={2} />}
+              />
+            </Tooltip>
+          </div>
+        </Header>
 
         <Content
           style={{

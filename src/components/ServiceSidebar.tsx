@@ -11,30 +11,24 @@
 // Collapse-состояние приходит из Layout (persist в localStorage там), кнопка
 // сворачивания — внизу сайдбара.
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Avatar, Dropdown, Spin, Tooltip, theme } from "antd";
-import { LeftOutlined, LoginOutlined, LogoutOutlined, RightOutlined, UserOutlined } from "@ant-design/icons";
+import { LoginOutlined, LogoutOutlined, UserOutlined } from "@ant-design/icons";
 import { KachoLogo } from "@/components/brand/KachoLogo";
 import { useContext } from "@/lib/context-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { COMMON_BOTTOM, type NavLeaf } from "@/lib/service-modules";
 import { activeLeafKey, buildSidebarGroups } from "@/lib/sidebar-groups";
-import { useSidebarCollapsed } from "@/lib/use-sidebar-collapsed";
 
 const RAIL_WIDTH = 56;
-const EXPANDED_WIDTH = 224;
+const EXPANDED_WIDTH = 232;
 
-interface Props {
-  /** Collapse-состояние. Если не передано — компонент держит своё (standalone). */
-  collapsed?: boolean;
-  onToggle?: () => void;
-}
-
-export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onToggleProp }: Props = {}) {
-  const [internalCollapsed, internalToggle] = useSidebarCollapsed();
-  const collapsed = collapsedProp ?? internalCollapsed;
-  const onToggle = onToggleProp ?? internalToggle;
+export function ServiceSidebar() {
+  // KAC-246: узкий icon-rail; при наведении на сайдбар он разворачивается
+  // оверлеем с подписями (collapsed = !hovered). Узел мыши — снова рейл.
+  const [hovered, setHovered] = useState(false);
+  const collapsed = !hovered;
   const navigate = useNavigate();
   const location = useLocation();
   const projectId = useContext((s) => s.project)?.id ?? null;
@@ -63,6 +57,11 @@ export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onTogglePro
     [groups, location.pathname],
   );
 
+  // KAC-246: «Система» (шестерёнка-администрирование) — пинуется в нижний блок,
+  // не в общий скроллящийся список.
+  const navGroups = groups.filter((g) => g.key !== "system");
+  const systemGroup = groups.find((g) => g.key === "system");
+
   const renderLeaf = (leaf: NavLeaf) => {
     const disabled = !!leaf.requiresProject && !projectId;
     const active = activeKey === leaf.key;
@@ -83,12 +82,25 @@ export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onTogglePro
 
   return (
     <nav
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
+        // Оверлей: узкий рейл в покое, разворот вправо поверх контента при hover.
+        position: "absolute",
+        left: 0,
+        top: 0,
+        height: "100%",
+        width: collapsed ? RAIL_WIDTH : EXPANDED_WIDTH,
         display: "flex",
         flexDirection: "column",
-        height: "100%",
         paddingTop: 6,
         paddingBottom: 6,
+        background: token.colorBgLayout,
+        borderRight: `1px solid ${token.colorBorderSecondary}`,
+        boxShadow: collapsed ? "none" : "var(--kc-shadow-lg)",
+        transition: "width 160ms cubic-bezier(0.4, 0, 0.2, 1)",
+        overflowX: "hidden",
+        zIndex: 30,
       }}
       aria-label="Навигация сервиса"
     >
@@ -127,7 +139,7 @@ export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onTogglePro
 
       {/* Группы — скроллятся, нижний блок (user/collapse) прижат вниз */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingInline: 8 }}>
-        {groups.map((g, i) => (
+        {navGroups.map((g, i) => (
           <div key={g.key} style={{ marginTop: i === 0 ? 0 : 10 }}>
             {!collapsed && g.title && (
               <div
@@ -152,7 +164,7 @@ export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onTogglePro
         ))}
       </div>
 
-      {/* Нижний блок: user-menu + collapse-toggle */}
+      {/* Нижний блок: «Система» (шестерёнка) + user-menu — прижаты к низу. */}
       <div
         style={{
           paddingInline: 8,
@@ -164,8 +176,12 @@ export function ServiceSidebar({ collapsed: collapsedProp, onToggle: onTogglePro
           gap: 4,
         }}
       >
+        {systemGroup && systemGroup.leaves.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 2 }}>
+            {systemGroup.leaves.map(renderLeaf)}
+          </div>
+        )}
         <SidebarUserButton token={token} collapsed={collapsed} />
-        <CollapseToggle collapsed={collapsed} onToggle={onToggle} token={token} />
       </div>
     </nav>
   );
@@ -276,62 +292,6 @@ function SidebarItem({
   if (collapsed || disabled) {
     return (
       <Tooltip title={tooltip} placement="right" mouseEnterDelay={0.4}>
-        {btn}
-      </Tooltip>
-    );
-  }
-  return btn;
-}
-
-// ── CollapseToggle ──────────────────────────────────────────────────────────
-function CollapseToggle({
-  collapsed,
-  onToggle,
-  token,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-  token: ReturnType<typeof theme.useToken>["token"];
-}) {
-  const btn = (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-label={collapsed ? "Развернуть меню" : "Свернуть меню"}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: collapsed ? 0 : 10,
-        justifyContent: collapsed ? "center" : "flex-start",
-        width: "100%",
-        height: collapsed ? 36 : 32,
-        paddingInline: collapsed ? 0 : 10,
-        borderRadius: 8,
-        border: "none",
-        background: "transparent",
-        color: token.colorTextTertiary,
-        cursor: "pointer",
-        fontSize: 13,
-        transition: "background-color 150ms ease, color 150ms ease",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--kc-hover-fill)";
-        e.currentTarget.style.color = token.colorText;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = token.colorTextTertiary;
-      }}
-    >
-      <span style={{ display: "inline-flex", fontSize: 14, lineHeight: 0 }}>
-        {collapsed ? <RightOutlined /> : <LeftOutlined />}
-      </span>
-      {!collapsed && <span>Свернуть</span>}
-    </button>
-  );
-  if (collapsed) {
-    return (
-      <Tooltip title="Развернуть меню" placement="right" mouseEnterDelay={0.4}>
         {btn}
       </Tooltip>
     );
