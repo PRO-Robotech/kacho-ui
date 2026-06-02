@@ -71,6 +71,11 @@ export function ResourceTable<T extends object>({
     rowKey: (row) => rowKey(row),
     pagination: false,
     size: "small",
+    // KAC-246: kc-table — zebra-striping + контрастный header + комфортный
+    // row-height + чёткий hover (стили в index.css, theme-aware через vars).
+    className: "kc-table",
+    // Sticky header — заголовок остаётся при вертикальном скролле длинного списка.
+    sticky: true,
     loading,
     locale: {
       emptyText: empty ?? "Ресурсов не найдено",

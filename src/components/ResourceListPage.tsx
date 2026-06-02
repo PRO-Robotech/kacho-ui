@@ -184,7 +184,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <div>
-        <Typography.Title level={3} style={{ margin: 0 }}>
+        <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
           {spec.plural}
         </Typography.Title>
         {spec.description && (

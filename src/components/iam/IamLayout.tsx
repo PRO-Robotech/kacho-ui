@@ -47,7 +47,7 @@ export function IamLayout() {
         }}
       >
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
+          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
             Identity and Access Management
           </Typography.Title>
           <Typography.Text type="secondary" style={{ fontSize: 13 }}>

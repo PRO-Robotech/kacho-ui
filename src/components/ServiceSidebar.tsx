@@ -288,6 +288,8 @@ function SidebarButton({
   token: ReturnType<typeof theme.useToken>["token"];
 }) {
   const restColor = disabled ? (token.colorTextDisabled ?? token.colorTextTertiary) : token.colorTextSecondary;
+  // KAC-246: усиленный active-state — accent-tint fill (заметный в обеих темах),
+  // левый 2px accent-бар, иконка в colorPrimary. Hover — мягкий fill.
   return (
     <Tooltip title={label} placement="right" mouseEnterDelay={0.4}>
       <button
@@ -306,15 +308,15 @@ function SidebarButton({
           flexShrink: 0,
           borderRadius: 6,
           border: "none",
-          background: active ? token.colorBgElevated : "transparent",
-          color: active ? token.colorText : restColor,
+          background: active ? "var(--sidebar-active-bg)" : "transparent",
+          color: active ? token.colorPrimary : restColor,
           cursor: disabled ? "not-allowed" : "pointer",
           fontSize: 18,
-          transition: "background-color 120ms ease, color 120ms ease",
+          transition: "background-color 140ms ease, color 140ms ease",
         }}
         onMouseEnter={(e) => {
           if (!disabled && !active) {
-            (e.currentTarget as HTMLButtonElement).style.background = token.colorFillTertiary;
+            (e.currentTarget as HTMLButtonElement).style.background = "var(--kc-hover-fill)";
             (e.currentTarget as HTMLButtonElement).style.color = token.colorText;
           }
         }}
@@ -330,9 +332,9 @@ function SidebarButton({
             style={{
               position: "absolute",
               left: -8,
-              top: 6,
-              bottom: 6,
-              width: 3,
+              top: 5,
+              bottom: 5,
+              width: 2,
               borderRadius: 2,
               background: token.colorPrimary,
             }}

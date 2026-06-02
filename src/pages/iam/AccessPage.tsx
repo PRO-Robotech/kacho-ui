@@ -161,7 +161,7 @@ export function AccessPage() {
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <Space size={12} align="center">
-        <Typography.Title level={3} style={{ margin: 0 }}>
+        <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
           Права доступа
         </Typography.Title>
       </Space>

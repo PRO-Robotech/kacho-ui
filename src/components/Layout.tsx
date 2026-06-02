@@ -1,6 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
 import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
+import { Moon, Sun } from "lucide-react";
+import { KachoLogo } from "@/components/brand/KachoLogo";
+import { useThemeMode } from "@/lib/theme-context";
 import { ContextCascader } from "@/components/ContextCascader";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
 import { ServiceSidebar } from "@/components/ServiceSidebar";
@@ -29,6 +32,7 @@ export function Layout() {
 
 function LayoutInner() {
   const { token } = theme.useToken();
+  const { mode, toggle } = useThemeMode();
 
   return (
     <AntLayout style={{ minHeight: "100vh" }}>
@@ -54,27 +58,11 @@ function LayoutInner() {
           style={{
             display: "inline-flex",
             alignItems: "center",
-            justifyContent: "center",
             height: 28,
-            width: 28,
+            textDecoration: "none",
           }}
         >
-          <div
-            style={{
-              height: 24,
-              width: 24,
-              borderRadius: 6,
-              background: "linear-gradient(135deg, #fbbf24, #f43f5e)",
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            K
-          </div>
+          <KachoLogo variant="full" size={22} wordmarkColor={token.colorText} />
         </NavLink>
 
         <ContextCascader />
@@ -109,6 +97,21 @@ function LayoutInner() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <HeaderRightSlot />
+          <Tooltip title={mode === "dark" ? "Светлая тема" : "Тёмная тема"}>
+            <Button
+              type="text"
+              size="small"
+              onClick={toggle}
+              aria-label={mode === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+              icon={
+                mode === "dark" ? (
+                  <Sun size={16} strokeWidth={2} />
+                ) : (
+                  <Moon size={16} strokeWidth={2} />
+                )
+              }
+            />
+          </Tooltip>
         </div>
       </Header>
 

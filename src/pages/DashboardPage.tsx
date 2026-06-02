@@ -119,7 +119,7 @@ export function DashboardPage() {
     <div style={{ maxWidth: 1100 }} data-testid="dashboard-page">
       <Space direction="vertical" size={20} style={{ width: "100%" }}>
         <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
+          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
             Сервисы облака
           </Typography.Title>
           <Typography.Text type="secondary">{caption}</Typography.Text>

@@ -1,8 +1,10 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConfigProvider, theme as antdTheme, App as AntdApp } from "antd";
+import { ConfigProvider, App as AntdApp } from "antd";
 import ruRU from "antd/locale/ru_RU";
+import { ThemeProvider, useThemeMode } from "@/lib/theme-context";
+import { buildTheme } from "@/lib/theme";
 import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { AdminLayout } from "@/components/AdminLayout";
@@ -71,6 +73,19 @@ const NLB_SCOPED = ["load-balancers", "listeners", "target-groups"]
 
 export default function App() {
   return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
+  );
+}
+
+/**
+ * ThemedApp — ConfigProvider, чья тема реактивно зависит от useThemeMode().
+ * Вынесено из App, чтобы хук useThemeMode читался уже внутри <ThemeProvider>.
+ */
+function ThemedApp() {
+  const { mode } = useThemeMode();
+  return (
     <ConfigProvider
       locale={ruRU}
       form={{
@@ -87,72 +102,7 @@ export default function App() {
           </>
         ),
       }}
-      theme={{
-        algorithm: antdTheme.darkAlgorithm,
-        token: {
-          // YC-style палитра: тёмный графит + сине-голубой primary.
-          colorPrimary: "#3D8DF5",
-          colorBgBase: "#1c1d22",
-          colorBgContainer: "#26272d",
-          colorBgElevated: "#2d2e35",
-          colorBorder: "#383941",
-          colorBorderSecondary: "#2a2b32",
-          colorText: "#dadde3",
-          colorTextSecondary: "#8b8f99",
-          colorTextTertiary: "#6b6f78",
-          fontFamily:
-            "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-          borderRadius: 6,
-          borderRadiusLG: 8,
-          borderRadiusSM: 4,
-          fontSize: 13,
-        },
-        components: {
-          Layout: {
-            headerBg: "#1c1d22",
-            headerHeight: 48,
-            headerPadding: "0 12px",
-            siderBg: "#1c1d22",
-            bodyBg: "#1c1d22",
-          },
-          Menu: {
-            itemBg: "transparent",
-            itemSelectedBg: "#2d2e35",
-            itemActiveBg: "#26272d",
-            itemHoverBg: "#26272d",
-            itemSelectedColor: "#dadde3",
-          },
-          Table: {
-            headerBg: "#26272d",
-            rowHoverBg: "#2a2b32",
-          },
-          // KAC-69: единый цвет модалок + селекторов внутри форм (по
-          // указанию user'а: фон модалки rgb(52,54,61) = #34363d;
-          // внутренний цвет селектора rgb(28,29,33) = #1c1d22).
-          Modal: {
-            contentBg: "#34363d",
-            headerBg: "#34363d",
-            footerBg: "#34363d",
-          },
-          Select: {
-            // Закрытое поле + dropdown — затемнённый фон (как у Layout body).
-            colorBgContainer: "#1c1d22",
-            colorBgElevated: "#1c1d22",
-            optionSelectedBg: "#2a2b32",
-            optionActiveBg: "#26272d",
-          },
-          Input: {
-            // Чтобы Input в модалке имел тот же фон что Select — visual unity.
-            colorBgContainer: "#1c1d22",
-          },
-          InputNumber: {
-            colorBgContainer: "#1c1d22",
-          },
-          DatePicker: {
-            colorBgContainer: "#1c1d22",
-          },
-        },
-      }}
+      theme={buildTheme(mode)}
     >
       <AntdApp>
         <QueryClientProvider client={queryClient}>

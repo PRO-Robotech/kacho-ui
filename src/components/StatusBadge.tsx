@@ -1,18 +1,21 @@
-// StatusBadge — YC-style плотный pill для статуса ресурса.
+// StatusBadge — плотный pill для статуса ресурса.
 // Поддерживает оба naming convention: STATUS_* (1.0 flat) и STATE_* (legacy 0.x).
-// Тема — dark only (под AntD darkAlgorithm). Светлые палитры из 0.x удалены.
+// KAC-246: theme-aware через CSS-vars (--status-<tone>-bg/-fg/-border),
+// определённые в index.css для обеих тем (dark — приглушённый фон + яркий текст;
+// light — светлый фон + насыщенный текст + чёткий border). Никакого хардкода
+// Tailwind-цвета, который бы сломался в другой теме.
 
-import { cn } from "@/lib/utils";
+import type { CSSProperties } from "react";
 
 type Tone = "ok" | "info" | "warn" | "muted" | "error" | "violet";
 
-const TONE_CLASS: Record<Tone, string> = {
-  ok:    "bg-emerald-900/40 text-emerald-300 border-emerald-800/60",
-  info:  "bg-sky-900/40 text-sky-300 border-sky-800/60",
-  warn:  "bg-amber-900/40 text-amber-300 border-amber-800/60",
-  muted: "bg-zinc-700/30 text-zinc-300 border-zinc-700/50",
-  error: "bg-rose-900/40 text-rose-300 border-rose-800/60",
-  violet:"bg-violet-900/40 text-violet-300 border-violet-800/60",
+const TONE_STYLE: Record<Tone, CSSProperties> = {
+  ok:     { background: "var(--status-ok-bg)",     color: "var(--status-ok-fg)",     borderColor: "var(--status-ok-border)" },
+  info:   { background: "var(--status-info-bg)",   color: "var(--status-info-fg)",   borderColor: "var(--status-info-border)" },
+  warn:   { background: "var(--status-warn-bg)",   color: "var(--status-warn-fg)",   borderColor: "var(--status-warn-border)" },
+  muted:  { background: "var(--status-muted-bg)",  color: "var(--status-muted-fg)",  borderColor: "var(--status-muted-border)" },
+  error:  { background: "var(--status-error-bg)",  color: "var(--status-error-fg)",  borderColor: "var(--status-error-border)" },
+  violet: { background: "var(--status-violet-bg)", color: "var(--status-violet-fg)", borderColor: "var(--status-violet-border)" },
 };
 
 const TONE_BY_STATUS: Record<string, Tone> = {
@@ -40,10 +43,8 @@ export function StatusBadge({ state }: { state?: string }) {
   const tone = TONE_BY_STATUS[display] ?? "muted";
   return (
     <span
-      className={cn(
-        "inline-flex items-center rounded px-1.5 h-[20px] text-[11px] font-medium leading-none border",
-        TONE_CLASS[tone],
-      )}
+      className="inline-flex items-center rounded px-1.5 h-[20px] text-[11px] font-medium leading-none border"
+      style={TONE_STYLE[tone]}
     >
       {display.charAt(0) + display.slice(1).toLowerCase()}
     </span>

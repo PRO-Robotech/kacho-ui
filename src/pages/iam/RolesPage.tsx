@@ -171,7 +171,7 @@ export function RolesPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={3} style={{ margin: 0 }}>
+      <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
         Roles
       </Typography.Title>
 
