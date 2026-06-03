@@ -118,61 +118,44 @@ export function DeleteDialog({
   };
 
   const left = (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        textAlign: "center",
-        gap: 14,
-        flex: 1,
-        minWidth: 300,
-        padding: "8px 4px 4px",
-      }}
-    >
-      {/* Danger-иллюстрация (как welcome empty-state, но красная). */}
-      <div
-        style={{
-          width: 72,
-          height: 72,
-          borderRadius: 20,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 30,
-          color: token.colorError,
-          background: "linear-gradient(135deg, rgba(229,72,77,0.18), rgba(229,72,77,0.05))",
-          border: "1px solid rgba(229,72,77,0.28)",
-        }}
-      >
-        <DeleteOutlined />
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1, minWidth: 300 }}>
+      {/* Header: компактный danger-икон + заголовок с именем + подзаголовок. */}
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        <div
+          style={{
+            width: 42,
+            height: 42,
+            borderRadius: 11,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 20,
+            color: token.colorError,
+            background: "rgba(229,72,77,0.12)",
+            border: "1px solid rgba(229,72,77,0.22)",
+          }}
+        >
+          <DeleteOutlined />
+        </div>
+        <div style={{ minWidth: 0, paddingTop: 1 }}>
+          <Typography.Title
+            level={5}
+            style={{ margin: "0 0 4px", fontWeight: 600, color: "var(--kc-text)", wordBreak: "break-word" }}
+          >
+            Удалить {resourceLabel.toLowerCase()} «{displayName}»?
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13, lineHeight: 1.55 }}>
+            Действие необратимо — ресурс будет удалён безвозвратно.
+          </Typography.Text>
+        </div>
       </div>
-
-      <div>
-        <Typography.Title level={4} style={{ margin: "0 0 6px", fontWeight: 600, color: "var(--kc-text)" }}>
-          Удалить {resourceLabel.toLowerCase()}?
-        </Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
-          Ресурс{" "}
-          <Typography.Text strong style={{ color: "var(--kc-text)" }}>
-            {displayName}
-          </Typography.Text>{" "}
-          будет удалён безвозвратно. Действие необратимо.
-        </Typography.Paragraph>
-      </div>
-
-      <Typography.Text
-        code
-        style={{ fontSize: 11, wordBreak: "break-all", color: "var(--kc-text-tertiary)" }}
-      >
-        DELETE {apiPath}
-      </Typography.Text>
 
       {requireNameConfirm && (
-        <div style={{ width: "100%", maxWidth: 360, textAlign: "left", marginTop: 2 }}>
+        <div>
           <Typography.Text style={{ fontSize: 12, color: "var(--kc-text-secondary)" }}>
-            Введите имя{" "}
-            <Typography.Text code>{name || "(без имени)"}</Typography.Text> для подтверждения:
+            Для подтверждения введите имя{" "}
+            <Typography.Text code>{name || "(без имени)"}</Typography.Text>:
           </Typography.Text>
           <Input
             value={confirmText}

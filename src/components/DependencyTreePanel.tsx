@@ -26,7 +26,16 @@ function toDataNode(n: DepNode, token: ReturnType<typeof theme.useToken>["token"
       )}
       <span style={{ color: token.colorTextTertiary }}>{specSingular(n.resourceId)}</span>
       {href ? (
-        <Link to={href} style={{ color: token.colorText }} onClick={(e) => e.stopPropagation()}>
+        // KAC-246: открываем зависимость в НОВОЙ вкладке — иначе уход с модалки
+        // удаления безвозвратен (нельзя вернуться к удалению).
+        <Link
+          to={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: token.colorText }}
+          onClick={(e) => e.stopPropagation()}
+          title="Открыть в новой вкладке"
+        >
           {n.name}
         </Link>
       ) : (

@@ -45,11 +45,10 @@ beforeEach(() => {
 });
 
 describe("DeleteDialog", () => {
-  it("показывает заголовок и имя ресурса в сообщении", () => {
+  it("показывает заголовок с именем ресурса", () => {
     wrap(<DeleteDialog {...base} />);
-    // KAC-246: empty-state-стиль — заголовок «Удалить <label>?» + имя в теле.
-    expect(screen.getByText(/Удалить сеть\?/i)).toBeInTheDocument();
-    expect(screen.getByText("prod-net")).toBeInTheDocument();
+    // KAC-246: confirm-заголовок «Удалить <label> «<name>»?».
+    expect(screen.getByText(/Удалить сеть «prod-net»/i)).toBeInTheDocument();
   });
 
   it("requireNameConfirm gates the danger button until the name matches", async () => {
