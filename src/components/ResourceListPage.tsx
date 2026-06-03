@@ -14,7 +14,7 @@ import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
-import { useBreadcrumb } from "@/components/PageHeaderSlot";
+import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath, resourceServicePrefix } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
@@ -70,8 +70,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     spec.id === "address-pools";
   const listBase = location.pathname.endsWith("/") ? location.pathname.slice(0, -1) : location.pathname;
   const createTarget = panelForms ? `${listBase}/create` : `${listBase}?modal=${spec.id}-create`;
-  // KAC-246: CTA «Создать» переехала из header right-slot в page-toolbar
-  // (внутри surface-контейнера над таблицей).
+  // KAC-246: CTA «Создать» — в header right-slot (шапка), НЕ в page-toolbar.
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
     return (
@@ -82,6 +81,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
       </Link>
     );
   }, [spec, createTarget]);
+  useHeaderRight(cta);
 
   if (parentField && !filterValue) return <ProjectRequiredEmpty resource={spec.plural} />;
 
@@ -181,7 +181,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");
 
-  // Заголовок-toolbar: title + count-подзаголовок слева, CTA справа.
+  // Заголовок-toolbar: title + count-подзаголовок (CTA «Создать» — в шапке, см. useHeaderRight).
   const titleBlock = (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -195,7 +195,6 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
           {spec.description && !isLoading && !isError ? ` · ${spec.description}` : ""}
         </Typography.Text>
       </div>
-      {cta && <div style={{ flexShrink: 0 }}>{cta}</div>}
     </div>
   );
 
