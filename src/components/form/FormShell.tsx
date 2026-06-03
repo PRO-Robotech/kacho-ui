@@ -1,7 +1,8 @@
 // src/components/form/FormShell.tsx
-// FormShell — единый заголовок (level=4 + ResourceIcon + verb) + контейнер тела
+// FormShell — единый заголовок (ResourceIcon + verb) + контейнер тела
 // Create/Edit форм. Унифицирует title между modal и page (раньше page был
 // level=3 без иконки и с другим текстом). title-override опционален.
+// Theme-aware (--kc-text): уверенный размер/вес, иконка слева.
 import { Typography } from "antd";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 
@@ -19,7 +20,14 @@ export function FormShell({ specId, mode, singular, title, children }: Props) {
     <div>
       <Typography.Title
         level={4}
-        style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 10 }}
+        style={{
+          margin: "0 0 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          color: "var(--kc-text)",
+          fontWeight: 600,
+        }}
       >
         <ResourceIcon specId={specId} />
         {heading}

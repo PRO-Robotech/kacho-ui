@@ -12,7 +12,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Form,
   Input,
   InputNumber,
@@ -25,7 +24,8 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -157,20 +157,7 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
   }
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="address-pools" />
-        Редактирование: AddressPool
-      </Typography.Title>
-
+    <FormShell specId="address-pools" mode="edit" singular={spec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -248,21 +235,14 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button
-              type="primary"
-              onClick={submit}
-              loading={mutation.isPending}
-              disabled={mutation.isPending}
-            >
-              Сохранить
-            </Button>
-            <Button onClick={onCancel} disabled={mutation.isPending}>
-              Отмена
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Сохранить"
+            submitting={mutation.isPending}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 }

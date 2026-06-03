@@ -9,7 +9,7 @@ import { type ReactNode, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "antd";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { DeleteDialog } from "@/components/DeleteDialog";
+import { DeleteDialog, requiresNameConfirm } from "@/components/DeleteDialog";
 import {
   getByPath,
   resourceProjectPath,
@@ -61,6 +61,7 @@ export function DetailOverviewActions({ spec, data, projectId, detailBase, extAc
           resourceLabel={spec.singular}
           name={name}
           projectId={projectId}
+          requireNameConfirm={requiresNameConfirm(spec.id)}
           onSuccess={() => navigate(listPath)}
         />
       )}

@@ -9,7 +9,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Collapse,
   Form,
   Input,
@@ -19,14 +18,14 @@ import {
   Typography,
 } from "antd";
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import {
   QuestionCircleOutlined,
   LockOutlined,
 } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
-import { DopplerButton } from "@/components/DopplerButton";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -216,20 +215,7 @@ export function InlineSubnetEditForm({
   }
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="subnets" />
-        Редактирование: Subnet
-      </Typography.Title>
-
+    <FormShell specId="subnets" mode="edit" singular={subnetSpec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -329,24 +315,15 @@ export function InlineSubnetEditForm({
         </div>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <DopplerButton
-              type="primary"
-              onClick={submit}
-              pulsing={mutation.isPending || pendingOpId !== null}
-            >
-              Сохранить
-            </DopplerButton>
-            <Button
-              onClick={onCancel}
-              disabled={mutation.isPending || pendingOpId !== null}
-            >
-              Отменить
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Сохранить"
+            submitting={mutation.isPending || pendingOpId !== null}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 
   // Suppress unused

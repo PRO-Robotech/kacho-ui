@@ -11,7 +11,7 @@ import {
   DragOutlined,
   PlusOutlined,
 } from "@ant-design/icons";
-import { DeleteDialog } from "@/components/DeleteDialog";
+import { DeleteDialog, requiresNameConfirm } from "@/components/DeleteDialog";
 import { MoveStubDialog } from "@/components/MoveStubDialog";
 import { getByPath, type ResourceSpec } from "@/lib/resource-registry";
 
@@ -150,6 +150,7 @@ export function RowActionsMenu({ spec, row, basePath, projectId, editAsPanel }: 
           resourceLabel={spec.singular}
           name={name}
           projectId={projectId}
+          requireNameConfirm={requiresNameConfirm(spec.id)}
         />
       )}
 

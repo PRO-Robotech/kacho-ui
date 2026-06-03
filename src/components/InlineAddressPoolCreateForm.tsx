@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Form,
   Input,
   InputNumber,
@@ -22,12 +21,12 @@ import {
   Space,
   Switch,
   Tooltip,
-  Typography,
 } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -117,20 +116,7 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   };
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="address-pools" />
-        Создание: AddressPool
-      </Typography.Title>
-
+    <FormShell specId="address-pools" mode="create" singular={spec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -223,21 +209,14 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button
-              type="primary"
-              onClick={submit}
-              loading={mutation.isPending}
-              disabled={mutation.isPending}
-            >
-              Создать пул адресов
-            </Button>
-            <Button onClick={onCancel} disabled={mutation.isPending}>
-              Отмена
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Создать пул адресов"
+            submitting={mutation.isPending}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 }

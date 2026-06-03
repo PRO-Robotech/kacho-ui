@@ -5,13 +5,26 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Modal, Typography, Input } from "antd";
+import { Button, Modal, Typography, Input } from "antd";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
+import { DopplerButton } from "@/components/DopplerButton";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import { DependencyTreePanel } from "@/components/DependencyTreePanel";
 import { hasDependencyResolver, loadDependents } from "@/lib/dependency-graph";
+
+/**
+ * High-risk ресурсы — удаление требует ввода имени для подтверждения
+ * (необратимо + каскадные RESTRICT-зависимости / влияние на трафик).
+ * Используется action-меню (DetailOverviewActions / RowActionsMenu) для
+ * вычисления requireNameConfirm по spec.id.
+ */
+export const HIGH_RISK_DELETE = new Set(["networks", "route-tables", "security-groups"]);
+
+export function requiresNameConfirm(specId: string): boolean {
+  return HIGH_RISK_DELETE.has(specId);
+}
 
 interface Props {
   open: boolean;
@@ -94,12 +107,22 @@ export function DeleteDialog({
   const pending = mutation.isPending || pendingOpId !== null;
   const canConfirm = !requireNameConfirm || confirmText.trim() === name;
 
+  const displayName = name || "(без имени)";
+
+  const close = () => {
+    if (pending) return;
+    onOpenChange(false);
+    setConfirmText("");
+  };
+
   const left = (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 280 }}>
-      <Typography.Text>
+      <Typography.Text style={{ color: "var(--kc-text)" }}>
         Вы уверены, что хотите удалить{" "}
-        <Typography.Text strong>{name || "(без имени)"}</Typography.Text>?
-        Действие необратимо.
+        <Typography.Text strong style={{ color: "var(--kc-text)" }}>
+          {displayName}
+        </Typography.Text>
+        ? Действие необратимо.
       </Typography.Text>
 
       <Typography.Text code style={{ fontSize: 11, wordBreak: "break-all" }}>
@@ -108,14 +131,16 @@ export function DeleteDialog({
 
       {requireNameConfirm && (
         <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Введите имя ресурса <Typography.Text code>{name}</Typography.Text> для
+          <Typography.Text style={{ fontSize: 12, color: "var(--kc-text-secondary)" }}>
+            Введите имя ресурса{" "}
+            <Typography.Text code>{name || "(без имени)"}</Typography.Text> для
             подтверждения:
           </Typography.Text>
           <Input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={name}
+            status={confirmText && !canConfirm ? "error" : undefined}
             style={{ marginTop: 6 }}
             autoFocus
           />
@@ -127,23 +152,32 @@ export function DeleteDialog({
   return (
     <Modal
       open={open}
-      width={showDeps ? 780 : undefined}
-      onCancel={() => {
-        if (pending) return;
-        onOpenChange(false);
-        setConfirmText("");
-      }}
-      onOk={() => mutation.mutate()}
-      okText="Удалить"
-      okButtonProps={{
-        danger: true,
-        loading: pending,
-        disabled: !canConfirm || pending,
-      }}
-      cancelButtonProps={{ disabled: pending }}
-      cancelText="Отмена"
-      title={`Удалить ${resourceLabel.toLowerCase()}?`}
+      // Стабильная ширина: 820 с панелью зависимостей (две колонки), иначе 560.
+      // Зависит только от наличия resolver'а ресурса — не «прыгает» в рамках
+      // одного ресурса.
+      width={showDeps ? 820 : 560}
+      onCancel={close}
+      title={
+        <span style={{ color: "var(--kc-text)" }}>
+          Удалить {resourceLabel}: {displayName}
+        </span>
+      }
       destroyOnClose
+      footer={[
+        <Button key="cancel" onClick={close} disabled={pending}>
+          Отмена
+        </Button>,
+        <DopplerButton
+          key="ok"
+          danger
+          type="primary"
+          onClick={() => mutation.mutate()}
+          pulsing={pending}
+          disabled={!canConfirm}
+        >
+          Удалить
+        </DopplerButton>,
+      ]}
     >
       {showDeps ? (
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>

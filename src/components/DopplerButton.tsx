@@ -15,13 +15,17 @@ interface Props extends ButtonProps {
   pulsing?: boolean;
 }
 
-export function DopplerButton({ pulsing, children, ...rest }: Props) {
+export function DopplerButton({ pulsing, children, danger, ...rest }: Props) {
+  // danger → красная пульсация (delete-flow); иначе синяя (primary).
+  const ringStyle = danger
+    ? ({ "--doppler-c": "rgba(255, 77, 79, 0.6)", "--doppler-c0": "rgba(255, 77, 79, 0)" } as React.CSSProperties)
+    : ({ "--doppler-c": "rgba(22, 119, 255, 0.55)", "--doppler-c0": "rgba(22, 119, 255, 0)" } as React.CSSProperties);
   return (
     <>
       <style>{`
         @keyframes doppler-ring {
           0%   { box-shadow: 0 0 0 0   var(--doppler-c, rgba(22, 119, 255, 0.55)); }
-          100% { box-shadow: 0 0 0 14px rgba(22, 119, 255, 0);                     }
+          100% { box-shadow: 0 0 0 14px var(--doppler-c0, rgba(22, 119, 255, 0));  }
         }
         @keyframes doppler-shimmer {
           0%   { background-position: -120% 0; }
@@ -53,7 +57,9 @@ export function DopplerButton({ pulsing, children, ...rest }: Props) {
       `}</style>
       <Button
         {...rest}
+        danger={danger}
         loading={pulsing || rest.loading}
+        style={pulsing ? { ...rest.style, ...ringStyle } : rest.style}
         className={[rest.className, "doppler-btn", pulsing && "is-pulsing"]
           .filter(Boolean)
           .join(" ")}

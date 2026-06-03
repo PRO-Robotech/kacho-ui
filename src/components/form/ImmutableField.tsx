@@ -19,7 +19,7 @@ export function ImmutableField({ value, reason }: Props) {
         {empty ? "—" : value}
       </Typography.Text>
       <Tooltip title={reason}>
-        <LockOutlined aria-label="immutable-lock" style={{ color: "rgba(255,255,255,0.45)" }} />
+        <LockOutlined aria-label="immutable-lock" style={{ color: "var(--kc-text-tertiary)" }} />
       </Tooltip>
     </Space>
   );

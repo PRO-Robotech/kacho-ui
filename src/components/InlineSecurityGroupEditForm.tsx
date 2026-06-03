@@ -7,11 +7,12 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button, Form, Input, Space, Typography } from "antd";
+import { Form, Input, Typography } from "antd";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { operationStore } from "@/lib/use-operation-store";
@@ -95,15 +96,7 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
   }
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{ margin: "0 0 16px", display: "flex", alignItems: "center", gap: 10 }}
-      >
-        <ResourceIcon specId="security-groups" />
-        Редактирование: SecurityGroup
-      </Typography.Title>
-
+    <FormShell specId="security-groups" mode="edit" singular={sgSpec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -125,16 +118,14 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button type="primary" onClick={submit} loading={updateMain.isPending}>
-              Сохранить
-            </Button>
-            <Button onClick={onCancel} disabled={updateMain.isPending}>
-              Отменить
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Сохранить"
+            submitting={updateMain.isPending}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 }

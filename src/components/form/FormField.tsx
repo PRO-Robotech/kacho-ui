@@ -1,11 +1,11 @@
 import { useId } from "react";
-import { Card, Space, Tooltip, Typography, Button as AntButton } from "antd";
+import { Card, Input, Space, Tooltip, Typography, Button as AntButton } from "antd";
 import {
   DeleteOutlined,
   PlusOutlined,
   QuestionCircleOutlined,
 } from "@ant-design/icons";
-import { Input, Textarea, Label } from "@/components/ui/input";
+import { Label } from "@/components/ui/input";
 import { RefSelect } from "@/components/form/RefSelect";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { LabelsEditor } from "@/components/form/LabelsEditor";
@@ -120,7 +120,7 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hid
         />
       )}
       {field.type === "text" && (
-        <Textarea
+        <Input.TextArea
           id={id}
           value={(cur as string | undefined) ?? ""}
           onChange={(e) => set(e.target.value)}
@@ -209,8 +209,8 @@ function ArrayItemField({
           display: "flex",
           alignItems: "center",
           gap: 4,
-          fontSize: 11,
-          color: "rgba(255,255,255,0.55)",
+          fontSize: 12,
+          color: "var(--kc-text-secondary)",
           lineHeight: 1.2,
           whiteSpace: "nowrap",
         }}
@@ -226,7 +226,7 @@ function ArrayItemField({
         {description && (
           <Tooltip title={description}>
             <QuestionCircleOutlined
-              style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}
+              style={{ fontSize: 12, color: "var(--kc-text-tertiary)" }}
             />
           </Tooltip>
         )}
@@ -296,7 +296,7 @@ function ArrayFieldRenderer({ field, pathPrefix, value, onChange, editMode, disa
               gap: 8,
               padding: 8,
               borderRadius: 6,
-              background: "rgba(255,255,255,0.03)",
+              background: "var(--kc-hover-fill)",
             }}
           >
             <div

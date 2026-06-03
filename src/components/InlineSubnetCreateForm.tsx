@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Collapse,
   Form,
   Input,
@@ -27,8 +26,8 @@ import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
-import { DopplerButton } from "@/components/DopplerButton";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -230,20 +229,7 @@ export function InlineSubnetCreateForm({
   };
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="subnets" />
-        Создание: Subnet
-      </Typography.Title>
-
+    <FormShell specId="subnets" mode="create" singular={subnetSpec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -369,23 +355,14 @@ export function InlineSubnetCreateForm({
         </div>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <DopplerButton
-              type="primary"
-              onClick={submit}
-              pulsing={mutation.isPending || pendingOpId !== null}
-            >
-              Создать подсеть
-            </DopplerButton>
-            <Button
-              onClick={onCancel}
-              disabled={mutation.isPending || pendingOpId !== null}
-            >
-              Отменить
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Создать подсеть"
+            submitting={mutation.isPending || pendingOpId !== null}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 }

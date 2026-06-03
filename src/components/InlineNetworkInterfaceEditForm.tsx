@@ -4,7 +4,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Form,
   Input,
   Space,
@@ -14,7 +13,8 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { ResourceRefChips } from "@/components/ResourceRefChips";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import {
   LabelsEditor,
   labelsFromMap,
@@ -165,20 +165,7 @@ export function InlineNetworkInterfaceEditForm({
   }
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="network-interfaces" />
-        Редактирование: NetworkInterface
-      </Typography.Title>
-
+    <FormShell specId="network-interfaces" mode="edit" singular={spec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -268,21 +255,14 @@ export function InlineNetworkInterfaceEditForm({
         </Form.Item>
 
         <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button
-              type="primary"
-              onClick={submit}
-              loading={mutation.isPending || !!pendingOpId}
-              disabled={mutation.isPending || !!pendingOpId}
-            >
-              Сохранить
-            </Button>
-            <Button onClick={onCancel} disabled={mutation.isPending}>
-              Отмена
-            </Button>
-          </Space>
+          <FormFooter
+            submitLabel="Сохранить"
+            submitting={mutation.isPending || !!pendingOpId}
+            onSubmit={submit}
+            onCancel={onCancel}
+          />
         </Form.Item>
       </Form>
-    </div>
+    </FormShell>
   );
 }
