@@ -386,16 +386,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_PROJECT_ID,
-      {
-        // KAC-239 S1: чекбокс авто-создания default-SG (только для Create).
-        name: "create_default_security_group",
-        label: "Группа безопасности по умолчанию",
-        type: "bool",
-        default: true,
-        createOnly: true,
-        description:
-          "Создать группу безопасности по умолчанию для сети. Снимите флажок, чтобы создать сеть без неё.",
-      },
+      // KAC-246: default-SG обязательна — вариативности (opt-out чекбокса KAC-239)
+      // на UI больше нет. Сеть всегда создаётся с группой безопасности по умолчанию
+      // (template ниже всегда шлёт create_default_security_group: true).
     ],
     template: ({ projectId }) => ({
       project_id: projectId ?? "",
