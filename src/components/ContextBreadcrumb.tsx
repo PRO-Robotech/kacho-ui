@@ -10,7 +10,7 @@
 // Логика выбора контекста переиспользует contextApi (context-store) + iamApi —
 // никакого нового API не вводится.
 
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dropdown, theme, type MenuProps } from "antd";
 import { ChevronRight } from "lucide-react";
@@ -191,22 +191,25 @@ function BreadcrumbSlotWithSeparator({ sep }: { sep: React.ReactNode }) {
   );
 }
 
-function PillButton({
-  children,
-  token,
-  active,
-  placeholder,
-  chevron,
-}: {
-  children?: React.ReactNode;
+// PillButton — forwardRef + проброс props ОБЯЗАТЕЛЬНЫ: AntD Dropdown инжектит
+// в свой триггер onClick/ref/aria-* через cloneElement; без forwardRef и {...rest}
+// onClick проглатывается и дропдаун не открывается (KAC-246 фикс).
+type PillButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   token: ReturnType<typeof theme.useToken>["token"];
   active: boolean;
   placeholder: string;
   chevron?: boolean;
-}) {
+};
+
+const PillButton = forwardRef<HTMLButtonElement, PillButtonProps>(function PillButton(
+  { children, token, active, placeholder, chevron, onMouseEnter, onMouseLeave, ...rest },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
+      {...rest}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -228,10 +231,12 @@ function PillButton({
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "var(--kc-hover-fill)";
         e.currentTarget.style.color = token.colorText;
+        onMouseEnter?.(e);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
         e.currentTarget.style.color = active ? token.colorText : token.colorTextTertiary;
+        onMouseLeave?.(e);
       }}
     >
       <span
@@ -249,4 +254,4 @@ function PillButton({
       )}
     </button>
   );
-}
+});
