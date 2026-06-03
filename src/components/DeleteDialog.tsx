@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button, Modal, Typography, Input, theme } from "antd";
-import { DeleteOutlined } from "@ant-design/icons";
+import { DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { DopplerButton } from "@/components/DopplerButton";
@@ -179,8 +179,21 @@ export function DeleteDialog({
       width={showDeps ? 820 : 560}
       onCancel={close}
       title={null}
+      // KAC-246: крестик не нужен — есть кнопка «Отмена».
+      closable={false}
       destroyOnClose
       footer={[
+        showDeps ? (
+          <Button
+            key="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => depsQuery.refetch()}
+            disabled={pending || depsQuery.isFetching}
+            style={{ marginInlineEnd: "auto" }}
+          >
+            Обновить связи
+          </Button>
+        ) : null,
         <Button key="cancel" onClick={close} disabled={pending}>
           Отмена
         </Button>,
@@ -203,7 +216,6 @@ export function DeleteDialog({
             nodes={depsQuery.data ?? []}
             loading={depsQuery.isLoading || depsQuery.isFetching}
             error={depsQuery.error ? (depsQuery.error as Error).message : null}
-            onRefresh={() => depsQuery.refetch()}
           />
         </div>
       ) : (

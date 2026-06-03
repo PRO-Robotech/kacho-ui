@@ -6,8 +6,8 @@
 
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Empty, Spin, Typography, Button, Tag, Tree, theme } from "antd";
-import { ReloadOutlined, WarningFilled } from "@ant-design/icons";
+import { Alert, Empty, Spin, Typography, Tag, Tree, theme } from "antd";
+import { WarningFilled } from "@ant-design/icons";
 import type { DataNode } from "antd/es/tree";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
@@ -121,10 +121,9 @@ interface Props {
   nodes: DepNode[];
   loading: boolean;
   error?: string | null;
-  onRefresh?: () => void;
 }
 
-export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props) {
+export function DependencyTreePanel({ nodes, loading, error }: Props) {
   const { token } = theme.useToken();
   const treeData = useMemo(() => buildGrouped(nodes, token), [nodes, token]);
   const blockers = useMemo(() => blockingNodes(nodes), [nodes]);
@@ -142,14 +141,9 @@ export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props)
         gap: 10,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Typography.Text strong style={{ fontSize: 12 }}>
-          Связанные ресурсы
-        </Typography.Text>
-        {onRefresh && (
-          <Button type="text" size="small" icon={<ReloadOutlined />} onClick={onRefresh} disabled={loading} title="Обновить" />
-        )}
-      </div>
+      <Typography.Text strong style={{ fontSize: 12 }}>
+        Связанные ресурсы
+      </Typography.Text>
 
       {loading ? (
         <div style={{ padding: "16px 0", textAlign: "center" }}>
