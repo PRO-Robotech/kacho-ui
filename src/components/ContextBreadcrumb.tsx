@@ -120,7 +120,7 @@ export function ContextBreadcrumb() {
       }}
     >
       <Dropdown menu={accountMenu} trigger={["click"]} placement="bottomLeft">
-        <PillButton token={token} active={!!account} placeholder="Аккаунт">
+        <PillButton token={token} active={!!account} placeholder="Выберите аккаунт" chevron>
           {account?.name || account?.id}
         </PillButton>
       </Dropdown>
