@@ -45,10 +45,11 @@ beforeEach(() => {
 });
 
 describe("DeleteDialog", () => {
-  it("показывает заголовок с именем ресурса", () => {
+  it("показывает тип и имя удаляемого ресурса", () => {
     wrap(<DeleteDialog {...base} />);
-    // KAC-246: confirm-заголовок «Удалить <label> «<name>»?».
-    expect(screen.getByText(/Удалить сеть «prod-net»/i)).toBeInTheDocument();
+    // KAC-246: caps-метка «Удаление · <label>» + имя ресурса отдельной строкой.
+    expect(screen.getByText(/Удаление · Сеть/i)).toBeInTheDocument();
+    expect(screen.getByText("prod-net")).toBeInTheDocument();
   });
 
   it("requireNameConfirm gates the danger button until the name matches", async () => {

@@ -118,51 +118,73 @@ export function DeleteDialog({
   };
 
   const left = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1, minWidth: 300 }}>
-      {/* Header: компактный danger-икон + заголовок с именем + подзаголовок. */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1, minWidth: 280 }}>
+      {/* Header: danger-икон + caps-метка типа + имя (ellipsis) + подзаголовок. */}
       <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
         <div
           style={{
-            width: 42,
-            height: 42,
-            borderRadius: 11,
+            width: 46,
+            height: 46,
+            borderRadius: 13,
             flexShrink: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 20,
+            fontSize: 21,
             color: token.colorError,
-            background: "rgba(229,72,77,0.12)",
-            border: "1px solid rgba(229,72,77,0.22)",
+            background: "linear-gradient(135deg, rgba(229,72,77,0.20), rgba(229,72,77,0.06))",
+            border: "1px solid rgba(229,72,77,0.26)",
+            boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
           }}
         >
           <DeleteOutlined />
         </div>
-        <div style={{ minWidth: 0, paddingTop: 1 }}>
+        <div style={{ minWidth: 0, flex: 1, paddingTop: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: token.colorError,
+            }}
+          >
+            Удаление · {resourceLabel}
+          </div>
           <Typography.Title
             level={5}
-            style={{ margin: "0 0 4px", fontWeight: 600, color: "var(--kc-text)", wordBreak: "break-word" }}
+            ellipsis={{ tooltip: displayName }}
+            style={{ margin: "3px 0 6px", fontWeight: 600, color: "var(--kc-text)" }}
           >
-            Удалить {resourceLabel.toLowerCase()} «{displayName}»?
+            {displayName}
           </Typography.Title>
-          <Typography.Text type="secondary" style={{ fontSize: 13, lineHeight: 1.55 }}>
-            Действие необратимо — ресурс будет удалён безвозвратно.
+          <Typography.Text type="secondary" style={{ fontSize: 13, lineHeight: 1.55, display: "block" }}>
+            Ресурс будет удалён безвозвратно. Действие необратимо.
           </Typography.Text>
         </div>
       </div>
 
       {requireNameConfirm && (
-        <div>
-          <Typography.Text style={{ fontSize: 12, color: "var(--kc-text-secondary)" }}>
-            Для подтверждения введите имя{" "}
-            <Typography.Text code>{name || "(без имени)"}</Typography.Text>:
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 7,
+            padding: 12,
+            borderRadius: 10,
+            background: token.colorFillQuaternary,
+            border: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
+          <Typography.Text style={{ fontSize: 12.5, color: "var(--kc-text-secondary)", lineHeight: 1.5 }}>
+            Подтвердите удаление — введите имя ресурса
           </Typography.Text>
           <Input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={name}
             status={confirmText && !canConfirm ? "error" : undefined}
-            style={{ marginTop: 6 }}
+            allowClear
             autoFocus
           />
         </div>
