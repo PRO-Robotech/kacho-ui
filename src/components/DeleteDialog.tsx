@@ -5,7 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Button, Modal, Typography, Input } from "antd";
+import { Button, Modal, Typography, Input, theme } from "antd";
+import { DeleteOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { DopplerButton } from "@/components/DopplerButton";
@@ -55,6 +56,7 @@ export function DeleteDialog({
   onSuccess,
   requireNameConfirm,
 }: Props) {
+  const { token } = theme.useToken();
   const [confirmText, setConfirmText] = useState("");
   const invalidate = useInvalidateResourceList();
   const [pendingOpId, setPendingOpId] = useState<string | null>(null);
@@ -116,25 +118,61 @@ export function DeleteDialog({
   };
 
   const left = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 280 }}>
-      <Typography.Text style={{ color: "var(--kc-text)" }}>
-        Вы уверены, что хотите удалить{" "}
-        <Typography.Text strong style={{ color: "var(--kc-text)" }}>
-          {displayName}
-        </Typography.Text>
-        ? Действие необратимо.
-      </Typography.Text>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        textAlign: "center",
+        gap: 14,
+        flex: 1,
+        minWidth: 300,
+        padding: "8px 4px 4px",
+      }}
+    >
+      {/* Danger-иллюстрация (как welcome empty-state, но красная). */}
+      <div
+        style={{
+          width: 72,
+          height: 72,
+          borderRadius: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 30,
+          color: token.colorError,
+          background: "linear-gradient(135deg, rgba(229,72,77,0.18), rgba(229,72,77,0.05))",
+          border: "1px solid rgba(229,72,77,0.28)",
+        }}
+      >
+        <DeleteOutlined />
+      </div>
 
-      <Typography.Text code style={{ fontSize: 11, wordBreak: "break-all" }}>
+      <div>
+        <Typography.Title level={4} style={{ margin: "0 0 6px", fontWeight: 600, color: "var(--kc-text)" }}>
+          Удалить {resourceLabel.toLowerCase()}?
+        </Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ margin: 0, fontSize: 14, lineHeight: 1.6 }}>
+          Ресурс{" "}
+          <Typography.Text strong style={{ color: "var(--kc-text)" }}>
+            {displayName}
+          </Typography.Text>{" "}
+          будет удалён безвозвратно. Действие необратимо.
+        </Typography.Paragraph>
+      </div>
+
+      <Typography.Text
+        code
+        style={{ fontSize: 11, wordBreak: "break-all", color: "var(--kc-text-tertiary)" }}
+      >
         DELETE {apiPath}
       </Typography.Text>
 
       {requireNameConfirm && (
-        <div>
+        <div style={{ width: "100%", maxWidth: 360, textAlign: "left", marginTop: 2 }}>
           <Typography.Text style={{ fontSize: 12, color: "var(--kc-text-secondary)" }}>
-            Введите имя ресурса{" "}
-            <Typography.Text code>{name || "(без имени)"}</Typography.Text> для
-            подтверждения:
+            Введите имя{" "}
+            <Typography.Text code>{name || "(без имени)"}</Typography.Text> для подтверждения:
           </Typography.Text>
           <Input
             value={confirmText}
@@ -157,11 +195,7 @@ export function DeleteDialog({
       // одного ресурса.
       width={showDeps ? 820 : 560}
       onCancel={close}
-      title={
-        <span style={{ color: "var(--kc-text)" }}>
-          Удалить {resourceLabel}: {displayName}
-        </span>
-      }
+      title={null}
       destroyOnClose
       footer={[
         <Button key="cancel" onClick={close} disabled={pending}>
