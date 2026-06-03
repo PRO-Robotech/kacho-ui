@@ -1,38 +1,120 @@
-// DependencyTreePanel — боковая панель в модалке удаления: связанные ресурсы,
-// СГРУППИРОВАННЫЕ по типу. У каждой группы — бейдж (иконка+тип) + счётчик;
-// внутри группы — только имена (ссылки открываются в новой вкладке, чтобы не
-// терять модалку удаления). Блокирующие удаление помечены ⚠. Источник —
-// lib/dependency-graph (дерево DepNode плющится в группы по resourceId).
+// DependencyTreePanel — боковая панель в модалке удаления: ДЕРЕВО связанных
+// ресурсов с сохранённой иерархией (Network → Подсети → {Адреса, NIC} и т.д.).
+// На каждом уровне дети сгруппированы по типу: ветка-группа = бейдж (иконка+тип)
+// + счётчик, внутри — только имена (ссылки в новой вкладке, чтобы не терять
+// модалку). Блокирующие удаление помечены ⚠. Источник — lib/dependency-graph.
 
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Alert, Empty, Spin, Typography, Button, Tag, theme } from "antd";
+import { Alert, Empty, Spin, Typography, Button, Tag, Tree, theme } from "antd";
 import { ReloadOutlined, WarningFilled } from "@ant-design/icons";
+import type { DataNode } from "antd/es/tree";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { blockingNodes, type DepNode } from "@/lib/dependency-graph";
 
-function specLabel(resourceId: string): string {
+type Token = ReturnType<typeof theme.useToken>["token"];
+
+// Label группы в дереве. Для addresses — точнее: под подсетью это ВНУТРЕННИЕ
+// (приватные) адреса (резолвер фильтрует по internal_*.subnet_id), а registry-
+// label «Публичные IP-адреса» здесь ввёл бы в заблуждение.
+function groupLabel(resourceId: string): string {
+  if (resourceId === "addresses") return "Внутренние адреса";
   return REGISTRY[resourceId]?.plural ?? REGISTRY[resourceId]?.singular ?? resourceId;
 }
 
-/** Рекурсивно расплющить дерево зависимостей в плоский список. */
-function flatten(nodes: DepNode[]): DepNode[] {
-  const out: DepNode[] = [];
-  const walk = (ns: DepNode[]) => {
-    for (const n of ns) {
-      out.push(n);
-      if (n.children?.length) walk(n.children);
-    }
-  };
-  walk(nodes);
-  return out;
+function CountPill({ n, token }: { n: number; token: Token }) {
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        minWidth: 18,
+        height: 17,
+        padding: "0 6px",
+        borderRadius: 9,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: token.colorFillSecondary,
+        color: token.colorTextSecondary,
+        fontWeight: 600,
+        flexShrink: 0,
+      }}
+    >
+      {n}
+    </span>
+  );
 }
 
-interface Group {
-  resourceId: string;
-  items: DepNode[];
-  blocks: boolean;
+function groupTitle(resourceId: string, count: number, anyBlocks: boolean, token: Token) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
+      <Tag
+        color={anyBlocks ? "warning" : "default"}
+        style={{ margin: 0, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, paddingInline: 8 }}
+      >
+        <span style={{ display: "inline-flex", fontSize: 13, lineHeight: 0 }}>
+          <ResourceIcon specId={resourceId} />
+        </span>
+        {groupLabel(resourceId)}
+      </Tag>
+      <CountPill n={count} token={token} />
+    </span>
+  );
+}
+
+function nameTitle(n: DepNode, token: Token) {
+  const href = n.projectId ? `/projects/${n.projectId}/${n.routeSegment}/${n.id}` : null;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, whiteSpace: "nowrap" }}>
+      {n.blocks && (
+        <WarningFilled style={{ color: token.colorWarning, fontSize: 10, flexShrink: 0 }} title="Блокирует удаление — удалите первым" />
+      )}
+      {href ? (
+        <Link
+          to={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: token.colorText }}
+          onClick={(e) => e.stopPropagation()}
+          title="Открыть в новой вкладке"
+        >
+          {n.name || n.id}
+        </Link>
+      ) : (
+        <span style={{ color: token.colorText }}>{n.name || n.id}</span>
+      )}
+    </span>
+  );
+}
+
+// Сгруппировать массив узлов по resourceId в ветки-группы; внутри — узлы-имена,
+// которые рекурсивно получают свои сгруппированные ветки (иерархия сохраняется).
+function buildGrouped(nodes: DepNode[], token: Token): DataNode[] {
+  const order: string[] = [];
+  const map = new Map<string, DepNode[]>();
+  for (const n of nodes) {
+    if (!map.has(n.resourceId)) {
+      map.set(n.resourceId, []);
+      order.push(n.resourceId);
+    }
+    map.get(n.resourceId)!.push(n);
+  }
+  return order.map((rid) => {
+    const items = map.get(rid)!;
+    const anyBlocks = items.some((i) => i.blocks);
+    return {
+      key: `grp-${rid}-${items[0].key}`,
+      selectable: false,
+      title: groupTitle(rid, items.length, anyBlocks, token),
+      children: items.map<DataNode>((n) => ({
+        key: n.key,
+        selectable: false,
+        title: nameTitle(n, token),
+        children: n.children?.length ? buildGrouped(n.children, token) : undefined,
+      })),
+    };
+  });
 }
 
 interface Props {
@@ -44,24 +126,7 @@ interface Props {
 
 export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props) {
   const { token } = theme.useToken();
-
-  const groups = useMemo<Group[]>(() => {
-    const flat = flatten(nodes);
-    const order: string[] = [];
-    const map = new Map<string, DepNode[]>();
-    for (const n of flat) {
-      if (!map.has(n.resourceId)) {
-        map.set(n.resourceId, []);
-        order.push(n.resourceId);
-      }
-      map.get(n.resourceId)!.push(n);
-    }
-    return order.map((rid) => {
-      const items = map.get(rid)!;
-      return { resourceId: rid, items, blocks: items.some((i) => i.blocks) };
-    });
-  }, [nodes]);
-
+  const treeData = useMemo(() => buildGrouped(nodes, token), [nodes, token]);
   const blockers = useMemo(() => blockingNodes(nodes), [nodes]);
 
   return (
@@ -69,7 +134,7 @@ export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props)
       style={{
         borderLeft: `1px solid ${token.colorBorderSecondary}`,
         paddingLeft: 16,
-        minWidth: 320,
+        minWidth: 340,
         maxHeight: 440,
         overflow: "auto",
         display: "flex",
@@ -82,14 +147,7 @@ export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props)
           Связанные ресурсы
         </Typography.Text>
         {onRefresh && (
-          <Button
-            type="text"
-            size="small"
-            icon={<ReloadOutlined />}
-            onClick={onRefresh}
-            disabled={loading}
-            title="Обновить"
-          />
+          <Button type="text" size="small" icon={<ReloadOutlined />} onClick={onRefresh} disabled={loading} title="Обновить" />
         )}
       </div>
 
@@ -99,7 +157,7 @@ export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props)
         </div>
       ) : error ? (
         <Alert type="error" showIcon message="Не удалось загрузить связи" description={error} />
-      ) : groups.length === 0 ? (
+      ) : treeData.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
@@ -117,86 +175,18 @@ export function DependencyTreePanel({ nodes, loading, error, onRefresh }: Props)
               style={{ fontSize: 12 }}
               message={
                 <span style={{ fontSize: 12 }}>
-                  Сначала удалите помеченные ⚠ ресурсы — иначе удаление будет отклонено
-                  («… is not empty»).
+                  Сначала удалите помеченные ⚠ ресурсы — иначе удаление будет отклонено.
                 </span>
               }
             />
           )}
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {groups.map((g) => (
-              <div key={g.resourceId}>
-                {/* Бейдж группы: иконка+тип + счётчик + ⚠ если блокирует. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
-                  <Tag
-                    color={g.blocks ? "warning" : "default"}
-                    style={{ margin: 0, fontSize: 12, display: "inline-flex", alignItems: "center", gap: 5, paddingInline: 8 }}
-                  >
-                    <span style={{ display: "inline-flex", fontSize: 13, lineHeight: 0 }}>
-                      <ResourceIcon specId={g.resourceId} />
-                    </span>
-                    {specLabel(g.resourceId)}
-                  </Tag>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      minWidth: 20,
-                      height: 18,
-                      padding: "0 6px",
-                      borderRadius: 9,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: token.colorFillSecondary,
-                      color: token.colorTextSecondary,
-                      fontWeight: 600,
-                    }}
-                  >
-                    {g.items.length}
-                  </span>
-                </div>
-
-                {/* Внутри группы — только имена. */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 3, paddingLeft: 6 }}>
-                  {g.items.map((it) => {
-                    const href = it.projectId
-                      ? `/projects/${it.projectId}/${it.routeSegment}/${it.id}`
-                      : null;
-                    return (
-                      <span
-                        key={it.key}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, minWidth: 0 }}
-                      >
-                        {it.blocks && (
-                          <WarningFilled
-                            style={{ color: token.colorWarning, fontSize: 10, flexShrink: 0 }}
-                            title="Блокирует удаление — удалите первым"
-                          />
-                        )}
-                        {href ? (
-                          <Link
-                            to={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                            onClick={(e) => e.stopPropagation()}
-                            title="Открыть в новой вкладке"
-                          >
-                            {it.name || it.id}
-                          </Link>
-                        ) : (
-                          <span style={{ color: token.colorText, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {it.name || it.id}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Tree
+            treeData={treeData}
+            defaultExpandAll
+            selectable={false}
+            showLine={{ showLeafIcon: false }}
+            style={{ background: "transparent", fontSize: 12 }}
+          />
         </>
       )}
     </div>
