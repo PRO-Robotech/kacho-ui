@@ -7,9 +7,10 @@
 
 import { useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { Button, Input, Select, Space, Typography } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { Button, Input, Select, Space, Tag, Typography } from "antd";
+import { ReloadOutlined, ApartmentOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
+import { PanelHeader } from "@/components/PanelHeader";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ErrorResult } from "@/components/ErrorResult";
 import {
@@ -42,7 +43,8 @@ const STATUS_OPTIONS: { value: OperationStatus | "all"; label: string }[] = [
 
 const KIND_OPTIONS = [
   { value: "all", label: "Все типы" },
-  ...VPC_RESOURCES.map((r) => ({ value: r.id, label: r.label })),
+  // Русские названия из реестра (singular), а не английские VPC_RESOURCES.label.
+  ...VPC_RESOURCES.map((r) => ({ value: r.id, label: REGISTRY[r.id]?.singular ?? r.label })),
 ];
 
 interface ResListResp {
@@ -180,36 +182,46 @@ export function OperationsPage() {
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      {/* KAC-246: заголовок + фильтры в одной строке (title слева, фильтры справа). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", width: "100%" }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
-            Операции
-          </Typography.Title>
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-            Все операции (LRO) по VPC-ресурсам в текущем проекте.
-          </Typography.Text>
-        </div>
-        <Space size={8} wrap style={{ flexShrink: 0 }}>
-          <Input
-            placeholder="Фильтр по идентификатору"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            allowClear
-            style={{ width: 280 }}
-          />
-          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
-          <Select value={kind} onChange={setKind} options={KIND_OPTIONS} style={{ width: 180 }} />
-        </Space>
-      </div>
+    <div className="kc-surface" style={{ padding: 20, minHeight: "calc(100vh - 110px)" }}>
+      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+        {/* Единая шапка (PanelHeader) с общей VPC-иконкой + «Список» + «Операции»
+            + счётчик; фильтры — справа. */}
+        <PanelHeader
+          icon={<ApartmentOutlined />}
+          eyebrow="Список"
+          title={
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              Операции
+              <Tag
+                style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: "22px", height: 24, paddingInline: 9, borderRadius: 7 }}
+              >
+                {filtered.length}
+              </Tag>
+            </span>
+          }
+          subtitle="Все операции (LRO) по VPC-ресурсам в текущем проекте."
+          right={
+            <>
+              <Input
+                placeholder="Фильтр по идентификатору"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                allowClear
+                style={{ width: 280 }}
+              />
+              <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+              <Select value={kind} onChange={setKind} options={KIND_OPTIONS} style={{ width: 180 }} />
+            </>
+          }
+        />
 
-      <OperationsTable
-        rows={filtered}
-        loading={isLoading}
-        showResourceKind
-        empty={allOps.length > 0 && filtered.length === 0}
-      />
-    </Space>
+        <OperationsTable
+          rows={filtered}
+          loading={isLoading}
+          showResourceKind
+          empty={allOps.length > 0 && filtered.length === 0}
+        />
+      </Space>
+    </div>
   );
 }
