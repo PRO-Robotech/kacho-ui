@@ -85,7 +85,13 @@ export function ResourceFormBody({
   });
 
   return (
-    <FormShell specId={spec.id} mode={mode} singular={spec.singular} title={title}>
+    <FormShell
+      specId={spec.id}
+      mode={mode}
+      singular={spec.singular}
+      description={mode === "create" ? spec.description : undefined}
+      title={title}
+    >
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
