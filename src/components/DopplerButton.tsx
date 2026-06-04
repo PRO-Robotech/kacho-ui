@@ -20,52 +20,20 @@ export function DopplerButton({ pulsing, children, danger, ...rest }: Props) {
   const ringStyle = danger
     ? ({ "--doppler-c": "rgba(255, 77, 79, 0.6)", "--doppler-c0": "rgba(255, 77, 79, 0)" } as React.CSSProperties)
     : ({ "--doppler-c": "rgba(22, 119, 255, 0.55)", "--doppler-c0": "rgba(22, 119, 255, 0)" } as React.CSSProperties);
+  // KAC-246: keyframes/стили вынесены в index.css (.doppler-btn). Inline <style>
+  // убран — он рвал смежность .ant-btn+.ant-btn в Modal-футере (кнопки липли).
+  // Теперь DopplerButton — чистый <Button>, и AntD-зазор между кнопками работает.
   return (
-    <>
-      <style>{`
-        @keyframes doppler-ring {
-          0%   { box-shadow: 0 0 0 0   var(--doppler-c, rgba(22, 119, 255, 0.55)); }
-          100% { box-shadow: 0 0 0 14px var(--doppler-c0, rgba(22, 119, 255, 0));  }
-        }
-        @keyframes doppler-shimmer {
-          0%   { background-position: -120% 0; }
-          100% { background-position: 220% 0; }
-        }
-        .doppler-btn {
-          position: relative;
-          overflow: hidden;
-        }
-        .doppler-btn.is-pulsing {
-          animation: doppler-ring 1.4s ease-out infinite;
-        }
-        .doppler-btn.is-pulsing::after {
-          content: "";
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            100deg,
-            transparent 0%,
-            rgba(255, 255, 255, 0.18) 45%,
-            rgba(255, 255, 255, 0.34) 50%,
-            rgba(255, 255, 255, 0.18) 55%,
-            transparent 100%
-          );
-          background-size: 200% 100%;
-          animation: doppler-shimmer 1.4s linear infinite;
-          pointer-events: none;
-        }
-      `}</style>
-      <Button
-        {...rest}
-        danger={danger}
-        loading={pulsing || rest.loading}
-        style={pulsing ? { ...rest.style, ...ringStyle } : rest.style}
-        className={[rest.className, "doppler-btn", pulsing && "is-pulsing"]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {children}
-      </Button>
-    </>
+    <Button
+      {...rest}
+      danger={danger}
+      loading={pulsing || rest.loading}
+      style={pulsing ? { ...rest.style, ...ringStyle } : rest.style}
+      className={[rest.className, "doppler-btn", pulsing && "is-pulsing"]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </Button>
   );
 }
