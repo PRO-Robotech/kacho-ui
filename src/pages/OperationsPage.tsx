@@ -181,36 +181,28 @@ export function OperationsPage() {
 
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <div>
-        <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
-          Операции
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-          Все операции (LRO) по VPC-ресурсам в текущем проекте.
-        </Typography.Text>
+      {/* KAC-246: заголовок + фильтры в одной строке (title слева, фильтры справа). */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", width: "100%" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
+            Операции
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            Все операции (LRO) по VPC-ресурсам в текущем проекте.
+          </Typography.Text>
+        </div>
+        <Space size={8} wrap style={{ flexShrink: 0 }}>
+          <Input
+            placeholder="Фильтр по идентификатору"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            allowClear
+            style={{ width: 280 }}
+          />
+          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+          <Select value={kind} onChange={setKind} options={KIND_OPTIONS} style={{ width: 180 }} />
+        </Space>
       </div>
-
-      <Space size={8} wrap>
-        <Input
-          placeholder="Фильтр по идентификатору"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          allowClear
-          style={{ width: 320 }}
-        />
-        <Select
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-          style={{ width: 200 }}
-        />
-        <Select
-          value={kind}
-          onChange={setKind}
-          options={KIND_OPTIONS}
-          style={{ width: 200 }}
-        />
-      </Space>
 
       <OperationsTable
         rows={filtered}
