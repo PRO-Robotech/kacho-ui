@@ -41,10 +41,7 @@ export function LabelsEditor({ value, onChange, disabled }: Props) {
   };
 
   return (
-    <div
-      className="rounded-lg border border-border overflow-hidden bg-card"
-      style={{ maxWidth: 520 }}
-    >
+    <div className="rounded-lg border border-border overflow-hidden bg-card" style={{ width: "100%" }}>
       <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
         <colgroup>
           <col style={{ width: "calc((100% - 48px) / 2)" }} />
