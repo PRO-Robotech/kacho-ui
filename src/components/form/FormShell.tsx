@@ -29,11 +29,8 @@ interface Props {
 export function FormShell({ specId, mode, singular, title, subtitle, children }: Props) {
   const verb = mode === "create" ? "Создание" : "Редактирование";
   const heading = title ?? singular;
-  const sub =
-    subtitle ??
-    (mode === "create"
-      ? "Заполните параметры — ресурс будет создан после подтверждения."
-      : "Измените параметры — изменения вступят в силу после сохранения.");
+  // Подзаголовок-подсказка убран (лишний) — шапка формы = иконка + действие +
+  // название, идентична шапке таба. subtitle оставлен как опц. override.
 
   // Внутри detail-страницы (есть DetailHeaderContext) форма рендерится edit-/
   // child-create-панелью в main-pane, который УЖЕ является поверхностью. Своя
@@ -47,7 +44,7 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
       icon={<ResourceIcon specId={specId} />}
       eyebrow={verb}
       title={heading}
-      subtitle={sub}
+      subtitle={subtitle}
     />
   );
 

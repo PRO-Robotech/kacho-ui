@@ -6,9 +6,10 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Input, Select, Space, Typography } from "antd";
+import { Input, Select } from "antd";
 import { api, ApiError } from "@/api/client";
 import { ErrorResult } from "@/components/ErrorResult";
+import { SectionHeader } from "@/components/SectionHeader";
 import {
   OperationsTable,
   type Op,
@@ -86,29 +87,31 @@ export function OperationsTab({ spec, resourceId }: Props) {
   }
 
   return (
-    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      {/* KAC-246: заголовок + фильтры в одной строке (title слева, фильтры справа). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", width: "100%" }}>
-        <Typography.Title level={4} style={{ margin: 0, flex: 1, minWidth: 0 }}>
-          Операции
-        </Typography.Title>
-        <Space size={8} wrap style={{ flexShrink: 0 }}>
-          <Input
-            placeholder="Фильтр по идентификатору"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            allowClear
-            style={{ width: 260 }}
-          />
-          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
-        </Space>
-      </div>
+    <div>
+      {/* Единая шапка: иконка ресурса (из DetailHeaderContext) + действие
+          «Операции» + название (singular) + фильтры справа. */}
+      <SectionHeader
+        eyebrow="Операции"
+        title={spec.singular}
+        right={
+          <>
+            <Input
+              placeholder="Фильтр по идентификатору"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              allowClear
+              style={{ width: 260 }}
+            />
+            <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+          </>
+        }
+      />
 
       <OperationsTable
         rows={filtered}
         loading={isLoading}
         empty={ops.length > 0 && filtered.length === 0}
       />
-    </Space>
+    </div>
   );
 }
