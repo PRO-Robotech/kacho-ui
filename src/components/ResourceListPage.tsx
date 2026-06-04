@@ -215,13 +215,16 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     </div>
   );
 
-  // Welcome (пустой список) — лёгкий layout без surface-обёртки таблицы.
+  // Welcome (пустой список) — та же surface-подложка, что и заполнённая страница,
+  // чтобы заголовок не «прыгал» и не выглядел инородно (KAC-246).
   if (showWelcome) {
     return (
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {titleBlock}
-        <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
-      </Space>
+      <div className="kc-surface" style={{ padding: 20 }}>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          {titleBlock}
+          <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
+        </Space>
+      </div>
     );
   }
 
