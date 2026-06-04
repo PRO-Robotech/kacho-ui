@@ -17,10 +17,9 @@ import {
   Tooltip,
   Typography,
 } from "antd";
-import { CidrSection } from "@/components/SubnetCidrManager";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
-import { QuestionCircleOutlined, LockOutlined } from "@ant-design/icons";
+import { LockOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
@@ -68,8 +67,6 @@ export function InlineSubnetEditForm({
 
   const networkId = (subnet?.network_id as string | undefined) ?? "";
   const zoneId = (subnet?.zone_id as string | undefined) ?? "";
-  const v4Cidrs = (subnet?.v4_cidr_blocks as string[] | undefined) ?? [];
-  const v6Cidrs = (subnet?.v6_cidr_blocks as string[] | undefined) ?? [];
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -269,33 +266,9 @@ export function InlineSubnetEditForm({
           />
         </Form.Item>
 
-        {/* IPv4 и IPv6 CIDR — ДВА отдельных поля. Блоки управляются через
-            :add-cidr-blocks / :remove-cidr-blocks (PATCH их не меняет). */}
-        <Form.Item
-          label={
-            <Space size={4}>
-              IPv4 CIDR
-              <Tooltip title="IPv4 CIDR-блоки управляются через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
-              </Tooltip>
-            </Space>
-          }
-        >
-          <CidrSection subnetId={subnetId} kind="v4" blocks={v4Cidrs} hideTitle />
-        </Form.Item>
-
-        <Form.Item
-          label={
-            <Space size={4}>
-              IPv6 CIDR
-              <Tooltip title="IPv6 CIDR-блоки управляются через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
-              </Tooltip>
-            </Space>
-          }
-        >
-          <CidrSection subnetId={subnetId} kind="v6" blocks={v6Cidrs} hideTitle />
-        </Form.Item>
+        {/* CIDR-блоки (IPv4/IPv6) НЕ в форме редактирования — они мутируются
+            отдельными RPC (:add/:remove-cidr-blocks), а не PATCH-ом подсети.
+            Управление — отдельной панелью SubnetCidrPanel в блоке «Обзор». */}
 
         <div style={{ margin: "16px 0" }}>
           <Collapse
