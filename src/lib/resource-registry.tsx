@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { FormField } from "./form-schema";
 import { setByPath } from "./path";
 import { CopyableId } from "@/components/CopyableId";
+import { RoutesEditor, type RouteEntry } from "@/components/RoutesEditor";
 import { CopyableName } from "@/components/CopyableName";
 import { RefNameLink } from "@/components/RefNameLink";
 import { LabelsCell } from "@/components/LabelsCell";
@@ -998,34 +999,22 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "static_routes",
         label: "Статические маршруты",
-        type: "array",
-        // KAC-239: маршруты редактируются отдельно (RoutesPanel в detail),
-        // не в форме ресурса. В Create оставляем, в Edit скрыто.
+        type: "custom",
+        // KAC-239/KAC-246: в Create маршруты добавляются ТОЙ ЖЕ таблицей, что и в
+        // detail (RoutesPanel) — controlled RoutesEditor (Префикс назначения |
+        // Следующий узел | ⌫ + dashed «Добавить маршрут»). В Edit скрыто —
+        // маршруты правятся RoutesPanel отдельно (full-replace).
         editHidden: true,
-        itemLabel: "маршрут",
-        description:
-          "При обновлении список заменяется целиком (full-replace).",
-        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
-        itemFields: [
-          {
-            name: "destination_prefix",
-            label: "CIDR",
-            type: "string",
-            required: true,
-            placeholder: "10.0.0.0/24",
-            description:
-              "CIDR-блок назначения. Трафик в этот блок будет направлен через указанный next-hop.",
-          },
-          {
-            name: "next_hop_address",
-            label: "Next-hop",
-            type: "string",
-            required: true,
-            placeholder: "10.0.0.1",
-            description:
-              "IP-адрес next-hop. Должен быть достижим из подсетей, использующих эту таблицу маршрутизации.",
-          },
-        ],
+        description: "При обновлении список заменяется целиком (full-replace).",
+        render: ({ value, onChange }) => {
+          const routes = (getByPath(value, "static_routes") as RouteEntry[] | undefined) ?? [];
+          return (
+            <RoutesEditor
+              value={routes}
+              onChange={(next) => onChange(setByPath(value, "static_routes", next))}
+            />
+          );
+        },
       },
     ],
     template: ({ projectId }) => ({
@@ -1035,6 +1024,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       static_routes: [],
     }),
+    // Выкидываем пустые строки маршрутов (без префикса/next-hop) перед POST.
+    sanitize: (obj) => {
+      const routes = Array.isArray(obj.static_routes)
+        ? (obj.static_routes as RouteEntry[]).filter(
+            (r) => (r?.destination_prefix ?? "").trim() !== "" && (r?.next_hop_address ?? "").trim() !== "",
+          )
+        : [];
+      return { ...obj, static_routes: routes };
+    },
   },
 
   // proto: GET /vpc/v1/networkInterfaces — AWS-ENI-подобный ресурс (эпик KAC-2).
