@@ -1005,6 +1005,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // Следующий узел | ⌫ + dashed «Добавить маршрут»). В Edit скрыто —
         // маршруты правятся RoutesPanel отдельно (full-replace).
         editHidden: true,
+        // fullWidth:false — рендерить как обычное labeled-поле (label «Статические
+        // маршруты» слева 200px + таблица в wrapper-колонке 570px), выровнено с
+        // остальными полями. Без этого custom → full-width.
+        fullWidth: false,
         description: "При обновлении список заменяется целиком (full-replace).",
         render: ({ value, onChange }) => {
           const routes = (getByPath(value, "static_routes") as RouteEntry[] | undefined) ?? [];

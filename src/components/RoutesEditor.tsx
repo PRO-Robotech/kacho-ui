@@ -9,7 +9,7 @@
 //
 // Backend поддерживает только next_hop_address (kacho-vpc#55) — gateway_id не
 // вводим (как и RoutesPanel).
-import { Button, Input, Typography } from "antd";
+import { Button, Input } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 export interface RouteEntry {
@@ -41,89 +41,99 @@ export function RoutesEditor({ value, onChange, disabled }: Props) {
   };
 
   return (
-    <div>
-      <Typography.Text strong style={{ display: "block", marginBottom: 8 }}>
-        Статические маршруты{" "}
-        <Typography.Text type="secondary" style={{ fontWeight: 400 }}>
-          ({value.length})
-        </Typography.Text>
-      </Typography.Text>
-
+    <div
+      className="rounded-lg border border-border overflow-hidden bg-card"
+      style={{ width: "100%", minWidth: 0 }}
+    >
+      {/* header */}
       <div
-        className="rounded-lg border border-border overflow-hidden bg-card"
-        style={{ width: "100%", minWidth: 0 }}
+        className="bg-muted/40 text-xs uppercase tracking-wide"
+        style={{ display: "grid", gridTemplateColumns: GRID_COLS }}
       >
-        {/* header */}
+        <div className="px-3 py-2">Префикс назначения</div>
+        <div className="px-3 py-2">Следующий узел</div>
+        <div />
+      </div>
+
+      {/* rows */}
+      {value.length === 0 && (
         <div
-          className="bg-muted/40 text-xs uppercase tracking-wide"
-          style={{ display: "grid", gridTemplateColumns: GRID_COLS }}
+          className="px-3 text-center text-xs text-muted-foreground"
+          style={{
+            height: ROW_H,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <div className="px-3 py-2">Префикс назначения</div>
-          <div className="px-3 py-2">Следующий узел</div>
-          <div />
+          Маршрутов нет
         </div>
-
-        {/* rows */}
-        {value.length === 0 && (
-          <div
-            className="px-3 text-center text-xs text-muted-foreground"
-            style={{ height: ROW_H, display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            Маршрутов нет
+      )}
+      {value.map((r, idx) => (
+        <div
+          key={idx}
+          className="border-t border-border hover:bg-muted/20"
+          style={{
+            display: "grid",
+            gridTemplateColumns: GRID_COLS,
+            alignItems: "center",
+            minWidth: 0,
+          }}
+        >
+          <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
+            <Input
+              variant="borderless"
+              placeholder="10.0.0.0/24"
+              value={r.destination_prefix}
+              onChange={(e) =>
+                update(idx, { destination_prefix: e.target.value })
+              }
+              disabled={disabled}
+              style={cellInputStyle}
+            />
           </div>
-        )}
-        {value.map((r, idx) => (
-          <div
-            key={idx}
-            className="border-t border-border hover:bg-muted/20"
-            style={{ display: "grid", gridTemplateColumns: GRID_COLS, alignItems: "center", minWidth: 0 }}
-          >
-            <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
-              <Input
-                variant="borderless"
-                placeholder="10.0.0.0/24"
-                value={r.destination_prefix}
-                onChange={(e) => update(idx, { destination_prefix: e.target.value })}
-                disabled={disabled}
-                style={cellInputStyle}
-              />
-            </div>
-            <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
-              <Input
-                variant="borderless"
-                placeholder="10.0.0.1"
-                value={r.next_hop_address}
-                onChange={(e) => update(idx, { next_hop_address: e.target.value })}
-                disabled={disabled}
-                style={cellInputStyle}
-              />
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <Button
-                type="text"
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                aria-label="Удалить маршрут"
-                onClick={() => onChange(value.filter((_, i) => i !== idx))}
-                disabled={disabled}
-              />
-            </div>
+          <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
+            <Input
+              variant="borderless"
+              placeholder="10.0.0.1"
+              value={r.next_hop_address}
+              onChange={(e) =>
+                update(idx, { next_hop_address: e.target.value })
+              }
+              disabled={disabled}
+              style={cellInputStyle}
+            />
           </div>
-        ))}
-
-        {/* footer */}
-        <div className="border-t border-border" style={{ padding: "8px 12px" }}>
-          <Button
-            type="dashed"
-            block
-            icon={<PlusOutlined />}
-            onClick={() => onChange([...value, { destination_prefix: "", next_hop_address: "" }])}
-            disabled={disabled}
-          >
-            Добавить маршрут
-          </Button>
+          <div style={{ textAlign: "center" }}>
+            <Button
+              type="text"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+              aria-label="Удалить маршрут"
+              onClick={() => onChange(value.filter((_, i) => i !== idx))}
+              disabled={disabled}
+            />
+          </div>
         </div>
+      ))}
+
+      {/* footer */}
+      <div className="border-t border-border" style={{ padding: "8px 12px" }}>
+        <Button
+          type="dashed"
+          block
+          icon={<PlusOutlined />}
+          onClick={() =>
+            onChange([
+              ...value,
+              { destination_prefix: "", next_hop_address: "" },
+            ])
+          }
+          disabled={disabled}
+        >
+          Добавить маршрут
+        </Button>
       </div>
     </div>
   );
