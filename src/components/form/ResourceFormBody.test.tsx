@@ -35,7 +35,8 @@ describe("ResourceFormBody", () => {
         submitLabel="Создать сеть" submitting={false} onSubmit={() => {}} onCancel={() => {}}
       />,
     );
-    expect(screen.getByText("enpXYZ")).toBeInTheDocument();
+    // locked-поле — disabled-инпут (значение в value, не текст) + замок.
+    expect(screen.getByDisplayValue("enpXYZ")).toBeDisabled();
     expect(screen.getByLabelText("immutable-lock")).toBeInTheDocument();
   });
 

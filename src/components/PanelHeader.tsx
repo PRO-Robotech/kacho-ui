@@ -22,14 +22,14 @@ export function useDetailHeaderIcon(): ReactNode | undefined {
 }
 
 const tileStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
+  width: 42,
+  height: 42,
+  borderRadius: 12,
   flexShrink: 0,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  fontSize: 17,
+  fontSize: 19,
   color: "var(--kc-primary)",
   background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
   border: "1px solid rgba(61,141,245,0.22)",
@@ -48,6 +48,10 @@ interface Props {
 
 export function PanelHeader({ icon, eyebrow, title, subtitle, right }: Props) {
   const stacked = !!(eyebrow || subtitle);
+  // С subtitle (3 строки) — плитку выравниваем по верху (flex-start). Без
+  // subtitle (eyebrow+title) — ЦЕНТРИРУЕМ плитку и текст: текст не вылазит за
+  // верх/низ плитки (плитка крупнее текстового блока). KAC-246.
+  const align = subtitle ? "flex-start" : "center";
   return (
     <div
       style={{
@@ -55,8 +59,8 @@ export function PanelHeader({ icon, eyebrow, title, subtitle, right }: Props) {
         justifyContent: "space-between",
         gap: 12,
         flexWrap: "wrap",
-        alignItems: stacked ? "flex-start" : "center",
-        minHeight: 36,
+        alignItems: align,
+        minHeight: 42,
         paddingBottom: 14,
         marginBottom: 18,
         borderBottom: "1px solid var(--kc-border-secondary)",
@@ -68,7 +72,7 @@ export function PanelHeader({ icon, eyebrow, title, subtitle, right }: Props) {
           gap: 12,
           minWidth: 0,
           flex: 1,
-          alignItems: stacked ? "flex-start" : "center",
+          alignItems: align,
         }}
       >
         {icon && <div style={tileStyle}>{icon}</div>}
@@ -95,7 +99,7 @@ export function PanelHeader({ icon, eyebrow, title, subtitle, right }: Props) {
               fontSize: 16,
               fontWeight: 600,
               color: "var(--kc-text)",
-              lineHeight: stacked ? 1.3 : "36px",
+              lineHeight: stacked ? 1.3 : "42px",
             }}
           >
             {title}
