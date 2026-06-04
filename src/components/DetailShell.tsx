@@ -69,7 +69,11 @@ interface Props {
   headerIcon?: ReactNode;
 }
 
-const SUB_PANE_WIDTH = 232;
+// Рейл табов: фиксированная ширина под самый длинный label/zone-2-заголовок
+// («Таблицы маршрутизации»/«Группы безопасности» + иконка 42). Жёстко пинуется
+// (min=max), иначе в `min-width:max-content` обёртке длинный заголовок распирал
+// бы aside → ширина рейла «прыгала» при смене таба (KAC-246).
+const SUB_PANE_WIDTH = 300;
 
 export function DetailShell({
   resourceLabel,
@@ -126,7 +130,11 @@ export function DetailShell({
       <aside
         style={{
           width: SUB_PANE_WIDTH,
+          minWidth: SUB_PANE_WIDTH,
+          maxWidth: SUB_PANE_WIDTH,
+          flexGrow: 0,
           flexShrink: 0,
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           borderRight: "1px solid var(--kc-border-secondary)",
