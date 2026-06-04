@@ -36,7 +36,10 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
       : "Измените параметры — изменения вступят в силу после сохранения.");
 
   return (
-    <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: "0 auto" }}>
+    // Прижато влево (margin 0, не auto) — единый отступ слева от сайдбара во
+    // ВСЕХ формах: create-page, edit-page и edit-панель в зоне 3 detail.
+    // Раньше margin:auto центрировал карточку → edit «уезжал» в середину зоны 3.
+    <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
       <div
         style={{
           background: "var(--kc-elevated)",

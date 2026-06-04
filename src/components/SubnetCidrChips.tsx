@@ -25,9 +25,11 @@ interface SectionProps {
   kind: CidrKind;
   blocks: string[];
   onChange: (next: string[]) => void;
+  /** Скрыть заголовок карточки (когда identity даёт Form.Item-label слева). */
+  hideTitle?: boolean;
 }
 
-function CidrSection({ kind, blocks, onChange }: SectionProps) {
+export function CidrSection({ kind, blocks, onChange, hideTitle }: SectionProps) {
   const [draft, setDraft] = useState("");
   const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
   const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
@@ -59,12 +61,14 @@ function CidrSection({ kind, blocks, onChange }: SectionProps) {
     <Card
       size="small"
       title={
-        <Space size={8}>
-          <Typography.Text strong>{label}</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {blocks.length} блок(ов)
-          </Typography.Text>
-        </Space>
+        hideTitle ? undefined : (
+          <Space size={8}>
+            <Typography.Text strong>{label}</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+              {blocks.length} блок(ов)
+            </Typography.Text>
+          </Space>
+        )
       }
     >
       <Space direction="vertical" size={8} style={{ width: "100%" }}>

@@ -49,9 +49,11 @@ interface SectionProps {
   subnetId: string;
   kind: CidrKind;
   blocks: string[];
+  /** Скрыть заголовок карточки (когда identity даёт Form.Item-label слева). */
+  hideTitle?: boolean;
 }
 
-function CidrSection({ subnetId, kind, blocks }: SectionProps) {
+export function CidrSection({ subnetId, kind, blocks, hideTitle }: SectionProps) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState("");
   const [opId, setOpId] = useState<string | null>(null);
@@ -116,12 +118,14 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
     <Card
       size="small"
       title={
-        <Space size={8}>
-          <Typography.Text strong>{label}</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {blocks.length} блок(ов)
-          </Typography.Text>
-        </Space>
+        hideTitle ? undefined : (
+          <Space size={8}>
+            <Typography.Text strong>{label}</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+              {blocks.length} блок(ов)
+            </Typography.Text>
+          </Space>
+        )
       }
     >
       <Space direction="vertical" size={8} style={{ width: "100%" }}>

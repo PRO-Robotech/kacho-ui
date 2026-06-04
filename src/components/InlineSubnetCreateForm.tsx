@@ -25,7 +25,7 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
-import { SubnetCidrChips } from "@/components/SubnetCidrChips";
+import { CidrSection } from "@/components/SubnetCidrChips";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
@@ -304,28 +304,33 @@ export function InlineSubnetCreateForm({
           />
         </Form.Item>
 
+        {/* IPv4 и IPv6 CIDR — ДВА отдельных поля (как в edit). Хотя бы одно
+            семейство обязательно (v4-only / v6-only / dual-stack). */}
         <Form.Item
           label={
             <Space size={4}>
-              IPv4 и IPv6 CIDR
-              <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Введите CIDR с префиксом, например 10.0.0.0/24 или 2001:db8::/64, и нажмите Add.">
-                <QuestionCircleOutlined
-                  style={{ color: "rgba(255,255,255,0.45)" }}
-                />
+              IPv4 CIDR
+              <Tooltip title="IPv4 CIDR-блоки подсети. Введите CIDR с префиксом, например 10.0.0.0/24, и нажмите Add. Можно оставить пустым для IPv6-only подсети.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
           required
         >
-          {/* Тот же chip-list-виджет, что у Edit (SubnetCidrManager), но в
-              controlled-mode — мутирует локальный state, отправка вместе с
-              формой. Визуальная parity с edit-страницей. */}
-          <SubnetCidrChips
-            v4Blocks={v4Blocks}
-            onV4Change={setV4Blocks}
-            v6Blocks={v6Blocks}
-            onV6Change={setV6Blocks}
-          />
+          <CidrSection kind="v4" blocks={v4Blocks} onChange={setV4Blocks} hideTitle />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              IPv6 CIDR
+              <Tooltip title="IPv6 CIDR-блоки подсети. Введите CIDR с префиксом, например 2001:db8::/64, и нажмите Add. Можно оставить пустым для IPv4-only подсети.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <CidrSection kind="v6" blocks={v6Blocks} onChange={setV6Blocks} hideTitle />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>

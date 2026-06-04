@@ -17,7 +17,7 @@ import {
   Tooltip,
   Typography,
 } from "antd";
-import { SubnetCidrManager } from "@/components/SubnetCidrManager";
+import { CidrSection } from "@/components/SubnetCidrManager";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
 import { QuestionCircleOutlined, LockOutlined } from "@ant-design/icons";
@@ -269,23 +269,32 @@ export function InlineSubnetEditForm({
           />
         </Form.Item>
 
+        {/* IPv4 и IPv6 CIDR — ДВА отдельных поля. Блоки управляются через
+            :add-cidr-blocks / :remove-cidr-blocks (PATCH их не меняет). */}
         <Form.Item
           label={
             <Space size={4}>
-              IPv4 и IPv6 CIDR
-              <Tooltip title="IPv4 and IPv6 CIDR blocks managed via :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
-                <QuestionCircleOutlined
-                  style={{ color: "rgba(255,255,255,0.45)" }}
-                />
+              IPv4 CIDR
+              <Tooltip title="IPv4 CIDR-блоки управляются через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
         >
-          <SubnetCidrManager
-            subnetId={subnetId}
-            v4Blocks={v4Cidrs}
-            v6Blocks={v6Cidrs}
-          />
+          <CidrSection subnetId={subnetId} kind="v4" blocks={v4Cidrs} hideTitle />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              IPv6 CIDR
+              <Tooltip title="IPv6 CIDR-блоки управляются через :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <CidrSection subnetId={subnetId} kind="v6" blocks={v6Cidrs} hideTitle />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>
