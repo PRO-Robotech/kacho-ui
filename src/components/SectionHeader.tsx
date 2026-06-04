@@ -22,12 +22,19 @@ export function SectionHeader({ title, right }: Props) {
         justifyContent: "space-between",
         gap: 12,
         flexWrap: "wrap",
+        // Фикс-высота контентной части шапки = высота middle-кнопки (32px), чтобы
+        // заголовок и нижняя линия стояли на одном уровне во ВСЕХ табах — и там,
+        // где справа есть кнопки/поиск/счётчик, и там, где их нет (Обзор/JSON).
+        minHeight: 32,
         paddingBottom: 14,
         marginBottom: 18,
         borderBottom: "1px solid var(--ant-color-border-secondary)",
       }}
     >
-      <Typography.Title level={4} style={{ margin: 0, fontWeight: 600, fontSize: 16 }}>
+      <Typography.Title
+        level={4}
+        style={{ margin: 0, fontWeight: 600, fontSize: 16, lineHeight: "32px" }}
+      >
         {title}
       </Typography.Title>
       {right && (

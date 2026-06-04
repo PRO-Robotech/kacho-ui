@@ -26,6 +26,7 @@ import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
+import { LabelsCell } from "@/components/LabelsCell";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
 import { OperationsTab } from "@/components/OperationsTab";
@@ -305,8 +306,9 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     { label: "Имя", value: name },
     { label: "Описание", value: getByPath<string>(data, "description") || "—" },
     { label: "Дата создания", value: fmtCreatedAt(getByPath<string>(data, "created_at")) },
-    // KAC-246: метки в обзоре НЕ показываем — они добавляются/правятся в форме
+    // KAC-246: метки в обзоре — read-only (chips); добавление/правка — в форме
     // создания/модификации (LabelsEditor, key=value-таблица).
+    { label: "Метки", value: <LabelsCell labels={getByPath<Record<string, string>>(data, "labels")} max={12} /> },
     ...(ext?.overviewExtra?.(extCtx) ?? []),
   ];
 
