@@ -3,13 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Form,
-  Input,
-  Space,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Form, Input, Space, Tooltip, Typography } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { ResourceRefChips } from "@/components/ResourceRefChips";
@@ -22,10 +16,7 @@ import {
   type LabelEntry,
 } from "@/components/LabelsEditor";
 import { REGISTRY } from "@/lib/resource-registry";
-import {
-  useInvalidateResourceList,
-  useOperation,
-} from "@/lib/use-operation";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { extractOperationId } from "@/components/OperationDialog";
 import { toast } from "@/lib/toast";
 
@@ -107,7 +98,9 @@ export function InlineNetworkInterfaceEditForm({
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Сохранить NIC: ${m}`);
     },
   });
@@ -133,13 +126,17 @@ export function InlineNetworkInterfaceEditForm({
     const newLabels = labelsToMap(labels);
     if ((nic.name ?? "") !== name) mask.push("name");
     if ((nic.description ?? "") !== description) mask.push("description");
-    if (JSON.stringify(nic.labels ?? {}) !== JSON.stringify(newLabels)) mask.push("labels");
+    if (JSON.stringify(nic.labels ?? {}) !== JSON.stringify(newLabels))
+      mask.push("labels");
     const origV4 = (nic.v4_address_ids ?? []).slice().sort();
     const origV6 = (nic.v6_address_ids ?? []).slice().sort();
     const origSg = (nic.security_group_ids ?? []).slice().sort();
-    if (JSON.stringify(origV4) !== JSON.stringify(v4.slice().sort())) mask.push("v4_address_ids");
-    if (JSON.stringify(origV6) !== JSON.stringify(v6.slice().sort())) mask.push("v6_address_ids");
-    if (JSON.stringify(origSg) !== JSON.stringify(sgs.slice().sort())) mask.push("security_group_ids");
+    if (JSON.stringify(origV4) !== JSON.stringify(v4.slice().sort()))
+      mask.push("v4_address_ids");
+    if (JSON.stringify(origV6) !== JSON.stringify(v6.slice().sort()))
+      mask.push("v6_address_ids");
+    if (JSON.stringify(origSg) !== JSON.stringify(sgs.slice().sort()))
+      mask.push("security_group_ids");
 
     if (mask.length === 0) {
       onCancel();
@@ -175,13 +172,18 @@ export function InlineNetworkInterfaceEditForm({
         size="middle"
       >
         <Form.Item
-          label={labelWithInfo("Имя", "Имя интерфейса в пределах фолдера. Можно изменять.")}
+          label={labelWithInfo(
+            "Имя",
+            "Имя интерфейса в пределах фолдера. Можно изменять.",
+          )}
           required
         >
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Описание", "Опциональное описание для людей.")}>
+        <Form.Item
+          label={labelWithInfo("Описание", "Опциональное описание для людей.")}
+        >
           <Input.TextArea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -189,15 +191,27 @@ export function InlineNetworkInterfaceEditForm({
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Метки", "Пары ключ=значение для группировки/фильтрации.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "Метки",
+            "Пары ключ=значение для группировки/фильтрации.",
+          )}
+        >
           <LabelsEditor value={labels} onChange={setLabels} />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Подсеть", "Иммутабельно после создания.")}>
+        <Form.Item
+          label={labelWithInfo("Подсеть", "Иммутабельно после создания.")}
+        >
           <Input value={nic.subnet_id ?? ""} disabled />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("IPv4 адрес", "Один Address-ресурс с internal_ipv4. KAC-55: максимум один.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "IPv4 адрес",
+            "Один Address-ресурс с internal_ipv4. KAC-55: максимум один.",
+          )}
+        >
           <ResourceRefChips
             title="IPv4 Address"
             refResource="addresses"
@@ -218,7 +232,12 @@ export function InlineNetworkInterfaceEditForm({
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("IPv6 адрес", "Internal или external IPv6 Address-ресурс. KAC-55: максимум один.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "IPv6 адрес",
+            "Internal или external IPv6 Address-ресурс. KAC-55: максимум один.",
+          )}
+        >
           <ResourceRefChips
             title="IPv6 Address"
             refResource="addresses"
@@ -241,7 +260,12 @@ export function InlineNetworkInterfaceEditForm({
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Группы безопасности", "Security Groups, прилинкованные к NIC.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "Группы безопасности",
+            "Security Groups, прилинкованные к NIC.",
+          )}
+        >
           <ResourceRefChips
             title="Security Group"
             refResource="security-groups"
@@ -253,15 +277,12 @@ export function InlineNetworkInterfaceEditForm({
             createTitle="Создание группы безопасности"
           />
         </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Сохранить"
-            submitting={mutation.isPending || !!pendingOpId}
-            onSubmit={submit}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        <FormFooter
+          submitLabel="Сохранить"
+          submitting={mutation.isPending || !!pendingOpId}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );

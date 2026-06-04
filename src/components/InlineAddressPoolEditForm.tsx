@@ -51,11 +51,13 @@ interface PoolData {
 // KAC-70: AddressPoolKind — единственный валидный вариант EXTERNAL_PUBLIC.
 // EXTERNAL_TEST = 2 / RESERVED_INTERNAL = 100 удалены из proto enum
 // (`reserved 2, 100` в kacho.cloud.vpc.v1.AddressPoolKind).
-const KIND_OPTIONS = [
-  { value: "EXTERNAL_PUBLIC", label: "External public" },
-];
+const KIND_OPTIONS = [{ value: "EXTERNAL_PUBLIC", label: "External public" }];
 
-export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props) {
+export function InlineAddressPoolEditForm({
+  poolId,
+  onCancel,
+  onSuccess,
+}: Props) {
   const invalidate = useInvalidateResourceList();
   const spec = REGISTRY["address-pools"];
 
@@ -87,7 +89,8 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
   }, [pool, hydrated]);
 
   const mutation = useMutation({
-    mutationFn: (item: unknown) => api.update(`${spec.apiPath}/${poolId}`, item),
+    mutationFn: (item: unknown) =>
+      api.update(`${spec.apiPath}/${poolId}`, item),
     onSuccess: () => {
       invalidate(spec.id, null);
       toast.success(`Пул адресов ${name || poolId} обновлён`);
@@ -96,7 +99,9 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Сохранить пул адресов: ${m}`);
     },
   });
@@ -124,7 +129,8 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
     if (v4Changed) mask.push("v4_cidr_blocks", "replace_v4_cidr_blocks");
     if (v6Changed) mask.push("v6_cidr_blocks", "replace_v6_cidr_blocks");
     if ((pool.is_default ?? false) !== isDefault) mask.push("is_default");
-    if ((pool.selector_priority ?? 0) !== selectorPriority) mask.push("selector_priority");
+    if ((pool.selector_priority ?? 0) !== selectorPriority)
+      mask.push("selector_priority");
 
     if (mask.length === 0) {
       onCancel();
@@ -200,7 +206,9 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
             <Space size={4}>
               IPv4 и IPv6 CIDR
               <Tooltip title="Блоки IPv4 и/или IPv6, из которых аллоцируются адреса. Update заменяет полный список.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -218,7 +226,9 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
             <Space size={4}>
               Default
               <Tooltip title="Один is_default=true на (zone, kind).">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -233,15 +243,12 @@ export function InlineAddressPoolEditForm({ poolId, onCancel, onSuccess }: Props
             style={{ width: "100%" }}
           />
         </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Сохранить"
-            submitting={mutation.isPending}
-            onSubmit={submit}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        <FormFooter
+          submitLabel="Сохранить"
+          submitting={mutation.isPending}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );

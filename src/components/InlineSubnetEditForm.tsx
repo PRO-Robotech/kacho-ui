@@ -20,10 +20,7 @@ import {
 import { SubnetCidrManager } from "@/components/SubnetCidrManager";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
-import {
-  QuestionCircleOutlined,
-  LockOutlined,
-} from "@ant-design/icons";
+import { QuestionCircleOutlined, LockOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { REGISTRY, getByPath } from "@/lib/resource-registry";
@@ -77,7 +74,9 @@ export function InlineSubnetEditForm({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<LabelEntry[]>([]);
-  const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
+  const [routeTableId, setRouteTableId] = useState<string | undefined>(
+    undefined,
+  );
   const [dhcpDomainName, setDhcpDomainName] = useState("");
   const [dhcpDns, setDhcpDns] = useState<string[]>([]);
   const [dhcpNtp, setDhcpNtp] = useState<string[]>([]);
@@ -108,10 +107,13 @@ export function InlineSubnetEditForm({
   const { data: rtData } = useQuery({
     queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
-      api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ route_tables: Array<Record<string, unknown>> }>(
+        rtSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     enabled: !!projectId && !!networkId,
     staleTime: 30_000,
   });
@@ -127,7 +129,8 @@ export function InlineSubnetEditForm({
   );
 
   const mutation = useMutation({
-    mutationFn: (item: unknown) => api.update(`${subnetSpec.apiPath}/${subnetId}`, item),
+    mutationFn: (item: unknown) =>
+      api.update(`${subnetSpec.apiPath}/${subnetId}`, item),
     onSuccess: (resp) => {
       const opId = extractOperationId(resp);
       if (opId) {
@@ -140,7 +143,9 @@ export function InlineSubnetEditForm({
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Сохранить подсеть: ${m}`);
     },
   });
@@ -185,7 +190,8 @@ export function InlineSubnetEditForm({
     // Diff против текущего объекта — определяем актуальные изменения.
     const mask: string[] = [];
     if ((subnet.name as string) !== name) mask.push("name");
-    if (((subnet.description as string) ?? "") !== description) mask.push("description");
+    if (((subnet.description as string) ?? "") !== description)
+      mask.push("description");
     const origLabels = JSON.stringify(subnet.labels ?? {});
     const newLabels = JSON.stringify(labelMap);
     if (origLabels !== newLabels) mask.push("labels");
@@ -268,12 +274,18 @@ export function InlineSubnetEditForm({
             <Space size={4}>
               IPv4 и IPv6 CIDR
               <Tooltip title="IPv4 and IPv6 CIDR blocks managed via :add-cidr-blocks / :remove-cidr-blocks. PATCH не меняет существующие блоки.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
         >
-          <SubnetCidrManager subnetId={subnetId} v4Blocks={v4Cidrs} v6Blocks={v6Cidrs} />
+          <SubnetCidrManager
+            subnetId={subnetId}
+            v4Blocks={v4Cidrs}
+            v6Blocks={v6Cidrs}
+          />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>
@@ -284,7 +296,11 @@ export function InlineSubnetEditForm({
                 key: "dhcp",
                 label: <Typography.Text strong>Настройки DHCP</Typography.Text>,
                 children: (
-                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    style={{ width: "100%" }}
+                  >
                     <Form.Item label="Domain name" style={{ marginBottom: 0 }}>
                       <Input
                         value={dhcpDomainName}
@@ -313,15 +329,12 @@ export function InlineSubnetEditForm({
             ]}
           />
         </div>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Сохранить"
-            submitting={mutation.isPending || pendingOpId !== null}
-            onSubmit={submit}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        <FormFooter
+          submitLabel="Сохранить"
+          submitting={mutation.isPending || pendingOpId !== null}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );

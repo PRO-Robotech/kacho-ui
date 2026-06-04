@@ -65,17 +65,22 @@ export function InlineSubnetCreateForm({
 
   // Если networkId preset (передан из контекста — например, "Создать подсеть"
   // из NetworkDetailPage), сеть locked. Иначе — selectable в форме.
-  const [networkId, setNetworkId] = useState<string | undefined>(presetNetworkId);
+  const [networkId, setNetworkId] = useState<string | undefined>(
+    presetNetworkId,
+  );
   const networkLocked = !!presetNetworkId;
 
   // Список Networks для RefSelect (когда preset не задан).
   const { data: netData } = useQuery({
     queryKey: ["networks", "list", projectId],
     queryFn: () =>
-      api.list<{ networks: Array<{ id: string; name?: string }> }>(networkSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ networks: Array<{ id: string; name?: string }> }>(
+        networkSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     enabled: !networkLocked,
     staleTime: 30_000,
   });
@@ -92,7 +97,9 @@ export function InlineSubnetCreateForm({
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<LabelEntry[]>([]);
   const [zoneId, setZoneId] = useState<string | undefined>(undefined);
-  const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
+  const [routeTableId, setRouteTableId] = useState<string | undefined>(
+    undefined,
+  );
   // CIDR-блоки храним как массив готовых строк "10.0.0.0/24" (как в edit-вью);
   // визуально — chip-list через SubnetCidrChips (visual parity с SubnetCidrManager).
   const [v4Blocks, setV4Blocks] = useState<string[]>([]);
@@ -105,9 +112,12 @@ export function InlineSubnetCreateForm({
   const { data: zoneData } = useQuery({
     queryKey: ["zones", "list"],
     queryFn: () =>
-      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
-        pageSize: "500",
-      }),
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(
+        zoneSpec.apiPath,
+        {
+          pageSize: "500",
+        },
+      ),
     staleTime: 60_000,
   });
   const zoneOptions = useMemo(
@@ -129,10 +139,13 @@ export function InlineSubnetCreateForm({
   const { data: rtData } = useQuery({
     queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
-      api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ route_tables: Array<Record<string, unknown>> }>(
+        rtSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     staleTime: 30_000,
   });
   const rtOptions = useMemo(
@@ -164,7 +177,9 @@ export function InlineSubnetCreateForm({
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Создать подсеть: ${m}`);
     },
   });
@@ -294,7 +309,9 @@ export function InlineSubnetCreateForm({
             <Space size={4}>
               IPv4 и IPv6 CIDR
               <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Введите CIDR с префиксом, например 10.0.0.0/24 или 2001:db8::/64, и нажмите Add.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -317,11 +334,13 @@ export function InlineSubnetCreateForm({
             items={[
               {
                 key: "dhcp",
-                label: (
-                  <Typography.Text strong>Настройки DHCP</Typography.Text>
-                ),
+                label: <Typography.Text strong>Настройки DHCP</Typography.Text>,
                 children: (
-                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    style={{ width: "100%" }}
+                  >
                     <Form.Item label="Domain name" style={{ marginBottom: 0 }}>
                       <Input
                         value={dhcpDomainName}
@@ -353,15 +372,12 @@ export function InlineSubnetCreateForm({
             ]}
           />
         </div>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Создать подсеть"
-            submitting={mutation.isPending || pendingOpId !== null}
-            onSubmit={submit}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        <FormFooter
+          submitLabel="Создать подсеть"
+          submitting={mutation.isPending || pendingOpId !== null}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );

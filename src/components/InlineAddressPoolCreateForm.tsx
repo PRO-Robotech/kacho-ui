@@ -13,15 +13,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Space,
-  Switch,
-  Tooltip,
-} from "antd";
+import { Form, Input, InputNumber, Select, Space, Switch, Tooltip } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
@@ -39,9 +31,7 @@ interface Props {
 // KAC-70: AddressPoolKind — единственный валидный вариант EXTERNAL_PUBLIC.
 // EXTERNAL_TEST = 2 / RESERVED_INTERNAL = 100 удалены из proto enum
 // (`reserved 2, 100` в kacho.cloud.vpc.v1.AddressPoolKind).
-const KIND_OPTIONS = [
-  { value: "EXTERNAL_PUBLIC", label: "External public" },
-];
+const KIND_OPTIONS = [{ value: "EXTERNAL_PUBLIC", label: "External public" }];
 
 export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   const invalidate = useInvalidateResourceList();
@@ -61,9 +51,12 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   const { data: zoneData } = useQuery({
     queryKey: ["zones", "list"],
     queryFn: () =>
-      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
-        pageSize: "500",
-      }),
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(
+        zoneSpec.apiPath,
+        {
+          pageSize: "500",
+        },
+      ),
     staleTime: 60_000,
   });
   const zoneOptions = useMemo(
@@ -92,7 +85,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Создать пул адресов: ${m}`);
     },
   });
@@ -165,7 +160,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               IPv4 и IPv6 CIDR
               <Tooltip title="Блоки IPv4 (например, 198.51.100.0/24) и/или IPv6 (например, 2001:db8::/64), из которых аллоцируются адреса. Хотя бы одно семейство обязательно.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -183,7 +180,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               Default
               <Tooltip title="Один is_default=true на (zone, kind). Default-пул используется когда явный pool не задан.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -196,7 +195,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               Selector priority
               <Tooltip title="Tie-break при равенстве specificity. Higher wins.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -207,15 +208,12 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             style={{ width: "100%" }}
           />
         </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Создать пул адресов"
-            submitting={mutation.isPending}
-            onSubmit={submit}
-            onCancel={onCancel}
-          />
-        </Form.Item>
+        <FormFooter
+          submitLabel="Создать пул адресов"
+          submitting={mutation.isPending}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );

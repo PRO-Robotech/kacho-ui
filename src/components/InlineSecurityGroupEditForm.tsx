@@ -24,13 +24,18 @@ interface Props {
   onCancel: () => void;
 }
 
-export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props) {
+export function InlineSecurityGroupEditForm({
+  projectId,
+  sgId,
+  onCancel,
+}: Props) {
   const sgSpec = REGISTRY["security-groups"];
   const invalidate = useInvalidateResourceList();
 
   const { data, isLoading } = useQuery({
     queryKey: [sgSpec.id, "detail", sgId],
-    queryFn: () => api.get<Record<string, unknown>>(`${sgSpec.apiPath}/${sgId}`),
+    queryFn: () =>
+      api.get<Record<string, unknown>>(`${sgSpec.apiPath}/${sgId}`),
     enabled: !!sgId,
     staleTime: 0,
   });
@@ -49,15 +54,18 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
   }, [data, hydrated]);
 
   const updateMain = useMutation({
-    mutationFn: (payload: unknown) => api.update(`${sgSpec.apiPath}/${sgId}`, payload),
+    mutationFn: (payload: unknown) =>
+      api.update(`${sgSpec.apiPath}/${sgId}`, payload),
   });
 
   const submit = async () => {
     if (!data) return;
     const mask: string[] = [];
     if ((data.name as string) !== name) mask.push("name");
-    if (((data.description as string) ?? "") !== description) mask.push("description");
-    if (JSON.stringify(data.labels ?? {}) !== JSON.stringify(obj.labels ?? {})) mask.push("labels");
+    if (((data.description as string) ?? "") !== description)
+      mask.push("description");
+    if (JSON.stringify(data.labels ?? {}) !== JSON.stringify(obj.labels ?? {}))
+      mask.push("labels");
 
     if (mask.length === 0) {
       onCancel();
@@ -70,7 +78,9 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
         labels: obj.labels ?? {},
         update_mask: mask.join(","),
       });
-      const opId = extractOperationId(resp as Parameters<typeof extractOperationId>[0]);
+      const opId = extractOperationId(
+        resp as Parameters<typeof extractOperationId>[0],
+      );
       if (opId) {
         operationStore.start({
           id: opId,
@@ -82,7 +92,10 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
       invalidate(sgSpec.id, projectId);
       onCancel();
     } catch (err) {
-      const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      const m =
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Сохранить группу безопасности: ${m}`);
     }
   };
@@ -110,21 +123,28 @@ export function InlineSecurityGroupEditForm({ projectId, sgId, onCancel }: Props
         </Form.Item>
 
         <Form.Item label="Описание">
-          <Input.TextArea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+          <Input.TextArea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+          />
         </Form.Item>
 
         <Form.Item label="Метки">
-          <LabelsEditor pathPrefix="" path="labels" label="" value={obj} onChange={setObj} />
-        </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel="Сохранить"
-            submitting={updateMain.isPending}
-            onSubmit={submit}
-            onCancel={onCancel}
+          <LabelsEditor
+            pathPrefix=""
+            path="labels"
+            label=""
+            value={obj}
+            onChange={setObj}
           />
         </Form.Item>
+        <FormFooter
+          submitLabel="Сохранить"
+          submitting={updateMain.isPending}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
     </FormShell>
   );
