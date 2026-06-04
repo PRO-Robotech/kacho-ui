@@ -104,6 +104,17 @@ function LayoutInner() {
           <div style={{ minWidth: "max-content", padding: "16px 16px" }}>
             <Outlet />
           </div>
+          {/* Глобальный футер — год считается автоматически. */}
+          <footer
+            style={{
+              padding: "10px 16px 16px",
+              textAlign: "center",
+              fontSize: 12,
+              color: token.colorTextTertiary,
+            }}
+          >
+            PRO Robotech © {new Date().getFullYear()}
+          </footer>
           {/* Глобальный mount модалок Create/Edit — для всех ресурсов. */}
           <GlobalResourceFormModal />
         </Content>

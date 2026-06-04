@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { Card, Input, Space, Tooltip, Typography, Button as AntButton } from "antd";
+import { Card, Input, Space, Switch, Tooltip, Typography, Button as AntButton } from "antd";
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -141,17 +141,14 @@ function ScalarFieldRenderer({ field, pathPrefix, value, onChange, disabled, hid
         />
       )}
       {field.type === "bool" && (
-        <div className="flex items-center gap-2">
-          <input
-            id={id}
-            type="checkbox"
-            checked={Boolean(cur ?? field.default)}
-            onChange={(e) => set(e.target.checked)}
-            className="h-4 w-4 rounded border-border"
-            disabled={disabled}
-          />
-          <label htmlFor={id} className="text-sm">{field.label}</label>
-        </div>
+        // Переключатель (Switch), а не сырой checkbox. Label — слева в Form.Item,
+        // здесь не дублируем.
+        <Switch
+          id={id}
+          checked={Boolean(cur ?? field.default)}
+          onChange={(checked) => set(checked)}
+          disabled={disabled}
+        />
       )}
       {field.type === "enum" && (
         <select
