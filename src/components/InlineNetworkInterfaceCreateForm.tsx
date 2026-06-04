@@ -221,7 +221,7 @@ export function InlineNetworkInterfaceCreateForm({
                 ? { "internal_ipv4_address_spec.subnet_id": subnetId }
                 : {}),
             }}
-            createTitle="Создание Internal IPv4-адреса"
+            createTitle="Создание внутреннего IPv4-адреса"
           />
         </Form.Item>
 

@@ -182,7 +182,7 @@ export function RolesPage() {
           icon={<PlusOutlined />}
           onClick={() => setCreateOpen(true)}
         >
-          Создать custom Role
+          Создать пользовательскую роль
         </Button>
       </Space>
 
@@ -304,7 +304,7 @@ function RoleCreateModal({
 
   return (
     <Modal
-      title="Создать custom Role"
+      title="Создать пользовательскую роль"
       open={open}
       onCancel={onClose}
       maskClosable
