@@ -10,16 +10,8 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Card,
-  Input,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from "antd";
-import { CloseOutlined, LoadingOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Input, Space, Spin } from "antd";
+import { DeleteOutlined, LoadingOutlined, PlusOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -49,18 +41,17 @@ interface SectionProps {
   subnetId: string;
   kind: CidrKind;
   blocks: string[];
-  /** Скрыть заголовок карточки (когда identity даёт Form.Item-label слева). */
-  hideTitle?: boolean;
 }
 
-export function CidrSection({ subnetId, kind, blocks, hideTitle }: SectionProps) {
+const ROW_H = 40;
+
+export function CidrSection({ subnetId, kind, blocks }: SectionProps) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState("");
   const [opId, setOpId] = useState<string | null>(null);
   const [opTitle, setOpTitle] = useState("");
   const [pendingCidr, setPendingCidr] = useState<string | null>(null);
 
-  const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
   const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
 
   const mutate = useMutation({
@@ -115,62 +106,115 @@ export function CidrSection({ subnetId, kind, blocks, hideTitle }: SectionProps)
   const inputDisabled = mutate.isPending || opId !== null;
 
   return (
-    <Card
-      size="small"
-      title={
-        hideTitle ? undefined : (
-          <Space size={8}>
-            <Typography.Text strong>{label}</Typography.Text>
-            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-              {blocks.length} блок(ов)
-            </Typography.Text>
-          </Space>
-        )
-      }
+    <div
+      style={{
+        width: "100%",
+        minWidth: 0,
+        border: "1px solid var(--kc-border)",
+        borderRadius: 8,
+        overflow: "hidden",
+        background: "var(--kc-page)",
+      }}
     >
-      <Space direction="vertical" size={8} style={{ width: "100%" }}>
-        <div style={{ minHeight: 24 }}>
-          {blocks.length === 0 ? (
-            <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
-              — пусто —
-            </Typography.Text>
-          ) : (
-            <Space direction="vertical" size={6} style={{ alignItems: "flex-start", width: "100%" }}>
-              {blocks.map((cidr) => {
-                const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
-                return (
-                  <Tag
-                    key={cidr}
-                    closable={!busy}
-                    closeIcon={
-                      busy ? (
-                        <Spin
-                          indicator={<LoadingOutlined style={{ fontSize: 10 }} spin />}
-                        />
-                      ) : (
-                        <CloseOutlined style={{ fontSize: 10 }} />
-                      )
-                    }
-                    onClose={(e) => {
-                      e.preventDefault();
-                      if (!busy) onRemove(cidr);
-                    }}
-                    style={{ fontFamily: "monospace", fontSize: 12, margin: 0 }}
-                  >
-                    {cidr}
-                  </Tag>
-                );
-              })}
-            </Space>
-          )}
+      {/* header */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) 44px",
+          background: "var(--kc-container)",
+        }}
+      >
+        <div
+          style={{
+            padding: "7px 12px",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+            color: "var(--kc-text-tertiary)",
+            borderRight: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          CIDR-блок
         </div>
+        <div />
+      </div>
+
+      {/* rows */}
+      {blocks.length === 0 && (
+        <div
+          style={{
+            height: ROW_H,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            color: "var(--kc-text-tertiary)",
+            borderTop: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          CIDR-блоков нет
+        </div>
+      )}
+      {blocks.map((cidr) => {
+        const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
+        return (
+          <div
+            key={cidr}
+            className="kc-kv-row"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) 44px",
+              alignItems: "stretch",
+              minWidth: 0,
+              borderTop: "1px solid var(--kc-border-secondary)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "0 12px",
+                minWidth: 0,
+                minHeight: ROW_H,
+                fontFamily: "ui-monospace, monospace",
+                fontSize: 12.5,
+                color: "var(--kc-text)",
+                borderRight: "1px solid var(--kc-border-secondary)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {cidr}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {busy ? (
+                <Spin indicator={<LoadingOutlined style={{ fontSize: 12 }} spin />} />
+              ) : (
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  aria-label="Удалить CIDR"
+                  onClick={() => onRemove(cidr)}
+                  disabled={inputDisabled}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* footer — input + add */}
+      <div style={{ borderTop: "1px solid var(--kc-border-secondary)", padding: "8px 10px" }}>
         <Space.Compact style={{ width: "100%" }}>
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={placeholder}
             disabled={inputDisabled}
-            style={{ fontFamily: "monospace", fontSize: 12 }}
+            style={{ fontFamily: "ui-monospace, monospace", fontSize: 12.5 }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -179,16 +223,15 @@ export function CidrSection({ subnetId, kind, blocks, hideTitle }: SectionProps)
             }}
           />
           <Button
-            type="primary"
-            ghost
+            type="dashed"
             onClick={onAdd}
             disabled={!draft.trim() || inputDisabled}
             icon={<PlusOutlined />}
           >
-            Add
+            Добавить
           </Button>
         </Space.Compact>
-      </Space>
+      </div>
 
       <OperationToastWatcher
         opId={opId}
@@ -200,7 +243,7 @@ export function CidrSection({ subnetId, kind, blocks, hideTitle }: SectionProps)
           qc.invalidateQueries({ queryKey: ["subnets", "list"] });
         }}
       />
-    </Card>
+    </div>
   );
 }
 
