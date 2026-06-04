@@ -135,13 +135,14 @@ export function DependencyTreePanel({ nodes, loading, error }: Props) {
         paddingLeft: 16,
         minWidth: 340,
         maxHeight: 440,
-        overflow: "auto",
+        // overflow на внешнем убран — header и blocker-alert закреплены сверху,
+        // скроллится только дерево (см. ниже). KAC-246.
         display: "flex",
         flexDirection: "column",
         gap: 10,
       }}
     >
-      <Typography.Text strong style={{ fontSize: 12 }}>
+      <Typography.Text strong style={{ fontSize: 12, flexShrink: 0 }}>
         Связанные ресурсы
       </Typography.Text>
 
@@ -162,11 +163,12 @@ export function DependencyTreePanel({ nodes, loading, error }: Props) {
         />
       ) : (
         <>
+          {/* Blocker-alert закреплён сверху (вне скролла дерева). */}
           {blockers.length > 0 && (
             <Alert
               type="warning"
               showIcon
-              style={{ fontSize: 12 }}
+              style={{ fontSize: 12, flexShrink: 0 }}
               message={
                 <span style={{ fontSize: 12 }}>
                   Сначала удалите помеченные ⚠ ресурсы — иначе удаление будет отклонено.
@@ -174,13 +176,16 @@ export function DependencyTreePanel({ nodes, loading, error }: Props) {
               }
             />
           )}
-          <Tree
-            treeData={treeData}
-            defaultExpandAll
-            selectable={false}
-            showLine={{ showLeafIcon: false }}
-            style={{ background: "transparent", fontSize: 12 }}
-          />
+          {/* Скроллится только дерево. */}
+          <div style={{ overflowY: "auto", minHeight: 0, flex: 1 }}>
+            <Tree
+              treeData={treeData}
+              defaultExpandAll
+              selectable={false}
+              showLine={{ showLeafIcon: false }}
+              style={{ background: "transparent", fontSize: 12 }}
+            />
+          </div>
         </>
       )}
     </div>
