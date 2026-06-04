@@ -159,6 +159,7 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
   return (
     <div style={{ marginTop: 24, maxWidth: 760 }}>
       <SectionHeader
+        eyebrow="Список"
         title={
           <span>
             Статические маршруты{" "}

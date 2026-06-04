@@ -146,6 +146,8 @@ function RelatedTable({
   return (
     <div>
       <SectionHeader
+        icon={<ResourceIcon specId={childSpec.id} />}
+        eyebrow="Список"
         title={
           <>
             {title ?? childSpec.plural}{" "}
@@ -324,7 +326,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "Обзор",
       render: () => (
         <div>
-          <SectionHeader title="Обзор" />
+          <SectionHeader eyebrow="Обзор" title={spec.singular} />
           <Descriptions
             column={1}
             size="small"
@@ -354,7 +356,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
           parentId={getByPath<string>(data, "id") ?? (uid ?? "")}
           projectId={projectId ?? ""}
           detailBase={detailBase}
-          title={r.label}
+          title={r.label ?? childSpec.plural}
         />
       ),
     });
@@ -376,7 +378,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     label: "JSON",
     render: () => (
       <div>
-        <SectionHeader title="JSON" />
+        <SectionHeader eyebrow="Информация" title={spec.singular} />
         <JsonMonacoView data={data} />
       </div>
     ),
@@ -388,7 +390,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "JSON (internal)",
       render: () => (
         <div>
-          <SectionHeader title="JSON (internal)" />
+          <SectionHeader eyebrow="Информация" title={`${spec.singular} · internal`} />
           <JsonIntView path={intPath} />
         </div>
       ),

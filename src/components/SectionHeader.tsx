@@ -1,8 +1,9 @@
-// SectionHeader — «шапка» секции/таба detail-страницы: title слева + действия
-// справа + нижняя линия. Унифицирована с шапкой форм через общий PanelHeader:
-// иконка ресурса берётся из DetailHeaderContext (ResourceShell прокидывает её
-// вниз), поэтому ВСЕ табы (Обзор / Связанные / JSON / Маршруты / SG-rules)
-// получают тот же вид [иконка] + title + actions + линия, что и форма.
+// SectionHeader — «шапка» секции/таба detail-страницы через общий PanelHeader:
+// [иконка] [eyebrow=действие] [title=название] [actions] + линия. Те же 3 части,
+// что и у форм (иконка + название + действие).
+//   • icon: по умолчанию — иконка ресурса из DetailHeaderContext (ResourceShell
+//     прокидывает её); related-табы передают icon ДОЧЕРНЕГО ресурса явно.
+//   • eyebrow: «Обзор» / «Информация» / «Список» / … (действие/вид секции).
 import { type ReactNode } from "react";
 import { PanelHeader, useDetailHeaderIcon } from "@/components/PanelHeader";
 
@@ -10,9 +11,13 @@ interface Props {
   title: ReactNode;
   /** Блок действий справа (кнопки, поиск, шестерёнка). */
   right?: ReactNode;
+  /** Override иконки (например иконка дочернего ресурса в related-табе). */
+  icon?: ReactNode;
+  /** Действие/вид секции (3-я часть): «Обзор» / «Информация» / «Список» / … */
+  eyebrow?: string;
 }
 
-export function SectionHeader({ title, right }: Props) {
-  const icon = useDetailHeaderIcon();
-  return <PanelHeader icon={icon} title={title} right={right} />;
+export function SectionHeader({ title, right, icon, eyebrow }: Props) {
+  const ctxIcon = useDetailHeaderIcon();
+  return <PanelHeader icon={icon ?? ctxIcon} eyebrow={eyebrow} title={title} right={right} />;
 }

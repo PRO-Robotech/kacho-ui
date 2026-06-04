@@ -12,6 +12,9 @@ import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { PanelHeader } from "@/components/PanelHeader";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { type ReactNode } from "react";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
@@ -181,15 +184,16 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");
 
-  // Заголовок-toolbar: title + счётчик-тег РЯДОМ с title; описание — ниже (CTA
-  // «Создать» — в шапке, см. useHeaderRight). KAC-246.
-  const titleBlock = (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
-            {spec.plural}
-          </Typography.Title>
+  // Единая шапка списка (PanelHeader) — те же 3 части, что у табов/форм:
+  // [иконка ресурса] + «Список» (действие) + plural (название) + счётчик.
+  // CTA «Создать» — в шапке страницы (useHeaderRight). KAC-246.
+  const listHeader = (right?: ReactNode) => (
+    <PanelHeader
+      icon={<ResourceIcon specId={spec.id} />}
+      eyebrow="Список"
+      title={
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          {spec.plural}
           {!isLoading && !isError && (
             <Tag
               style={{
@@ -205,14 +209,11 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
               {filteredItems.length}
             </Tag>
           )}
-        </div>
-        {spec.description && (
-          <Typography.Text type="secondary" style={{ fontSize: 13, display: "block", marginTop: 2 }}>
-            {spec.description}
-          </Typography.Text>
-        )}
-      </div>
-    </div>
+        </span>
+      }
+      subtitle={spec.description}
+      right={right}
+    />
   );
 
   // Welcome (пустой список) — та же surface-подложка, что и заполнённая страница,
@@ -220,10 +221,8 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   if (showWelcome) {
     return (
       <div className="kc-surface" style={{ padding: 20 }}>
-        <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          {titleBlock}
-          <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
-        </Space>
+        {listHeader()}
+        <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
       </div>
     );
   }
@@ -231,18 +230,9 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   return (
     <div className="kc-surface" style={{ padding: 20 }}>
       <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {/* KAC-246: заголовок + фильтр в одной строке (title слева, фильтры справа). */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            width: "100%",
-          }}
-        >
-          <div style={{ minWidth: 0, flex: 1 }}>{titleBlock}</div>
-          <Space size={12} wrap style={{ flexShrink: 0 }}>
+        {/* Шапка списка: иконка + «Список» + plural + счётчик слева, фильтры справа. */}
+        {listHeader(
+          <>
             <Input.Search
               placeholder="Фильтр по имени или идентификатору"
               value={query}
@@ -253,8 +243,8 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
             {hasZoneFilter && (
               <Select value={zone} onChange={setZone} options={zoneOptions} style={{ width: 220 }} />
             )}
-          </Space>
-        </div>
+          </>,
+        )}
 
         {isError ? (
           <ErrorResult error={error} />

@@ -90,6 +90,11 @@ function LayoutInner() {
         <Content
           style={{
             overflow: "auto",
+            // Резервируем место под вертикальный скроллбар ВСЕГДА — скролл здесь,
+            // на Content (не на html/body). Иначе при открытии формы (контент выше
+            // viewport) скроллбар появляется → горизонтальный сдвиг всего контента
+            // («прыгает» при нажатии Создать/Редактировать). KAC-246.
+            scrollbarGutter: "stable",
             minWidth: 0,
             background: token.colorBgLayout,
           }}

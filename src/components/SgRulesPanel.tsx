@@ -186,7 +186,7 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   if (editObj) {
     return (
       <div>
-        <SectionHeader title={editingId ? "Редактирование правила" : "Добавление правил"} />
+        <SectionHeader eyebrow={editingId ? "Редактирование" : "Добавление"} title={editingId ? "Правило" : "Правила"} />
         <SgRulesEditor
           pathPrefix=""
           value={editObj}
@@ -211,6 +211,7 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   return (
     <div>
       <SectionHeader
+        eyebrow="Список"
         title={<>Правила <Typography.Text type="secondary">({rules.length})</Typography.Text></>}
         right={
           <Space>
