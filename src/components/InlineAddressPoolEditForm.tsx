@@ -167,7 +167,7 @@ export function InlineAddressPoolEditForm({
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
+        wrapperCol={{ flex: "1 1 0" }}
         labelAlign="left"
         colon={false}
         size="middle"
