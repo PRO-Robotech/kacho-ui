@@ -169,7 +169,14 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
       />
 
       {showTable ? (
-        <div className="rounded-lg border border-border overflow-hidden bg-card">
+        <div
+          style={{
+            border: "1px solid var(--kc-border)",
+            borderRadius: 8,
+            overflow: "hidden",
+            background: "var(--kc-page)",
+          }}
+        >
           <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
             {/* Фиксированные ширины колонок — идентичны в read и edit, без горизонтального прыжка. */}
             <colgroup>
@@ -178,11 +185,21 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
               <col style={{ width: 48 }} />
             </colgroup>
             <thead>
-              <tr className="bg-muted/40 text-xs uppercase tracking-wide">
-                <th className="text-left px-3 py-2">Префикс назначения</th>
-                <th className="text-left px-3 py-2">Следующий узел</th>
+              <tr style={{ background: "var(--kc-container)" }}>
+                <th
+                  className="text-left"
+                  style={{ padding: "7px 12px", fontSize: 11, fontWeight: 600, letterSpacing: "0.02em", color: "var(--kc-text-tertiary)" }}
+                >
+                  Префикс назначения
+                </th>
+                <th
+                  className="text-left"
+                  style={{ padding: "7px 12px", fontSize: 11, fontWeight: 600, letterSpacing: "0.02em", color: "var(--kc-text-tertiary)" }}
+                >
+                  Следующий узел
+                </th>
                 {/* колонка действий присутствует всегда (пустая в read) → число колонок не меняется */}
-                <th className="px-1 py-2" />
+                <th style={{ padding: "7px 4px" }} />
               </tr>
             </thead>
             <tbody>
@@ -190,8 +207,8 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
                 ? (drafts ?? []).map((row, i) => (
                     <tr
                       key={i}
-                      className="border-t border-border hover:bg-muted/20"
-                      style={{ height: ROW_H }}
+                      className="kc-kv-row"
+                      style={{ height: ROW_H, borderTop: "1px solid var(--kc-border-secondary)" }}
                     >
                       <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
                         <Input
@@ -226,8 +243,8 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
                 : routes.map((r, i) => (
                     <tr
                       key={i}
-                      className="border-t border-border hover:bg-muted/20"
-                      style={{ height: ROW_H }}
+                      className="kc-kv-row"
+                      style={{ height: ROW_H, borderTop: "1px solid var(--kc-border-secondary)" }}
                     >
                       <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
                         {r.destination_prefix}
@@ -242,8 +259,8 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
             </tbody>
             {editing && (
               <tfoot>
-                <tr className="border-t border-border">
-                  <td className="px-3 py-2" colSpan={3}>
+                <tr style={{ borderTop: "1px solid var(--kc-border-secondary)" }}>
+                  <td style={{ padding: "8px 12px" }} colSpan={3}>
                     <Button type="dashed" block icon={<PlusOutlined />} onClick={addRow}>
                       Добавить маршрут
                     </Button>
@@ -254,7 +271,16 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
           </table>
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+        <div
+          style={{
+            border: "1px dashed var(--kc-border)",
+            borderRadius: 8,
+            padding: "24px 12px",
+            textAlign: "center",
+            fontSize: 13,
+            color: "var(--kc-text-tertiary)",
+          }}
+        >
           Статических маршрутов нет — нажмите «Редактировать», чтобы добавить.
         </div>
       )}

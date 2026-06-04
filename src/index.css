@@ -292,3 +292,12 @@ body.ant-modal-open {
 .kc-form-modal .ant-modal-body {
   background: var(--kc-page);
 }
+
+/* kc-kv-row — строка EditableKVTable (метки / статические маршруты): мягкий
+   hover в тон остального UI. KAC-246. */
+.kc-kv-row {
+  transition: background 0.12s ease;
+}
+.kc-kv-row:hover {
+  background: var(--kc-hover-fill);
+}
