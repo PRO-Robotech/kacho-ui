@@ -10,7 +10,7 @@
 // (InlineSubnet/SG/NIC/AddressPool) → визуальный паритет всех форм.
 // Theme-aware (--kc-*): чисто в DARK и LIGHT.
 import { ResourceIcon } from "@/components/form/ResourceIcon";
-import { PanelHeader } from "@/components/PanelHeader";
+import { PanelHeader, useDetailHeaderIcon } from "@/components/PanelHeader";
 
 /** Единый стандарт ширины формы (modal width / page maxWidth / card maxWidth). */
 export const FORM_WIDTH = 820;
@@ -35,22 +35,37 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
       ? "Заполните параметры — ресурс будет создан после подтверждения."
       : "Измените параметры — изменения вступят в силу после сохранения.");
 
+  // Внутри detail-страницы (есть DetailHeaderContext) форма рендерится edit-/
+  // child-create-панелью в main-pane, который УЖЕ является поверхностью. Своя
+  // kc-surface-карточка тут не нужна — она сдвигала бы шапку формы относительно
+  // шапки таба (padding карточки) → «прыжок» иконки/названия/действия при
+  // переключении таб↔форма. Embedded → без карточки, шапка ровно как у таба.
+  const embedded = useDetailHeaderIcon() !== undefined;
+
+  const header = (
+    <PanelHeader
+      icon={<ResourceIcon specId={specId} />}
+      eyebrow={verb}
+      title={heading}
+      subtitle={sub}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
+        {header}
+        {children}
+      </div>
+    );
+  }
+
   return (
-    // Прижато влево (margin 0, не auto) — единый отступ слева от сайдбара во
-    // ВСЕХ формах: create-page, edit-page и edit-панель в зоне 3 detail.
-    // Раньше margin:auto центрировал карточку → edit «уезжал» в середину зоны 3.
+    // Standalone (create/edit-страница, модалка) — прижато влево, kc-surface
+    // (как секции detail/list), не модалка.
     <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
-      {/* kc-surface — тот же стиль, что у секций detail/list-страниц (container-фон,
-          secondary-border, r12, лёгкая shadow-sm). Форма читается как часть страницы,
-          а не как всплывающая модалка (раньше был elevated + shadow-md + r16). */}
-      <div className="kc-surface" style={{ padding: "22px 24px 20px" }}>
-        {/* Единая шапка (PanelHeader) — общая с табами detail-страниц. */}
-        <PanelHeader
-          icon={<ResourceIcon specId={specId} />}
-          eyebrow={verb}
-          title={heading}
-          subtitle={sub}
-        />
+      <div className="kc-surface" style={{ padding: "20px 22px" }}>
+        {header}
         {children}
       </div>
     </div>
