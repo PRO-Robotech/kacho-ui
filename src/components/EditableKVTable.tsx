@@ -47,12 +47,23 @@ const cellInputStyle: React.CSSProperties = {
   lineHeight: `${ROW_H - 1}px`,
 };
 
+const COL_DIVIDER = "1px solid var(--kc-border-secondary)";
+
 const headCellStyle: React.CSSProperties = {
   padding: "7px 12px",
   fontSize: 11,
   fontWeight: 600,
   letterSpacing: "0.02em",
   color: "var(--kc-text-tertiary)",
+  borderRight: COL_DIVIDER,
+};
+
+const cellWrapStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "0 12px",
+  minWidth: 0,
+  borderRight: COL_DIVIDER,
 };
 
 export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLabel, disabled }: Props) {
@@ -101,12 +112,12 @@ export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLab
           style={{
             display: "grid",
             gridTemplateColumns: GRID_COLS,
-            alignItems: "center",
+            alignItems: "stretch",
             minWidth: 0,
             borderTop: "1px solid var(--kc-border-secondary)",
           }}
         >
-          <div style={{ padding: "0 12px", minWidth: 0 }}>
+          <div style={cellWrapStyle}>
             <Input
               variant="borderless"
               placeholder={colA.placeholder}
@@ -116,7 +127,7 @@ export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLab
               style={cellInputStyle}
             />
           </div>
-          <div style={{ padding: "0 12px", minWidth: 0 }}>
+          <div style={cellWrapStyle}>
             <Input
               variant="borderless"
               placeholder={colB.placeholder}
@@ -126,7 +137,7 @@ export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLab
               style={cellInputStyle}
             />
           </div>
-          <div style={{ textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Button
               type="text"
               danger

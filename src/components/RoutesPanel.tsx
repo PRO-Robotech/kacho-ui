@@ -177,7 +177,7 @@ export function RoutesPanel({ routeTableId, projectId, routes }: RoutesPanelProp
             background: "var(--kc-page)",
           }}
         >
-          <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+          <table className="w-full text-sm kc-grid-table" style={{ tableLayout: "fixed" }}>
             {/* Фиксированные ширины колонок — идентичны в read и edit, без горизонтального прыжка. */}
             <colgroup>
               <col style={{ width: "calc((100% - 48px) / 2)" }} />

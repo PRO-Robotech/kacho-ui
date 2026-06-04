@@ -40,15 +40,10 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
     // ВСЕХ формах: create-page, edit-page и edit-панель в зоне 3 detail.
     // Раньше margin:auto центрировал карточку → edit «уезжал» в середину зоны 3.
     <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
-      <div
-        style={{
-          background: "var(--kc-elevated)",
-          border: "1px solid var(--kc-border)",
-          borderRadius: 16,
-          boxShadow: "var(--kc-shadow-md)",
-          padding: "22px 24px 20px",
-        }}
-      >
+      {/* kc-surface — тот же стиль, что у секций detail/list-страниц (container-фон,
+          secondary-border, r12, лёгкая shadow-sm). Форма читается как часть страницы,
+          а не как всплывающая модалка (раньше был elevated + shadow-md + r16). */}
+      <div className="kc-surface" style={{ padding: "22px 24px 20px" }}>
         {/* ── Шапка-band: иконка-плитка + caps-verb + заголовок + подзаголовок ── */}
         <div
           style={{

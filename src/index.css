@@ -301,3 +301,10 @@ body.ant-modal-open {
 .kc-kv-row:hover {
   background: var(--kc-hover-fill);
 }
+
+/* kc-grid-table — вертикальные разделители колонок (кроме последней — действий)
+   у table-таблиц (RoutesPanel detail). EditableKVTable рисует их inline. KAC-246. */
+.kc-grid-table th:not(:last-child),
+.kc-grid-table td:not(:last-child) {
+  border-right: 1px solid var(--kc-border-secondary);
+}
