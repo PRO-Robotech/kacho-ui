@@ -6,7 +6,7 @@
 import { Alert, Form } from "antd";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { FormShell } from "@/components/form/FormShell";
-import { FormPlanPanel } from "@/components/form/FormPlanPanel";
+import { FormArchitecturePanel } from "@/components/form/FormArchitecturePanel";
 import { FieldLabel } from "@/components/form/FieldLabel";
 import { FormFooter } from "@/components/form/FormFooter";
 import { ImmutableField } from "@/components/form/ImmutableField";
@@ -173,11 +173,12 @@ export function ResourceFormBody({
       title={title}
     >
       {mode === "create" ? (
-        // Двухзонная раскладка «Create with Live Plan» (KAC-246): слева поля,
-        // справа живой «План». Шапка FormShell — сверху на всю ширину.
+        // Двухзонная раскладка «Live Architecture» (KAC-246): слева поля,
+        // справа живой холст архитектуры (CIDR-линейка / узлы / план). Шапка
+        // FormShell — сверху на всю ширину.
         <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 0 }}>{form}</div>
-          <FormPlanPanel spec={spec} obj={obj} />
+          <FormArchitecturePanel spec={spec} obj={obj} />
         </div>
       ) : (
         form
