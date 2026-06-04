@@ -29,7 +29,6 @@ interface Props {
   colA: ColDef;
   colB: ColDef;
   addLabel: string;
-  emptyLabel: string;
   disabled?: boolean;
 }
 
@@ -66,7 +65,7 @@ const cellWrapStyle: React.CSSProperties = {
   borderRight: COL_DIVIDER,
 };
 
-export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLabel, disabled }: Props) {
+export function EditableKVTable({ rows, onChange, colA, colB, addLabel, disabled }: Props) {
   const update = (idx: number, patch: Partial<KVRow>) => {
     onChange(rows.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   };
@@ -89,22 +88,7 @@ export function EditableKVTable({ rows, onChange, colA, colB, addLabel, emptyLab
         <div />
       </div>
 
-      {/* rows */}
-      {rows.length === 0 && (
-        <div
-          style={{
-            height: ROW_H,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            color: "var(--kc-text-tertiary)",
-            borderTop: "1px solid var(--kc-border-secondary)",
-          }}
-        >
-          {emptyLabel}
-        </div>
-      )}
+      {/* rows (пустое состояние не показываем — только кнопка «Добавить» в футере) */}
       {rows.map((r, idx) => (
         <div
           key={idx}

@@ -26,7 +26,6 @@ export function RoutesEditor({ value, onChange, disabled }: Props) {
       colA={{ header: "Префикс назначения", placeholder: "10.0.0.0/24" }}
       colB={{ header: "Следующий узел", placeholder: "10.0.0.1" }}
       addLabel="Добавить маршрут"
-      emptyLabel="Маршрутов нет"
       disabled={disabled}
     />
   );

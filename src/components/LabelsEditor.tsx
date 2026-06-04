@@ -31,7 +31,6 @@ export function LabelsEditor({ value, onChange, disabled }: Props) {
       colA={{ header: "Ключ", placeholder: "ключ" }}
       colB={{ header: "Значение", placeholder: "значение" }}
       addLabel="Добавить метку"
-      emptyLabel="Меток нет"
       disabled={disabled}
     />
   );
