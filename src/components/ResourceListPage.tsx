@@ -211,7 +211,6 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
           )}
         </span>
       }
-      subtitle={spec.description}
       right={right}
     />
   );

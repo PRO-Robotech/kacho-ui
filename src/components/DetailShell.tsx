@@ -53,6 +53,11 @@ interface Props {
   onTabSelect?: (id: string) => void;
   /** Действия рядом с именем ресурса в зоне 3 (Редактировать/Удалить/Создать). */
   nameActions?: ReactNode;
+  /** Override зоны-2 шапки (для форм edit/create: «Редактирование»/«Создание» +
+   *  тип + иконка ресурса формы). Иначе eyebrow = label активного таба. */
+  headerEyebrow?: string;
+  headerTitle?: string;
+  headerIcon?: ReactNode;
 }
 
 const SUB_PANE_WIDTH = 232;
@@ -69,8 +74,11 @@ export function DetailShell({
   activeTabId,
   onTabSelect,
   nameActions,
+  headerEyebrow,
+  headerTitle,
+  headerIcon: headerIconOverride,
 }: Props) {
-  const headerIcon = useDetailHeaderIcon();
+  const ctxIcon = useDetailHeaderIcon();
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
   const controlled = onTabSelect !== undefined;
@@ -128,29 +136,29 @@ export function DetailShell({
             marginBottom: 8,
           }}
         >
-          {headerIcon && (
+          {(headerIconOverride ?? ctxIcon) && (
             <div
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: 11,
+                width: 42,
+                height: 42,
+                borderRadius: 12,
                 flexShrink: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 18,
+                fontSize: 19,
                 color: "var(--kc-primary)",
                 background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
                 border: "1px solid rgba(61,141,245,0.22)",
               }}
             >
-              {headerIcon}
+              {headerIconOverride ?? ctxIcon}
             </div>
           )}
           <div style={{ minWidth: 0 }}>
             <div
               style={{
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 600,
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
@@ -161,10 +169,10 @@ export function DetailShell({
                 textOverflow: "ellipsis",
               }}
             >
-              {active?.label}
+              {headerEyebrow ?? active?.label}
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--kc-text)", lineHeight: 1.2 }}>
-              {resourceLabel}
+            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--kc-text)", lineHeight: 1.2 }}>
+              {headerTitle ?? resourceLabel}
             </div>
           </div>
         </div>

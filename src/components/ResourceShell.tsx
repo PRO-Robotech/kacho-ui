@@ -407,6 +407,17 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     else navigate(`${detailBase}/${id}`);
   };
 
+  // Зона-2 шапка для форм (edit/child-create): действие + тип + иконка ресурса
+  // формы — контекст переезжает в блок табов, форма в зоне 3 свою шапку не дублирует.
+  const childForHeader =
+    mode === "child-create" && childRoute ? specByRoute(childRoute) : undefined;
+  const headerEyebrow =
+    mode === "edit" ? "Редактирование" : mode === "child-create" ? "Создание" : undefined;
+  const headerTitle =
+    mode === "edit" ? spec.singular : mode === "child-create" ? childForHeader?.singular : undefined;
+  const headerIcon =
+    mode === "child-create" && childForHeader ? <ResourceIcon specId={childForHeader.id} /> : undefined;
+
   return (
     // Прокидываем иконку ресурса вниз — все SectionHeader табов получают её
     // (единая шапка с формами через PanelHeader).
@@ -420,6 +431,9 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
         mainOverride={mainOverride}
         activeTabId={activeTabId}
         onTabSelect={onTabSelect}
+        headerEyebrow={headerEyebrow}
+        headerTitle={headerTitle}
+        headerIcon={headerIcon}
       />
     </DetailHeaderProvider>
   );

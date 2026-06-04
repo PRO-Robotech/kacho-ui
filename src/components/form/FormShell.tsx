@@ -49,9 +49,10 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
   );
 
   if (embedded) {
+    // Внутри detail-страницы шапку (иконка+действие+тип) показывает ЗОНА 2
+    // (DetailShell.headerEyebrow/Title/Icon) — здесь её НЕ дублируем, только поля.
     return (
       <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
-        {header}
         {children}
       </div>
     );
