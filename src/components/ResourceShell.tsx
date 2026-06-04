@@ -142,7 +142,20 @@ function RelatedTable({
       <SectionHeader
         title={
           <>
-            {childSpec.plural} <Tag style={{ marginLeft: 4 }}>{ownRows.length}</Tag>
+            {childSpec.plural}{" "}
+            <Tag
+              style={{
+                marginLeft: 6,
+                fontSize: 13,
+                fontWeight: 600,
+                lineHeight: "20px",
+                height: 22,
+                paddingInline: 8,
+                borderRadius: 7,
+              }}
+            >
+              {ownRows.length}
+            </Tag>
           </>
         }
         right={

@@ -5,7 +5,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Input, Select, Typography, Space } from "antd";
+import { Button, Input, Select, Typography, Space, Tag } from "antd";
 import { ErrorResult } from "@/components/ErrorResult";
 import { PlusOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
@@ -181,18 +181,36 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");
 
-  // Заголовок-toolbar: title + count-подзаголовок (CTA «Создать» — в шапке, см. useHeaderRight).
+  // Заголовок-toolbar: title + счётчик-тег РЯДОМ с title; описание — ниже (CTA
+  // «Создать» — в шапке, см. useHeaderRight). KAC-246.
   const titleBlock = (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
-          {spec.plural}
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-          {/* KAC-246: счётчик — только цифра (без слова «записи»). */}
-          {!isLoading && !isError ? `${filteredItems.length}` : spec.description}
-          {spec.description && !isLoading && !isError ? ` · ${spec.description}` : ""}
-        </Typography.Text>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
+            {spec.plural}
+          </Typography.Title>
+          {!isLoading && !isError && (
+            <Tag
+              style={{
+                margin: 0,
+                fontSize: 13,
+                fontWeight: 600,
+                lineHeight: "22px",
+                height: 24,
+                paddingInline: 9,
+                borderRadius: 7,
+              }}
+            >
+              {filteredItems.length}
+            </Tag>
+          )}
+        </div>
+        {spec.description && (
+          <Typography.Text type="secondary" style={{ fontSize: 13, display: "block", marginTop: 2 }}>
+            {spec.description}
+          </Typography.Text>
+        )}
       </div>
     </div>
   );
