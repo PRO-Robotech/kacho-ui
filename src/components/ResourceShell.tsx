@@ -256,9 +256,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     }
     return null;
   }, [mode, headerTabId, data, spec, projectId, detailBase, ext, navigate]);
-  // KAC-246: действия переехали из глобальной шапки страницы к ИМЕНИ ресурса в
-  // зоне 3 (DetailShell.nameActions). В глобальной шапке остаётся только breadcrumb.
-  useHeaderRight(null);
+  useHeaderRight(headerActions);
 
   if (isLoading && !data) {
     return <div style={{ padding: 48, textAlign: "center" }}><Spin /></div>;
@@ -422,7 +420,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
         mainOverride={mainOverride}
         activeTabId={activeTabId}
         onTabSelect={onTabSelect}
-        nameActions={headerActions}
       />
     </DetailHeaderProvider>
   );
