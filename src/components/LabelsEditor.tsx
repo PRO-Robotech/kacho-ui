@@ -1,6 +1,8 @@
 // LabelsEditor — единый controlled editor для map<string,string> labels.
 // Использовать в каждой модалке/форме (Subnet, Network, NIC, SG, AddressPool,
-// ...). Visual: список пар "ключ"+"значение"+корзина и кнопка «Добавить метку».
+// ...). Visual: ОДНА таблица key=value (Ключ | Значение | ⌫) — единый вид с
+// RoutesPanel/«Статические маршруты»: borderless-ячейки, dashed «Добавить
+// метку» снизу. Применяется в формах создания/модификации.
 //
 // Контракт: value — массив пар LabelEntry. State держится в parent, что
 // исключает feedback-loop, из-за которого row пропадал при первом клике
@@ -9,7 +11,7 @@
 // Утилиты: labelsToEntries / labelsFromEntries (canonical имена), labelsFromMap /
 // labelsToMap (алиасы для совместимости со старыми импортами).
 
-import { Button, Input, Space, Typography } from "antd";
+import { Button, Input } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 export interface LabelEntry {
@@ -23,50 +25,108 @@ interface Props {
   disabled?: boolean;
 }
 
+const ROW_H = 38;
+const cellInputStyle: React.CSSProperties = {
+  width: "100%",
+  fontFamily: "ui-monospace, monospace",
+  fontSize: 12,
+  padding: 0,
+  height: ROW_H - 2,
+  lineHeight: `${ROW_H - 2}px`,
+};
+
 export function LabelsEditor({ value, onChange, disabled }: Props) {
   const update = (idx: number, patch: Partial<LabelEntry>) => {
     onChange(value.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   };
 
   return (
-    <Space direction="vertical" size={6} style={{ width: "100%" }}>
-      {value.length === 0 && (
-        <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
-          — нет меток —
-        </Typography.Text>
-      )}
-      {value.map((l, idx) => (
-        <Space.Compact key={idx} style={{ width: "100%" }}>
-          <Input
-            placeholder="ключ"
-            value={l.key}
-            onChange={(e) => update(idx, { key: e.target.value })}
-            disabled={disabled}
-            style={{ flex: "0 0 220px" }}
-          />
-          <Input
-            placeholder="значение"
-            value={l.value}
-            onChange={(e) => update(idx, { value: e.target.value })}
-            disabled={disabled}
-            style={{ flex: 1 }}
-          />
-          <Button
-            icon={<DeleteOutlined />}
-            onClick={() => onChange(value.filter((_, i) => i !== idx))}
-            disabled={disabled}
-          />
-        </Space.Compact>
-      ))}
-      <Button
-        onClick={() => onChange([...value, { key: "", value: "" }])}
-        icon={<PlusOutlined />}
-        size="small"
-        disabled={disabled}
-      >
-        Добавить метку
-      </Button>
-    </Space>
+    <div
+      className="rounded-lg border border-border overflow-hidden bg-card"
+      style={{ maxWidth: 520 }}
+    >
+      <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: "calc((100% - 48px) / 2)" }} />
+          <col style={{ width: "calc((100% - 48px) / 2)" }} />
+          <col style={{ width: 48 }} />
+        </colgroup>
+        <thead>
+          <tr className="bg-muted/40 text-xs uppercase tracking-wide">
+            <th className="text-left px-3 py-2">Ключ</th>
+            <th className="text-left px-3 py-2">Значение</th>
+            <th className="px-1 py-2" />
+          </tr>
+        </thead>
+        <tbody>
+          {value.length === 0 && (
+            <tr style={{ height: ROW_H }}>
+              <td
+                colSpan={3}
+                className="px-3 text-center text-xs text-muted-foreground"
+                style={{ verticalAlign: "middle" }}
+              >
+                Меток нет
+              </td>
+            </tr>
+          )}
+          {value.map((l, idx) => (
+            <tr
+              key={idx}
+              className="border-t border-border hover:bg-muted/20"
+              style={{ height: ROW_H }}
+            >
+              <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
+                <Input
+                  variant="borderless"
+                  placeholder="ключ"
+                  value={l.key}
+                  onChange={(e) => update(idx, { key: e.target.value })}
+                  disabled={disabled}
+                  style={cellInputStyle}
+                />
+              </td>
+              <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
+                <Input
+                  variant="borderless"
+                  placeholder="значение"
+                  value={l.value}
+                  onChange={(e) => update(idx, { value: e.target.value })}
+                  disabled={disabled}
+                  style={cellInputStyle}
+                />
+              </td>
+              <td className="px-1 text-center" style={{ verticalAlign: "middle" }}>
+                <Button
+                  type="text"
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  aria-label="Удалить метку"
+                  onClick={() => onChange(value.filter((_, i) => i !== idx))}
+                  disabled={disabled}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="border-t border-border">
+            <td className="px-3 py-2" colSpan={3}>
+              <Button
+                type="dashed"
+                block
+                icon={<PlusOutlined />}
+                onClick={() => onChange([...value, { key: "", value: "" }])}
+                disabled={disabled}
+              >
+                Добавить метку
+              </Button>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
   );
 }
 

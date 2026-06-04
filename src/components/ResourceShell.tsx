@@ -26,7 +26,6 @@ import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
-import { LabelsPanel } from "@/components/LabelsPanel";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
 import { OperationsTab } from "@/components/OperationsTab";
@@ -306,8 +305,8 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     { label: "Имя", value: name },
     { label: "Описание", value: getByPath<string>(data, "description") || "—" },
     { label: "Дата создания", value: fmtCreatedAt(getByPath<string>(data, "created_at")) },
-    // KAC-246: Метки — отдельной редактируемой key=value-панелью под Обзором (LabelsPanel),
-    // как «Статические маршруты», вместо read-only строки в Descriptions.
+    // KAC-246: метки в обзоре НЕ показываем — они добавляются/правятся в форме
+    // создания/модификации (LabelsEditor, key=value-таблица).
     ...(ext?.overviewExtra?.(extCtx) ?? []),
   ];
 
@@ -325,13 +324,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
             style={{ maxWidth: 920 }}
             labelStyle={{ width: 260, whiteSpace: "nowrap", verticalAlign: "top" }}
             items={overviewItems.map((it, i) => ({ key: String(i), label: it.label, children: it.value }))}
-          />
-          <LabelsPanel
-            resourceId={spec.id}
-            apiPath={spec.apiPath}
-            uid={getByPath<string>(data, "id") ?? (uid ?? "")}
-            projectId={projectId ?? null}
-            labels={getByPath<Record<string, string>>(data, "labels")}
           />
           {ext?.overviewBelow?.(extCtx)}
         </div>
