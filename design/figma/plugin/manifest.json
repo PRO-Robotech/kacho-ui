@@ -1,0 +1,9 @@
+{
+  "name": "Kachō Design System Importer",
+  "id": "kacho-design-system-importer",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "capabilities": [],
+  "networkAccess": { "allowedDomains": ["none"] }
+}

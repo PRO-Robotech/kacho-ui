@@ -10,7 +10,34 @@
 
 ---
 
-## 1. Design tokens → Figma Variables/Styles
+## 0. Автоматический импортёр (плагин) — один клик
+
+`plugin/` — готовый Figma-плагин, который сам строит на холсте **всё сразу**:
+Variables (Dark/Light), Radius-переменные, Text styles, Effect styles (тени),
+страницу **Foundations** (свотчи / типографика / status-badges / buttons / card)
+и страницу **Screens** с растровыми референсами. Данные (токены + PNG) уже
+вшиты в `plugin/code.js` генератором `plugin/build.mjs`.
+
+> Запустить за тебя из кода нельзя — у Figma нет API записи на холст извне.
+> Поэтому единственный ручной шаг: импортировать плагин и нажать Run.
+
+### Запуск
+1. Figma (web или desktop) → меню → **Plugins → Development → Import plugin from
+   manifest…** → выбери `design/figma/plugin/manifest.json`.
+2. **Plugins → Development → Kachō Design System Importer** → Run.
+3. За пару секунд появятся: коллекции переменных `Kachō Colors` (modes Dark/Light)
+   и `Kachō Radius`, стили `Kachō/*`, страницы `Kachō — Foundations` и
+   `Kachō — Screens`.
+
+### Пересборка (если меняешь токены/скриншоты)
+```
+node design/figma/plugin/build.mjs   # перегенерит plugin/code.js из kacho-tokens.json + shots/
+```
+Шрифт: плагин грузит Inter, при отсутствии откатывается на Roboto/Arial.
+
+---
+
+## 1. Design tokens → Figma Variables/Styles (альтернатива — Tokens Studio)
 
 Файл: [`kacho-tokens.json`](./kacho-tokens.json) — формат **Tokens Studio**.
 

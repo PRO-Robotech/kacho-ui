@@ -24,6 +24,15 @@ export interface DetailTab {
   label: string;
   count?: number;
   render: () => ReactNode;
+  /** Зона-2 «действие» (eyebrow) для этого таба — НЕ обязано совпадать с label
+   *  меню. Default: label. Напр. json → «Информация», связанный таб → «Список». */
+  eyebrow?: string;
+  /** Зона-2 заголовок (тип/название предмета таба). Default: resourceLabel
+   *  (тип мастер-ресурса). Напр. связанный таб «Подсети» → plural ребёнка. */
+  headerTitle?: string;
+  /** Зона-2 иконка предмета таба. Default: иконка мастер-ресурса (ctxIcon).
+   *  Напр. связанный таб → иконка дочернего ресурса. */
+  headerIcon?: ReactNode;
 }
 
 export interface DocLink {
@@ -140,7 +149,7 @@ export function DetailShell({
             marginBottom: 8,
           }}
         >
-          {(headerIconOverride ?? ctxIcon) && (
+          {(headerIconOverride ?? active?.headerIcon ?? ctxIcon) && (
             <div
               style={{
                 width: 42,
@@ -156,7 +165,7 @@ export function DetailShell({
                 border: "1px solid rgba(61,141,245,0.22)",
               }}
             >
-              {headerIconOverride ?? ctxIcon}
+              {headerIconOverride ?? active?.headerIcon ?? ctxIcon}
             </div>
           )}
           <div style={{ minWidth: 0 }}>
@@ -173,7 +182,8 @@ export function DetailShell({
                 textOverflow: "ellipsis",
               }}
             >
-              {headerEyebrow ?? active?.label}
+              {/* действие: форма (Создание/Редактирование) > per-tab eyebrow > label */}
+              {headerEyebrow ?? active?.eyebrow ?? active?.label}
             </div>
             <div
               style={{
@@ -186,7 +196,7 @@ export function DetailShell({
                 textOverflow: "ellipsis",
               }}
             >
-              {headerTitle ?? resourceLabel}
+              {headerTitle ?? active?.headerTitle ?? resourceLabel}
             </div>
           </div>
         </div>

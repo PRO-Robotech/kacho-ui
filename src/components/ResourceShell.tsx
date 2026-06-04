@@ -309,6 +309,11 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     tabs.push({
       id: childSpec.route,
       label: r.label ?? childSpec.plural,
+      // Зона-2: связанный таб = список дочернего ресурса → «действие» Список,
+      // тип/иконка ребёнка (а НЕ label таба над типом родителя).
+      eyebrow: "Список",
+      headerTitle: childSpec.plural,
+      headerIcon: <ResourceIcon specId={childSpec.id} />,
       render: () => (
         <RelatedTable
           childSpec={childSpec}
@@ -335,6 +340,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   tabs.push({
     id: "json",
     label: "JSON",
+    eyebrow: "Информация",
     render: () => (
       <div>
         <JsonMonacoView data={data} />
@@ -346,6 +352,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     tabs.push({
       id: "jsonint",
       label: "JSON (internal)",
+      eyebrow: "Информация",
       render: () => (
         <div>
           <JsonIntView path={intPath} />
