@@ -95,7 +95,7 @@ export function ServiceSidebar() {
         style={{
           display: "flex",
           alignItems: "center",
-          height: 40,
+          height: 56,
           paddingInline: collapsed ? 0 : 14,
           justifyContent: collapsed ? "center" : "flex-start",
           marginBottom: 4,
@@ -112,13 +112,13 @@ export function ServiceSidebar() {
             border: "none",
             cursor: "pointer",
             padding: 0,
-            height: 28,
+            height: 48,
           }}
         >
           {collapsed ? (
-            <KachoLogo variant="mark" size={22} />
+            <KachoLogo variant="mark" size={44} />
           ) : (
-            <KachoLogo variant="full" size={22} wordmarkColor={token.colorText} />
+            <KachoLogo variant="full" size={44} wordmarkColor={token.colorText} />
           )}
         </button>
       </div>
