@@ -28,7 +28,6 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
-import { FormArchitecturePanel } from "@/components/form/FormArchitecturePanel";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -229,22 +228,8 @@ export function InlineSubnetCreateForm({
     mutation.mutate(payload);
   };
 
-  // KAC-246 Live Architecture: obj для холста (CIDR-линейка) из локального стейта.
-  const archObj = {
-    network_id: networkId ?? "",
-    name,
-    v4_cidr_blocks: v4Blocks,
-  };
-
   return (
-    <FormShell
-      specId="subnets"
-      mode="create"
-      singular={subnetSpec.singular}
-      description={subnetSpec.description}
-    >
-      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
+    <FormShell specId="subnets" mode="create" singular={subnetSpec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
@@ -378,9 +363,6 @@ export function InlineSubnetCreateForm({
           />
         </Form.Item>
       </Form>
-        </div>
-        <FormArchitecturePanel spec={subnetSpec} obj={archObj} />
-      </div>
     </FormShell>
   );
 }

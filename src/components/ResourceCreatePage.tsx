@@ -10,7 +10,6 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
-import { createSubmitLabel } from "@/lib/create-plan";
 import { setByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -203,7 +202,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
           obj={obj}
           onChange={setObj}
           lockedPaths={lockedPathsRef.current}
-          submitLabel={createSubmitLabel(spec, obj)}
+          submitLabel={`Создать ${spec.singular.toLowerCase()}`}
           submitting={mutation.isPending || pendingOpId !== null}
           onSubmit={submit}
           onCancel={() => navigate(backHref)}
