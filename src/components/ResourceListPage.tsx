@@ -211,25 +211,30 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   return (
     <div className="kc-surface" style={{ padding: 20 }}>
       <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {titleBlock}
-
-        <Space size={12} wrap>
-          <Input.Search
-            placeholder="Фильтр по имени или идентификатору"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ width: 360 }}
-            allowClear
-          />
-          {hasZoneFilter && (
-            <Select
-              value={zone}
-              onChange={setZone}
-              options={zoneOptions}
-              style={{ width: 240 }}
+        {/* KAC-246: заголовок + фильтр в одной строке (title слева, фильтры справа). */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            width: "100%",
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>{titleBlock}</div>
+          <Space size={12} wrap style={{ flexShrink: 0 }}>
+            <Input.Search
+              placeholder="Фильтр по имени или идентификатору"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ width: 320 }}
+              allowClear
             />
-          )}
-        </Space>
+            {hasZoneFilter && (
+              <Select value={zone} onChange={setZone} options={zoneOptions} style={{ width: 220 }} />
+            )}
+          </Space>
+        </div>
 
         {isError ? (
           <ErrorResult error={error} />
