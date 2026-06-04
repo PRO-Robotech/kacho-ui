@@ -208,11 +208,11 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
     ],
     // CIDR-блоки — отдельная панель управления под Обзором (как «Статические
     // маршруты» у route-tables). Мутируются :add/:remove-cidr-blocks, не PATCH.
-    overviewBelow: ({ data }) => {
+    overviewBelow: ({ data, projectId }) => {
       const subnetId = getByPath<string>(data, "id") ?? "";
       const v4 = (getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[];
       const v6 = (getByPath<string[]>(data, "v6_cidr_blocks") ?? []) as string[];
-      return <SubnetCidrPanel subnetId={subnetId} v4Blocks={v4} v6Blocks={v6} />;
+      return <SubnetCidrPanel subnetId={subnetId} v4Blocks={v4} v6Blocks={v6} projectId={projectId} />;
     },
   },
 
