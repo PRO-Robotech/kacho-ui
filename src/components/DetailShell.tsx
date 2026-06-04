@@ -121,7 +121,9 @@ export function DetailShell({
           display: "flex",
           flexDirection: "column",
           borderRight: "1px solid var(--kc-border-secondary)",
-          padding: 10,
+          // padding 20 — как у list kc-surface, чтобы блок [иконка+действие+тип]
+          // был на той же позиции (20,20) от kc-surface и НЕ прыгал list↔detail.
+          padding: 20,
         }}
       >
         {/* Зона 2 верх: [иконка] + действие (active tab) + тип ресурса. Имя
@@ -131,7 +133,9 @@ export function DetailShell({
             display: "flex",
             gap: 12,
             alignItems: "center",
-            padding: "4px 6px 14px",
+            // Без top/left padding — блок садится ровно на sub-pane padding(20),
+            // т.е. на (20,20) от kc-surface, как list-PanelHeader → не прыгает.
+            padding: "0 0 14px 0",
             borderBottom: "1px solid var(--kc-border-secondary)",
             marginBottom: 8,
           }}
@@ -171,7 +175,17 @@ export function DetailShell({
             >
               {headerEyebrow ?? active?.label}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "var(--kc-text)", lineHeight: 1.2 }}>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 600,
+                color: "var(--kc-text)",
+                lineHeight: 1.2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               {headerTitle ?? resourceLabel}
             </div>
           </div>
