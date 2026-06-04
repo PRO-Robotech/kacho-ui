@@ -95,7 +95,7 @@ export const SERVICE_MODULES: ServiceModule[] = [
     items: [
       { key: "networks", icon: <ApartmentOutlined />, label: "Облачные сети", to: (f) => seg(f, "vpc/networks"), matches: (p) => projectRe("vpc/networks").test(p), requiresProject: true },
       { key: "subnets", icon: <ClusterOutlined />, label: "Подсети", to: (f) => seg(f, "vpc/subnets"), matches: (p) => projectRe("vpc/subnets").test(p), requiresProject: true },
-      { key: "addresses", icon: <GlobalOutlined />, label: "Публичные IP-адреса", to: (f) => seg(f, "vpc/addresses"), matches: (p) => projectRe("vpc/addresses").test(p), requiresProject: true },
+      { key: "addresses", icon: <GlobalOutlined />, label: "IP-адреса", to: (f) => seg(f, "vpc/addresses"), matches: (p) => projectRe("vpc/addresses").test(p), requiresProject: true },
       { key: "route-tables", icon: <NodeIndexOutlined />, label: "Таблицы маршрутизации", to: (f) => seg(f, "vpc/route-tables"), matches: (p) => projectRe("vpc/route-tables").test(p), requiresProject: true },
       { key: "security-groups", icon: <SafetyOutlined />, label: "Группы безопасности", to: (f) => seg(f, "vpc/security-groups"), matches: (p) => projectRe("vpc/security-groups").test(p), requiresProject: true },
       { key: "network-interfaces", icon: <ApiOutlined />, label: "Сетевые интерфейсы", to: (f) => seg(f, "vpc/network-interfaces"), matches: (p) => projectRe("vpc/network-interfaces").test(p), requiresProject: true },

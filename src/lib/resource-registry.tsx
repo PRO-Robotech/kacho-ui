@@ -408,9 +408,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "subnets",
     related: [
       {
+        // Под подсетью адреса всегда ВНУТРЕННИЕ (фильтр по internal_*.subnet_id).
         childId: "addresses",
         filterField: ["internal_ipv4_address.subnet_id", "internal_ipv6_address.subnet_id"],
-        label: "IP-адреса",
+        label: "Внутренние адреса",
       },
     ],
     docs: [
@@ -628,7 +629,10 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       docs: ["Адреса облачных ресурсов"],
     },
     singular: "Address",
-    plural: "Публичные IP-адреса",
+    // Нейтральный plural — список содержит и внешние (Публичные), и внутренние
+    // адреса; вид различается колонкой «Вид» (Публичный/Внутренний). Раньше было
+    // «Публичные IP-адреса», что вводило в заблуждение для внутренних.
+    plural: "IP-адреса",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },

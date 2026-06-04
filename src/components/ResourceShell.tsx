@@ -83,12 +83,16 @@ function RelatedTable({
   parentId,
   projectId,
   detailBase,
+  title,
 }: {
   childSpec: ResourceSpec;
   filterFields: string[];
   parentId: string;
   projectId: string;
   detailBase: string;
+  /** Контекстный заголовок (related.label) — напр. «Внутренние адреса» под
+   *  подсетью вместо общего spec.plural. Fallback — childSpec.plural. */
+  title?: string;
 }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -142,7 +146,7 @@ function RelatedTable({
       <SectionHeader
         title={
           <>
-            {childSpec.plural}{" "}
+            {title ?? childSpec.plural}{" "}
             <Tag
               style={{
                 marginLeft: 6,
@@ -348,6 +352,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
           parentId={getByPath<string>(data, "id") ?? (uid ?? "")}
           projectId={projectId ?? ""}
           detailBase={detailBase}
+          title={r.label}
         />
       ),
     });

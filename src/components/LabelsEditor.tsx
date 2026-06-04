@@ -26,8 +26,14 @@ interface Props {
 }
 
 const ROW_H = 38;
+// Сетка из div'ов (НЕ <table>): minmax(0,1fr) даёт колонкам min-width 0 →
+// виджет сжимается вместе с wrapper-колонкой формы и НЕ выталкивает AntD-ряд
+// в wrap. С <table> min-content таблицы переносил ряд на свою строку во всю
+// ширину карточки (770px вместо 570px у полей). KAC-246.
+const GRID_COLS = "minmax(0, 1fr) minmax(0, 1fr) 40px";
 const cellInputStyle: React.CSSProperties = {
   width: "100%",
+  minWidth: 0,
   fontFamily: "ui-monospace, monospace",
   fontSize: 12,
   padding: 0,
@@ -41,88 +47,81 @@ export function LabelsEditor({ value, onChange, disabled }: Props) {
   };
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden bg-card" style={{ width: "100%" }}>
-      <table className="w-full text-sm" style={{ tableLayout: "fixed" }}>
-        <colgroup>
-          <col style={{ width: "calc((100% - 48px) / 2)" }} />
-          <col style={{ width: "calc((100% - 48px) / 2)" }} />
-          <col style={{ width: 48 }} />
-        </colgroup>
-        <thead>
-          <tr className="bg-muted/40 text-xs uppercase tracking-wide">
-            <th className="text-left px-3 py-2">Ключ</th>
-            <th className="text-left px-3 py-2">Значение</th>
-            <th className="px-1 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {value.length === 0 && (
-            <tr style={{ height: ROW_H }}>
-              <td
-                colSpan={3}
-                className="px-3 text-center text-xs text-muted-foreground"
-                style={{ verticalAlign: "middle" }}
-              >
-                Меток нет
-              </td>
-            </tr>
-          )}
-          {value.map((l, idx) => (
-            <tr
-              key={idx}
-              className="border-t border-border hover:bg-muted/20"
-              style={{ height: ROW_H }}
-            >
-              <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
-                <Input
-                  variant="borderless"
-                  placeholder="ключ"
-                  value={l.key}
-                  onChange={(e) => update(idx, { key: e.target.value })}
-                  disabled={disabled}
-                  style={cellInputStyle}
-                />
-              </td>
-              <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
-                <Input
-                  variant="borderless"
-                  placeholder="значение"
-                  value={l.value}
-                  onChange={(e) => update(idx, { value: e.target.value })}
-                  disabled={disabled}
-                  style={cellInputStyle}
-                />
-              </td>
-              <td className="px-1 text-center" style={{ verticalAlign: "middle" }}>
-                <Button
-                  type="text"
-                  danger
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  aria-label="Удалить метку"
-                  onClick={() => onChange(value.filter((_, i) => i !== idx))}
-                  disabled={disabled}
-                />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-border">
-            <td className="px-3 py-2" colSpan={3}>
-              <Button
-                type="dashed"
-                block
-                icon={<PlusOutlined />}
-                onClick={() => onChange([...value, { key: "", value: "" }])}
-                disabled={disabled}
-              >
-                Добавить метку
-              </Button>
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+    <div
+      className="rounded-lg border border-border overflow-hidden bg-card"
+      style={{ width: "100%", minWidth: 0 }}
+    >
+      {/* header */}
+      <div
+        className="bg-muted/40 text-xs uppercase tracking-wide"
+        style={{ display: "grid", gridTemplateColumns: GRID_COLS }}
+      >
+        <div className="px-3 py-2">Ключ</div>
+        <div className="px-3 py-2">Значение</div>
+        <div />
+      </div>
+
+      {/* rows */}
+      {value.length === 0 && (
+        <div
+          className="px-3 text-center text-xs text-muted-foreground"
+          style={{ height: ROW_H, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          Меток нет
+        </div>
+      )}
+      {value.map((l, idx) => (
+        <div
+          key={idx}
+          className="border-t border-border hover:bg-muted/20"
+          style={{ display: "grid", gridTemplateColumns: GRID_COLS, alignItems: "center", minWidth: 0 }}
+        >
+          <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
+            <Input
+              variant="borderless"
+              placeholder="ключ"
+              value={l.key}
+              onChange={(e) => update(idx, { key: e.target.value })}
+              disabled={disabled}
+              style={cellInputStyle}
+            />
+          </div>
+          <div className="px-3 font-mono text-xs" style={{ minWidth: 0 }}>
+            <Input
+              variant="borderless"
+              placeholder="значение"
+              value={l.value}
+              onChange={(e) => update(idx, { value: e.target.value })}
+              disabled={disabled}
+              style={cellInputStyle}
+            />
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <Button
+              type="text"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+              aria-label="Удалить метку"
+              onClick={() => onChange(value.filter((_, i) => i !== idx))}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+      ))}
+
+      {/* footer */}
+      <div className="border-t border-border" style={{ padding: "8px 12px" }}>
+        <Button
+          type="dashed"
+          block
+          icon={<PlusOutlined />}
+          onClick={() => onChange([...value, { key: "", value: "" }])}
+          disabled={disabled}
+        >
+          Добавить метку
+        </Button>
+      </div>
     </div>
   );
 }
