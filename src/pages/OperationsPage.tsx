@@ -8,7 +8,7 @@
 import { useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { Button, Input, Select, Space, Tag, Typography } from "antd";
-import { ReloadOutlined, ApartmentOutlined } from "@ant-design/icons";
+import { ReloadOutlined, DeploymentUnitOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
 import { PanelHeader } from "@/components/PanelHeader";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
@@ -184,14 +184,15 @@ export function OperationsPage() {
   return (
     <div className="kc-surface" style={{ padding: 20, minHeight: "calc(100vh - 110px)" }}>
       <Space direction="vertical" size={16} style={{ width: "100%" }}>
-        {/* Единая шапка (PanelHeader) с общей VPC-иконкой + «Список» + «Операции»
-            + счётчик; фильтры — справа. */}
+        {/* Единая шапка: общая VPC-иконка модуля (DeploymentUnitOutlined,
+            отличная от network) + действие «Операции» + название «VPC» +
+            счётчик; фильтры — справа. */}
         <PanelHeader
-          icon={<ApartmentOutlined />}
-          eyebrow="Список"
+          icon={<DeploymentUnitOutlined />}
+          eyebrow="Операции"
           title={
             <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-              Операции
+              VPC
               <Tag
                 style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: "22px", height: 24, paddingInline: 9, borderRadius: 7 }}
               >
@@ -199,7 +200,6 @@ export function OperationsPage() {
               </Tag>
             </span>
           }
-          subtitle="Все операции (LRO) по VPC-ресурсам в текущем проекте."
           right={
             <>
               <Input
