@@ -60,16 +60,28 @@ export function FormPlanPanel({ spec, obj }: Props) {
         position: "sticky",
         top: 0,
         alignSelf: "flex-start",
-        borderLeft: "1px solid var(--kc-border-secondary)",
-        paddingLeft: 16,
+        // KAC-246: цельная поверхность-карточка (recessed) — панель «принадлежит»
+        // форме, а не приклеена колонкой. container темнее elevated-модалки.
+        background: "var(--kc-container)",
+        border: "1px solid var(--kc-border-secondary)",
+        borderRadius: 12,
+        padding: 16,
         display: "flex",
         flexDirection: "column",
         gap: 16,
       }}
     >
-      <Typography.Text strong style={{ fontSize: 12, color: "var(--kc-text)" }}>
+      <span
+        style={{
+          textTransform: "uppercase",
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.06em",
+          color: "var(--kc-text-tertiary)",
+        }}
+      >
         План
-      </Typography.Text>
+      </span>
 
       {/* Будет создано */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
