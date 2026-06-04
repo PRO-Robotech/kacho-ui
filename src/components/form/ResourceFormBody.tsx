@@ -6,6 +6,7 @@
 import { Alert, Form } from "antd";
 import { FormFieldRenderer } from "@/components/form/FormField";
 import { FormShell } from "@/components/form/FormShell";
+import { FormPlanPanel } from "@/components/form/FormPlanPanel";
 import { FieldLabel } from "@/components/form/FieldLabel";
 import { FormFooter } from "@/components/form/FormFooter";
 import { ImmutableField } from "@/components/form/ImmutableField";
@@ -84,23 +85,18 @@ export function ResourceFormBody({
     return matchesVisibleWhen(obj, f.visibleWhen);
   });
 
-  return (
-    <FormShell
-      specId={spec.id}
-      mode={mode}
-      singular={spec.singular}
-      description={mode === "create" ? spec.description : undefined}
-      title={title}
+  // Единый рендер тела формы — переиспользуется в обеих раскладках (create с
+  // план-панелью / edit одноколоночный), чтобы не дублировать поля.
+  const form = (
+    <Form
+      layout="horizontal"
+      labelCol={{ flex: "200px" }}
+      wrapperCol={{ flex: "auto" }}
+      labelAlign="left"
+      colon={false}
+      size="middle"
     >
-      <Form
-        layout="horizontal"
-        labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
-        labelAlign="left"
-        colon={false}
-        size="middle"
-      >
-        {visible.map((f) => {
+      {visible.map((f) => {
           const isLocked = locked.has(f.name) || (editMode && !!f.immutable);
           const fullWidth = FULL_WIDTH.has(f.type as string);
 
@@ -156,16 +152,36 @@ export function ResourceFormBody({
           );
         })}
 
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel={submitLabel}
-            submitting={submitting}
-            onSubmit={onSubmit}
-            onCancel={onCancel}
-            sticky={stickyFooter}
-          />
-        </Form.Item>
-      </Form>
+      <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
+        <FormFooter
+          submitLabel={submitLabel}
+          submitting={submitting}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+          sticky={stickyFooter}
+        />
+      </Form.Item>
+    </Form>
+  );
+
+  return (
+    <FormShell
+      specId={spec.id}
+      mode={mode}
+      singular={spec.singular}
+      description={mode === "create" ? spec.description : undefined}
+      title={title}
+    >
+      {mode === "create" ? (
+        // Двухзонная раскладка «Create with Live Plan» (KAC-246): слева поля,
+        // справа живой «План». Шапка FormShell — сверху на всю ширину.
+        <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>{form}</div>
+          <FormPlanPanel spec={spec} obj={obj} />
+        </div>
+      ) : (
+        form
+      )}
     </FormShell>
   );
 }

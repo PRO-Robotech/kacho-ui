@@ -11,6 +11,7 @@ import { extractOperationId } from "@/components/OperationDialog";
 import { ResourceFormBody } from "@/components/form/ResourceFormBody";
 import { ApiError, api } from "@/api/client";
 import { applyFieldDefaults, type ResourceSpec } from "@/lib/resource-registry";
+import { createSubmitLabel } from "@/lib/create-plan";
 import { setByPath } from "@/lib/path";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -154,7 +155,7 @@ export function InlineResourceCreateForm({
       lockedPaths={lockedPathsRef.current}
       fieldOptionsFilter={fieldOptionsFilter}
       title={title}
-      submitLabel={`Создать ${spec.singular.toLowerCase()}`}
+      submitLabel={createSubmitLabel(spec, obj)}
       submitting={mutation.isPending || pendingOpId !== null}
       onSubmit={submit}
       onCancel={onCancel}
