@@ -87,25 +87,22 @@ export function OperationsTab({ spec, resourceId }: Props) {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        Операции
-      </Typography.Title>
-
-      <Space size={8} wrap>
-        <Input
-          placeholder="Фильтр по идентификатору"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          allowClear
-          style={{ width: 320 }}
-        />
-        <Select
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-          style={{ width: 200 }}
-        />
-      </Space>
+      {/* KAC-246: заголовок + фильтры в одной строке (title слева, фильтры справа). */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", width: "100%" }}>
+        <Typography.Title level={4} style={{ margin: 0, flex: 1, minWidth: 0 }}>
+          Операции
+        </Typography.Title>
+        <Space size={8} wrap style={{ flexShrink: 0 }}>
+          <Input
+            placeholder="Фильтр по идентификатору"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            allowClear
+            style={{ width: 260 }}
+          />
+          <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+        </Space>
+      </div>
 
       <OperationsTable
         rows={filtered}
