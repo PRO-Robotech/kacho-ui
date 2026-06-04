@@ -14,8 +14,9 @@ interface Props {
   v6Blocks: string[];
 }
 
+// Бейдж семейства — «IPv4» / «IPv6» в плитке (мелкий mono, чтобы поместилось).
 const familyTile = (text: string) => (
-  <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "ui-monospace, monospace", letterSpacing: "-0.02em" }}>
+  <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: "ui-monospace, monospace", letterSpacing: "-0.04em" }}>
     {text}
   </span>
 );
@@ -23,26 +24,26 @@ const familyTile = (text: string) => (
 export function SubnetCidrPanel({ subnetId, v4Blocks, v6Blocks }: Props) {
   return (
     <>
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 24, maxWidth: 760 }}>
         <SectionHeader
-          icon={familyTile("v4")}
+          icon={familyTile("IPv4")}
           eyebrow="Список"
           title={
             <span>
-              IPv4 CIDR <Typography.Text type="secondary">({v4Blocks.length})</Typography.Text>
+              CIDR <Typography.Text type="secondary">({v4Blocks.length})</Typography.Text>
             </span>
           }
         />
         <CidrSection subnetId={subnetId} kind="v4" blocks={v4Blocks} />
       </div>
 
-      <div style={{ marginTop: 24 }}>
+      <div style={{ marginTop: 24, maxWidth: 760 }}>
         <SectionHeader
-          icon={familyTile("v6")}
+          icon={familyTile("IPv6")}
           eyebrow="Список"
           title={
             <span>
-              IPv6 CIDR <Typography.Text type="secondary">({v6Blocks.length})</Typography.Text>
+              CIDR <Typography.Text type="secondary">({v6Blocks.length})</Typography.Text>
             </span>
           }
         />

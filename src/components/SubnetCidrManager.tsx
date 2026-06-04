@@ -43,7 +43,7 @@ interface SectionProps {
   blocks: string[];
 }
 
-const ROW_H = 40;
+const ROW_H = 41;
 
 export function CidrSection({ subnetId, kind, blocks }: SectionProps) {
   const qc = useQueryClient();
