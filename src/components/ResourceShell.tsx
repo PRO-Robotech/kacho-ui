@@ -21,7 +21,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Spin, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
-import { SectionHeader } from "@/components/SectionHeader";
 import { DetailHeaderProvider } from "@/components/PanelHeader";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
@@ -76,16 +75,12 @@ function RelatedTable({
   parentId,
   projectId,
   detailBase,
-  title,
 }: {
   childSpec: ResourceSpec;
   filterFields: string[];
   parentId: string;
   projectId: string;
   detailBase: string;
-  /** Контекстный заголовок (related.label) — напр. «Внутренние адреса» под
-   *  подсетью вместо общего spec.plural. Fallback — childSpec.plural. */
-  title?: string;
 }) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -136,36 +131,11 @@ function RelatedTable({
 
   return (
     <div>
-      <SectionHeader
-        icon={<ResourceIcon specId={childSpec.id} />}
-        eyebrow="Список"
-        title={
-          <>
-            {title ?? childSpec.plural}{" "}
-            <Tag
-              style={{
-                marginLeft: 6,
-                fontSize: 13,
-                fontWeight: 600,
-                lineHeight: "20px",
-                height: 22,
-                paddingInline: 8,
-                borderRadius: 7,
-              }}
-            >
-              {ownRows.length}
-            </Tag>
-          </>
-        }
-        right={
-          <>
-            <TableSearch value={search} onChange={setSearch} />
-            <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
-            {/* «Создать <child>» — в ШАПКЕ страницы (ResourceShell header, KAC-242),
-                не в заголовке таблицы. createPath/createLabel ещё нужны empty-state. */}
-          </>
-        }
-      />
+      {/* Заголовок раздела (тип/действие) — в зоне 2; здесь только тулбар. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <TableSearch value={search} onChange={setSearch} />
+        <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
+      </div>
       <ResourceTable
         rows={rows}
         columns={columns}
@@ -286,7 +256,9 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     }
     return null;
   }, [mode, headerTabId, data, spec, projectId, detailBase, ext, navigate]);
-  useHeaderRight(headerActions);
+  // KAC-246: действия переехали из глобальной шапки страницы к ИМЕНИ ресурса в
+  // зоне 3 (DetailShell.nameActions). В глобальной шапке остаётся только breadcrumb.
+  useHeaderRight(null);
 
   if (isLoading && !data) {
     return <div style={{ padding: 48, textAlign: "center" }}><Spin /></div>;
@@ -317,7 +289,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "Обзор",
       render: () => (
         <div>
-          <SectionHeader eyebrow="Обзор" title={spec.singular} />
           <Descriptions
             column={1}
             size="small"
@@ -347,7 +318,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
           parentId={getByPath<string>(data, "id") ?? (uid ?? "")}
           projectId={projectId ?? ""}
           detailBase={detailBase}
-          title={r.label ?? childSpec.plural}
         />
       ),
     });
@@ -369,7 +339,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     label: "JSON",
     render: () => (
       <div>
-        <SectionHeader eyebrow="Информация" title={spec.singular} />
         <JsonMonacoView data={data} />
       </div>
     ),
@@ -381,7 +350,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "JSON (internal)",
       render: () => (
         <div>
-          <SectionHeader eyebrow="Информация" title={`${spec.singular} · internal`} />
           <JsonIntView path={intPath} />
         </div>
       ),
@@ -454,6 +422,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
         mainOverride={mainOverride}
         activeTabId={activeTabId}
         onTabSelect={onTabSelect}
+        nameActions={headerActions}
       />
     </DetailHeaderProvider>
   );

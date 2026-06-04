@@ -17,6 +17,7 @@
 import { type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
+import { useDetailHeaderIcon } from "@/components/PanelHeader";
 
 export interface DetailTab {
   id: string;
@@ -50,6 +51,8 @@ interface Props {
    *  и переключение таба выходит из form-panel). Иначе — legacy ?tab=. */
   activeTabId?: string;
   onTabSelect?: (id: string) => void;
+  /** Действия рядом с именем ресурса в зоне 3 (Редактировать/Удалить/Создать). */
+  nameActions?: ReactNode;
 }
 
 const SUB_PANE_WIDTH = 232;
@@ -65,7 +68,9 @@ export function DetailShell({
   mainOverride,
   activeTabId,
   onTabSelect,
+  nameActions,
 }: Props) {
+  const headerIcon = useDetailHeaderIcon();
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
   const controlled = onTabSelect !== undefined;
@@ -111,33 +116,57 @@ export function DetailShell({
           padding: 10,
         }}
       >
+        {/* Зона 2 верх: [иконка] + действие (active tab) + тип ресурса. Имя
+            переехало в зону 3 (main). */}
         <div
           style={{
-            padding: "8px 8px 14px",
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            padding: "4px 6px 14px",
             borderBottom: "1px solid var(--kc-border-secondary)",
             marginBottom: 8,
           }}
         >
-          {/* Имя ресурса — bold сверху, label-тип ниже мелким (как в YC). */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography.Text strong style={{ wordBreak: "break-all", fontSize: 15 }}>
-              {resourceName || "(unnamed)"}
-            </Typography.Text>
-            {badges}
+          {headerIcon && (
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 11,
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+                color: "var(--kc-primary)",
+                background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
+                border: "1px solid rgba(61,141,245,0.22)",
+              }}
+            >
+              {headerIcon}
+            </div>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "var(--kc-primary)",
+                marginBottom: 2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {active?.label}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--kc-text)", lineHeight: 1.2 }}>
+              {resourceLabel}
+            </div>
           </div>
-          <Typography.Text
-            type="secondary"
-            style={{ fontSize: 12, marginTop: 2, display: "block" }}
-          >
-            {resourceLabel}
-          </Typography.Text>
         </div>
 
         <Menu
@@ -221,6 +250,36 @@ export function DetailShell({
           mainOverride
         ) : (
           <>
+            {/* Зона 3 верх: имя ресурса (крупно) + статус + действия. */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 16,
+                flexWrap: "wrap",
+                paddingBottom: 16,
+                marginBottom: 18,
+                borderBottom: "1px solid var(--kc-border-secondary)",
+              }}
+            >
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}
+              >
+                <Typography.Title
+                  level={3}
+                  style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--kc-text)", wordBreak: "break-all" }}
+                >
+                  {resourceName || "(без имени)"}
+                </Typography.Title>
+                {badges}
+              </div>
+              {nameActions && (
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
+                  {nameActions}
+                </div>
+              )}
+            </div>
             {secondaryActions && (
               <div
                 style={{

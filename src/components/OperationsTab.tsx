@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Input, Select } from "antd";
 import { api, ApiError } from "@/api/client";
 import { ErrorResult } from "@/components/ErrorResult";
-import { SectionHeader } from "@/components/SectionHeader";
 import {
   OperationsTable,
   type Op,
@@ -88,24 +87,18 @@ export function OperationsTab({ spec, resourceId }: Props) {
 
   return (
     <div>
-      {/* Единая шапка: иконка ресурса (из DetailHeaderContext) + действие
-          «Операции» + название (singular) + фильтры справа. */}
-      <SectionHeader
-        eyebrow="Операции"
-        title={spec.singular}
-        right={
-          <>
-            <Input
-              placeholder="Фильтр по идентификатору"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              allowClear
-              style={{ width: 260 }}
-            />
-            <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
-          </>
-        }
-      />
+      {/* Заголовок (иконка/действие «Операции») — в зоне 2 DetailShell; здесь
+          только тулбар фильтров. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        <Input
+          placeholder="Фильтр по идентификатору"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          allowClear
+          style={{ width: 260 }}
+        />
+        <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+      </div>
 
       <OperationsTable
         rows={filtered}
