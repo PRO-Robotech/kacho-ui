@@ -29,6 +29,7 @@ import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
 import { LabelsCell } from "@/components/LabelsCell";
+import { formatDateTime } from "@/lib/datetime";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
 import { OperationsTab } from "@/components/OperationsTab";
@@ -52,16 +53,6 @@ export type ResourceShellMode = "edit" | "child-create";
 
 function specByRoute(route: string): ResourceSpec | undefined {
   return Object.values(REGISTRY).find((s) => s.route === route);
-}
-
-/** Дата создания в формате "30.05.2026, в 00:38". */
-function fmtCreatedAt(iso?: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const date = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${date}, в ${time}`;
 }
 
 /** JsonIntView — internal/infra-проекция ресурса (GET spec.internalGetPath). */
@@ -313,7 +304,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     { label: "Идентификатор", value: <CopyableId id={getByPath<string>(data, "id") ?? ""} /> },
     { label: "Имя", value: name },
     { label: "Описание", value: getByPath<string>(data, "description") || "—" },
-    { label: "Дата создания", value: fmtCreatedAt(getByPath<string>(data, "created_at")) },
+    { label: "Дата создания", value: formatDateTime(getByPath<string>(data, "created_at")) },
     // KAC-246: метки в обзоре — read-only (chips); добавление/правка — в форме
     // создания/модификации (LabelsEditor, key=value-таблица).
     { label: "Метки", value: <LabelsCell labels={getByPath<Record<string, string>>(data, "labels")} max={12} /> },

@@ -119,7 +119,7 @@ export default function ClusterAdminsPage() {
 
   const columns: ColumnsType<ClusterAdminEntry> = [
     {
-      title: "Email",
+      title: "Эл. почта",
       dataIndex: "subject_email",
       key: "subject_email",
       render: (v: string, row) =>
@@ -130,7 +130,7 @@ export default function ClusterAdminsPage() {
         ),
     },
     {
-      title: "Display name",
+      title: "Отображаемое имя",
       dataIndex: "subject_display_name",
       key: "subject_display_name",
       render: (v: string) =>
@@ -144,7 +144,7 @@ export default function ClusterAdminsPage() {
       render: (v: string) => <CopyableMonoId id={v} />,
     },
     {
-      title: "Granted by",
+      title: "Кем выдано",
       dataIndex: "granted_by_email",
       key: "granted_by_email",
       render: (v: string, row) => {
@@ -155,7 +155,7 @@ export default function ClusterAdminsPage() {
       },
     },
     {
-      title: "Granted at",
+      title: "Дата выдачи",
       dataIndex: "granted_at",
       key: "granted_at",
       width: 180,

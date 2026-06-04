@@ -88,7 +88,7 @@ export function RolesPage() {
       render: (v) => <CopyableMonoId id={v} />,
     },
     {
-      title: "Account",
+      title: "Аккаунт",
       dataIndex: "account_id",
       key: "account",
       width: 200,
@@ -107,7 +107,7 @@ export function RolesPage() {
         v || <Typography.Text type="secondary">—</Typography.Text>,
     },
     {
-      title: "Permissions",
+      title: "Разрешения",
       dataIndex: "permissions",
       key: "perms",
       render: (v: string[] | undefined) => (

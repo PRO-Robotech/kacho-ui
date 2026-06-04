@@ -102,18 +102,18 @@ const POOL_KINDS = [{ value: "EXTERNAL_PUBLIC", label: "External" }];
 
 // Общие колонки
 const COL_NAME: ResourceColumn = {
-  header: "Name",
+  header: "Имя",
   path: "name",
   format: "text",
   className: "font-medium",
 };
 const COL_CREATED: ResourceColumn = {
-  header: "Created",
+  header: "Дата создания",
   path: "created_at",
   format: "datetime",
 };
 const COL_ID: ResourceColumn = {
-  header: "ID",
+  header: "Идентификатор",
   path: "id",
   format: "uid-short",
 };
@@ -238,7 +238,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Account", path: "account_id", format: "uid-short" },
+      { header: "Аккаунт", path: "account_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
@@ -271,7 +271,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Account", path: "account_id", format: "uid-short" },
+      { header: "Аккаунт", path: "account_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
@@ -302,7 +302,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     ops: { create: false, update: false, delete: true },
     columns: [
       { header: "Имя", path: "display_name", format: "text" },
-      { header: "Email", path: "email", format: "text" },
+      { header: "Эл. почта", path: "email", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
@@ -1335,7 +1335,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     columns: [
       COL_NAME,
       {
-        header: "Network",
+        header: "Сеть",
         path: "network_id",
         // KAC-243: network_id у SG — обязателен и неизменяем (kacho-proto вернул
         // (required) на CreateSecurityGroupRequest.network_id). Бессетевых SG
@@ -1345,8 +1345,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           return nid ? <RefNameLink specId="networks" refId={nid} /> : <span className="text-muted-foreground">—</span>;
         },
       },
-      { header: "Status", path: "status", format: "status" },
-      { header: "Default", path: "default_for_network", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "По умолчанию", path: "default_for_network", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
@@ -1475,7 +1475,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Описание", path: "description", format: "text" },
       { header: "Зоны", path: "zone_ids", format: "list" },
     ],
@@ -1496,7 +1496,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Регион", path: "region_id", format: "text" },
       { header: "Статус", path: "status", format: "status" },
     ],
@@ -1514,7 +1514,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Название", path: "name", format: "text" },
       { header: "Статус", path: "status", format: "status" },
     ],
@@ -1944,8 +1944,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
-      { header: "Name", path: "name", format: "text" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
+      { header: "Имя", path: "name", format: "text" },
       COL_CREATED,
     ],
     fields: [
@@ -1975,9 +1975,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
-      { header: "Region", path: "region_id", format: "text" },
-      { header: "Name", path: "name", format: "text" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
+      { header: "Регион", path: "region_id", format: "text" },
+      { header: "Имя", path: "name", format: "text" },
       COL_CREATED,
     ],
     fields: [
@@ -2050,7 +2050,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             : <span className="text-muted-foreground">—</span>;
         },
       },
-      { header: "Default", path: "is_default", format: "text" },
+      { header: "По умолчанию", path: "is_default", format: "text" },
       {
         header: "Метки селектора",
         path: "selector_labels",
@@ -2058,7 +2058,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           <LabelsCell labels={row.selector_labels as Record<string, string> | undefined} />
         ),
       },
-      { header: "Selector priority", path: "selector_priority", format: "text" },
+      { header: "Приоритет селектора", path: "selector_priority", format: "text" },
     ],
     fields: [
       {

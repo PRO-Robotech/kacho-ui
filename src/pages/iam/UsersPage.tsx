@@ -64,14 +64,14 @@ export function UsersPage() {
 
   const columns: ColumnsType<User> = [
     {
-      title: "Email",
+      title: "Эл. почта",
       dataIndex: "email",
       key: "email",
       render: (v) =>
         v ? <Typography.Text strong>{v}</Typography.Text> : "—",
     },
     {
-      title: "Display name",
+      title: "Отображаемое имя",
       dataIndex: "display_name",
       key: "display_name",
       render: (v) =>

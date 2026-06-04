@@ -232,7 +232,7 @@ export function AccessBindingsPage() {
 
   const columns: ColumnsType<AccessBinding> = [
     {
-      title: "Subject",
+      title: "Субъект",
       key: "subject",
       render: (_v, row) => {
         const u = row.subject_type === "user" ? userByIdLookup.get(row.subject_id) : undefined;
@@ -251,7 +251,7 @@ export function AccessBindingsPage() {
       },
     },
     {
-      title: "Role",
+      title: "Роль",
       dataIndex: "role_id",
       key: "role",
       render: (v: string) => {
@@ -265,7 +265,7 @@ export function AccessBindingsPage() {
       },
     },
     {
-      title: "Resource",
+      title: "Ресурс",
       key: "resource",
       render: (_v, row) => (
         <Space size={6}>
@@ -276,7 +276,7 @@ export function AccessBindingsPage() {
     },
     {
       // RBAC v2 (KAC-224): output-only scope tier из ответа AccessBinding.
-      title: "Scope",
+      title: "Область",
       dataIndex: "scope",
       key: "scope",
       width: 120,

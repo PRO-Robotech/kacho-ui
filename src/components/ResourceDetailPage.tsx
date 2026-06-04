@@ -19,6 +19,7 @@ import {
   DragOutlined,
 } from "@ant-design/icons";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
+import { formatDateTime } from "@/lib/datetime";
 import { ErrorResult } from "@/components/ErrorResult";
 import { RefNameLink } from "@/components/RefNameLink";
 import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
@@ -412,7 +413,7 @@ export function ResourceDetailPage({
     getByPath<string>(data, "created_at")
       ? {
           label: "Дата создания",
-          value: new Date(getByPath<string>(data, "created_at")!).toLocaleString(),
+          value: formatDateTime(getByPath<string>(data, "created_at")),
         }
       : null,
     getByPath<string>(data, "project_id")

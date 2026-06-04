@@ -173,7 +173,7 @@ export function TargetGroupDetailPage() {
       const columns: ColumnsType<Target> = [
         { title: "Тип", key: "kind", width: 120, render: (_v, t) => <Tag>{targetIdentity(t).label}</Tag> },
         {
-          title: "Endpoint",
+          title: "Эндпоинт",
           key: "endpoint",
           render: (_v, t) => (
             <Typography.Text style={{ fontFamily: "monospace", fontSize: 12 }}>
@@ -181,7 +181,7 @@ export function TargetGroupDetailPage() {
             </Typography.Text>
           ),
         },
-        { title: "Weight", dataIndex: "weight", key: "weight", width: 90, render: (v) => v ?? 1 },
+        { title: "Вес", dataIndex: "weight", key: "weight", width: 90, render: (v) => v ?? 1 },
         {
           title: "",
           key: "actions",
