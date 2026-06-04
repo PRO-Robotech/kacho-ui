@@ -22,6 +22,8 @@ import { Button, Descriptions, Spin, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
 import { SectionHeader } from "@/components/SectionHeader";
+import { DetailHeaderProvider } from "@/components/PanelHeader";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
@@ -447,15 +449,19 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   };
 
   return (
-    <DetailShell
-      resourceLabel={spec.singular}
-      resourceName={name}
-      badges={status ? <Tag>{status}</Tag> : undefined}
-      tabs={tabs}
-      docLinks={(spec.docs as DocLink[] | undefined) ?? []}
-      mainOverride={mainOverride}
-      activeTabId={activeTabId}
-      onTabSelect={onTabSelect}
-    />
+    // Прокидываем иконку ресурса вниз — все SectionHeader табов получают её
+    // (единая шапка с формами через PanelHeader).
+    <DetailHeaderProvider value={{ icon: <ResourceIcon specId={spec.id} /> }}>
+      <DetailShell
+        resourceLabel={spec.singular}
+        resourceName={name}
+        badges={status ? <Tag>{status}</Tag> : undefined}
+        tabs={tabs}
+        docLinks={(spec.docs as DocLink[] | undefined) ?? []}
+        mainOverride={mainOverride}
+        activeTabId={activeTabId}
+        onTabSelect={onTabSelect}
+      />
+    </DetailHeaderProvider>
   );
 }
