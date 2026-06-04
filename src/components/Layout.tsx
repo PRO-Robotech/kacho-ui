@@ -7,6 +7,7 @@ import { ContextBreadcrumb } from "@/components/ContextBreadcrumb";
 import { ServiceSidebar } from "@/components/ServiceSidebar";
 import { HeaderRightSlot, PageHeaderSlotProvider } from "@/components/PageHeaderSlot";
 import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
+import { OperationBanner } from "@/components/OperationBanner";
 // KAC-246: full-height sidebar (логотип сверху = левый верхний угол), от самого
 // верха до самого низа. Header — внутри правого под-лейаута, только НАД контентом
 // (а не во всю ширину поверх сайдбара). Сворачиватель убран.
@@ -31,7 +32,7 @@ function LayoutInner() {
   const { mode, toggle } = useThemeMode();
 
   return (
-    <AntLayout style={{ minHeight: "100vh" }} hasSider>
+    <AntLayout style={{ height: "100vh", overflow: "hidden" }} hasSider>
       <ContextUrlSync />
 
       {/* Сайдбар во всю высоту: от верха до низа, логотип в верхней части. */}
@@ -87,37 +88,54 @@ function LayoutInner() {
           </div>
         </Header>
 
+        {/* Sticky-плашка async-операций (operationStore): поллит Operation до
+            done, на done инвалидирует detail/list → реактивное обновление после
+            RoutesPanel/SgRules/SG-edit. Раньше НЕ был смонтирован — изменения не
+            подтягивались. KAC-246. */}
+        <OperationBanner />
+
+        {/* Страница фиксирована (outer height:100vh overflow:hidden) — скроллится
+            ТОЛЬКО Content (flex:1, overflow:auto). Footer вынесен из Content и
+            всегда виден внизу. KAC-246. */}
         <Content
           style={{
+            flex: 1,
+            minHeight: 0,
             overflow: "auto",
-            // Резервируем место под вертикальный скроллбар ВСЕГДА — скролл здесь,
-            // на Content (не на html/body). Иначе при открытии формы (контент выше
-            // viewport) скроллбар появляется → горизонтальный сдвиг всего контента
-            // («прыгает» при нажатии Создать/Редактировать). KAC-246.
+            // Резервируем место под вертикальный скроллбар ВСЕГДА (скролл здесь) —
+            // иначе при открытии высокого контента появляется скроллбар →
+            // горизонтальный сдвиг. KAC-246.
             scrollbarGutter: "stable",
             minWidth: 0,
             background: token.colorBgLayout,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           {/* min-width: max-content гарантирует, что широкие таблицы не сжимают
-              cells, а раздвигают page-level horizontal scrollbar. */}
-          <div style={{ minWidth: "max-content", padding: "16px 16px" }}>
+              cells, а раздвигают page-level horizontal scrollbar. flex:1 — чтобы
+              kc-surface (minHeight:100%) заполняла высоту видимой области. */}
+          <div style={{ minWidth: "max-content", padding: "16px 16px", flex: 1 }}>
             <Outlet />
           </div>
-          {/* Глобальный футер — год считается автоматически. */}
-          <footer
-            style={{
-              padding: "10px 16px 16px",
-              textAlign: "center",
-              fontSize: 12,
-              color: token.colorTextTertiary,
-            }}
-          >
-            PRO Robotech © {new Date().getFullYear()}
-          </footer>
-          {/* Глобальный mount модалок Create/Edit — для всех ресурсов. */}
+          {/* Глобальный mount модалок Create/Edit — для всех ресурсов (портал). */}
           <GlobalResourceFormModal />
         </Content>
+
+        {/* Глобальный футер — вне Content, всегда внизу; год автоматически. */}
+        <footer
+          style={{
+            flexShrink: 0,
+            padding: "9px 16px 11px",
+            textAlign: "center",
+            fontSize: 12,
+            color: token.colorTextTertiary,
+            borderTop: `1px solid ${token.colorBorderSecondary}`,
+            background: token.colorBgLayout,
+          }}
+        >
+          PRO Robotech © {new Date().getFullYear()}
+        </footer>
       </AntLayout>
     </AntLayout>
   );

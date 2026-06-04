@@ -220,7 +220,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
   // чтобы заголовок не «прыгал» и не выглядел инородно (KAC-246).
   if (showWelcome) {
     return (
-      <div className="kc-surface" style={{ padding: 20, minHeight: "calc(100vh - 110px)" }}>
+      <div className="kc-surface" style={{ padding: 20, minHeight: "100%" }}>
         {listHeader()}
         <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
       </div>

@@ -95,7 +95,7 @@ export function DetailShell({
         // Высота под viewport: header h=48 + Content padding 20+20 + small.
         // (marginTop:-8 убран — list-страница его не имеет, иначе фон прыгал
         // вверх на 8px при переходе list↔detail.)
-        minHeight: "calc(100vh - 110px)",
+        minHeight: "100%",
       }}
     >
       {/* KAC-246: рейл табов — часть единой detail-поверхности. Без своего
