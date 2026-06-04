@@ -189,9 +189,8 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
           {spec.plural}
         </Typography.Title>
         <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-          {!isLoading && !isError
-            ? `${filteredItems.length} ${pluralCount(filteredItems.length)}`
-            : spec.description}
+          {/* KAC-246: счётчик — только цифра (без слова «записи»). */}
+          {!isLoading && !isError ? `${filteredItems.length}` : spec.description}
           {spec.description && !isLoading && !isError ? ` · ${spec.description}` : ""}
         </Typography.Text>
       </div>
@@ -258,14 +257,5 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
       </Space>
     </div>
   );
-}
-
-/** Русское склонение «запись/записи/записей» для счётчика. */
-function pluralCount(n: number): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return "запись";
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return "записи";
-  return "записей";
 }
 
