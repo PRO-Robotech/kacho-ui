@@ -284,3 +284,11 @@ body.ant-modal-open {
   animation: doppler-shimmer 1.4s linear infinite;
   pointer-events: none;
 }
+
+/* kc-form-modal — Create/Edit-модалка: интерьер тёмный (--kc-page), чтобы
+   подложка-карточка FormShell (elevated) «всплывала», как на welcome-странице
+   «первый ресурс». KAC-246. */
+.kc-form-modal .ant-modal-content,
+.kc-form-modal .ant-modal-body {
+  background: var(--kc-page);
+}

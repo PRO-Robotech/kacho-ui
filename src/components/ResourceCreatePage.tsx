@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert, Button, Space, Typography } from "antd";
 import { ArrowLeftOutlined } from "@ant-design/icons";
 import { ResourceFormBody } from "@/components/form/ResourceFormBody";
+import { FORM_WIDTH } from "@/components/form/FormShell";
 import { extractOperationId } from "@/components/OperationDialog";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ApiError, api } from "@/api/client";
@@ -187,7 +188,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div style={{ maxWidth: FORM_WIDTH }}>
       <Space direction="vertical" size={20} style={{ width: "100%" }}>
         <div>
           <Link to={backHref}>
