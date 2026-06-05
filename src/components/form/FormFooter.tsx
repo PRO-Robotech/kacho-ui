@@ -34,12 +34,19 @@ export function FormFooter({
         display: "flex",
         alignItems: "center",
         gap: 8,
-        background: "var(--kc-elevated)",
         borderTop: "1px solid var(--kc-border-secondary)",
-        padding: "14px 0 2px",
-        marginTop: 12,
+        // Симметричный вертикальный padding — кнопки по центру полосы (был 14/2,
+        // кнопки «висели» у низа). Фон-band только в sticky-режиме (иначе в
+        // embedded-форме без карточки полоса elevated смотрелась криво).
+        padding: "16px 0",
+        marginTop: 10,
         ...(sticky
-          ? { position: "sticky", bottom: 0, zIndex: 1 }
+          ? {
+              background: "var(--kc-elevated)",
+              position: "sticky",
+              bottom: 0,
+              zIndex: 1,
+            }
           : null),
       }}
     >
