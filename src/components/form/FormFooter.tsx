@@ -35,17 +35,29 @@ export function FormFooter({
         alignItems: "center",
         gap: 8,
         borderTop: "1px solid var(--kc-border-secondary)",
-        // Симметричный вертикальный padding — кнопки по центру полосы (был 14/2,
-        // кнопки «висели» у низа). Фон-band только в sticky-режиме (иначе в
-        // embedded-форме без карточки полоса elevated смотрелась криво).
-        padding: "16px 0",
+        // Симметричный вертикальный padding — кнопки по центру (был 14/2, «висели»
+        // у низа). Боковые 0 — кнопки выровнены по левому краю полей.
+        paddingTop: 16,
+        paddingBottom: 16,
+        paddingLeft: 0,
+        paddingRight: 0,
         marginTop: 10,
         ...(sticky
           ? {
+              // Sticky-band (create-страницы) — bleed к краям FormShell-карточки
+              // (padding 20px 22px), чтобы полоса шла на всю ширину карточки, а не
+              // вставкой; кнопки re-inset на 22 → выровнены с полями.
               background: "var(--kc-elevated)",
               position: "sticky",
               bottom: 0,
               zIndex: 1,
+              marginLeft: -22,
+              marginRight: -22,
+              marginBottom: -20,
+              paddingLeft: 22,
+              paddingRight: 22,
+              borderBottomLeftRadius: 12,
+              borderBottomRightRadius: 12,
             }
           : null),
       }}
