@@ -305,42 +305,62 @@ export function DetailShell({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
-        {/* Зона 3 (main) верх — ТОЛЬКО название активного таба (дубль), без иконки
-            и без eyebrow-действия. Заголовок вертикально центрирован в 42 (как
-            текст зоны-2) → симметрия по вертикали; нижняя линия на той же y, что и
-            у рейла. Справа — слот фильтров активного таба. Для форм — действие
-            (Создание/Редактирование). */}
+        {/* Зона 3 (main) верх — ТОЛЬКО название активного таба (дубль). Структура
+            ЗЕРКАЛИТ зону-2: невидимый eyebrow-спейсер (та же высота, что caps-тип
+            в рейле) → title встаёт ровно на строку ИМЕНИ зоны-2 (req3). minHeight
+            42 + paddingBottom 14 → нижняя линия на той же y, что у рейла (req2).
+            Всё nowrap → высота фиксирована, текст/линия НЕ прыгают при смене таба
+            (req1). Справа — слот фильтров. */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             gap: 16,
-            flexWrap: "wrap",
-            minHeight: 42,
+            flexWrap: "nowrap",
+            // 56 (border-box) = высота блока зоны-2 (иконка 42 + paddingBottom 14)
+            // → нижние линии зоны-2/зоны-3 на одной y (req2). Контент-область 42,
+            // текст центрируется в ней как у зоны-2 → title на строке имени (req3).
+            minHeight: 56,
             paddingBottom: 14,
             marginBottom: 18,
             borderBottom: "1px solid var(--kc-border-secondary)",
           }}
         >
-          <Typography.Title
-            level={3}
-            ellipsis={{ tooltip: undefined }}
-            style={{
-              margin: 0,
-              fontSize: 16,
-              fontWeight: 600,
-              lineHeight: 1.25,
-              color: "var(--kc-text)",
-              minWidth: 0,
-            }}
-          >
-            {headerEyebrow ?? active?.headerTitle ?? active?.label}
-          </Typography.Title>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+          <div style={{ minWidth: 0 }}>
+            {/* невидимый eyebrow-спейсер = caps-тип зоны-2 по высоте */}
+            <div
+              aria-hidden
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginBottom: 2,
+                visibility: "hidden",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {" "}
+            </div>
+            <Typography.Title
+              level={3}
+              ellipsis={{ tooltip: undefined }}
+              style={{
+                margin: 0,
+                fontSize: 16,
+                fontWeight: 600,
+                lineHeight: 1.25,
+                color: "var(--kc-text)",
+              }}
+            >
+              {headerEyebrow ?? active?.headerTitle ?? active?.label}
+            </Typography.Title>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", flexShrink: 0 }}>
             {nameActions}
             {/* Слот для фильтров активного таба. */}
-            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
+            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap" }} />
           </div>
         </div>
 
