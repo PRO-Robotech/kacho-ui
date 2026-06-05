@@ -253,14 +253,16 @@ export function DetailShell({
                 </div>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                {/* Размер/вес синхронизированы с ContextBadge-title зоны-3
+                    (16/600/lh1.25) → типографика рейла и main идентична. */}
                 <Typography.Title
                   level={3}
                   ellipsis={{ tooltip: resourceName || undefined }}
                   style={{
                     margin: 0,
-                    fontSize: 20,
-                    fontWeight: 700,
-                    lineHeight: "24px",
+                    fontSize: 16,
+                    fontWeight: 600,
+                    lineHeight: 1.25,
                     color: "var(--kc-text)",
                   }}
                 >
