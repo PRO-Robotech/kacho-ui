@@ -14,7 +14,6 @@ import { Button, Checkbox, Dropdown, Modal, Space, Tag } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
-import { SectionHeader } from "@/components/SectionHeader";
 import { HeaderSlotPortal } from "@/components/DetailShell";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
@@ -187,7 +186,8 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   if (editObj) {
     return (
       <div>
-        <SectionHeader eyebrow={editingId ? "Редактирование" : "Добавление"} title={editingId ? "Правило" : "Правила"} />
+        {/* Свой SectionHeader («Добавление/Редактирование · Правила») убран —
+            дубль заголовка таба зоны-3. */}
         <SgRulesEditor
           pathPrefix=""
           value={editObj}
