@@ -75,8 +75,8 @@ interface Props {
   onTabSelect?: (id: string) => void;
   /** Действия рядом с именем ресурса в зоне 3 (Редактировать/Удалить/Создать). */
   nameActions?: ReactNode;
-  /** Мета-строка под именем (ID + дата создания и т.п.) — оживляет зону 3. */
-  nameMeta?: ReactNode;
+  /** Caps-eyebrow над именем (тип ресурса) — зеркалит eyebrow зоны-2 → симметрия. */
+  nameEyebrow?: string;
   /** Override зоны-2 шапки (для форм edit/create: «Редактирование»/«Создание» +
    *  тип + иконка ресурса формы). Иначе eyebrow = label активного таба. */
   headerEyebrow?: string;
@@ -89,7 +89,7 @@ interface Props {
 // безопасности» ≈175px@16 + иконка 42 + отступы). Жёстко пинуется (min=max),
 // иначе в `min-width:max-content` обёртке длинный заголовок распирал бы aside →
 // ширина рейла «прыгала» при смене таба (KAC-246).
-const SUB_PANE_WIDTH = 272;
+const SUB_PANE_WIDTH = 288;
 
 // NameDotGrid — бесток-identicon под Kachō: сетка 5×5 точек, размер/прозрачность
 // каждой из hash(имя) (Linear-стиль dot-pattern). Brand cool-палитра, тон-плитка/
@@ -165,7 +165,7 @@ export function DetailShell({
   activeTabId,
   onTabSelect,
   nameActions,
-  nameMeta,
+  nameEyebrow,
   headerEyebrow,
   headerTitle,
   headerIcon: headerIconOverride,
@@ -330,10 +330,31 @@ export function DetailShell({
             borderBottom: "1px solid var(--kc-border-secondary)",
           }}
         >
+          {/* Зеркало бейджа зоны-2: [аватар] + ЗАГЛАВНЫЙ eyebrow(тип) + имя —
+              та же типографика, что [иконка] + действие + тип в рейле → один
+              вайб/симметрия. (req3) */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             <NameDotGrid name={resourceName} />
             <div style={{ minWidth: 0 }}>
-              {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
+              {/* строка 1: тип ресурса (caps, как eyebrow зоны-2) */}
+              {nameEyebrow && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--kc-primary)",
+                    marginBottom: 2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {nameEyebrow}
+                </div>
+              )}
+              {/* строка 2: имя ресурса (крупнее — главный элемент) + статус */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <Typography.Title
                   level={3}
@@ -350,24 +371,6 @@ export function DetailShell({
                 </Typography.Title>
                 {badges}
               </div>
-              {/* строка 2: мета (зеркало title зоны-2) */}
-              {nameMeta && (
-                <div
-                  style={{
-                    marginTop: 2,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "nowrap",
-                    overflow: "hidden",
-                    fontSize: 12.5,
-                    lineHeight: "16px",
-                    color: "var(--kc-text-secondary)",
-                  }}
-                >
-                  {nameMeta}
-                </div>
-              )}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>

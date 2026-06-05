@@ -640,6 +640,7 @@ export function ResourceDetailPage({
       <DetailShell
         resourceLabel={spec.plural}
         resourceName={name || resourceId}
+        nameEyebrow={spec.singular}
         badges={statusValue ? <StatusBadge state={statusValue} /> : null}
         tabs={tabs}
         secondaryActions={secondaryActions ? secondaryActions(data) : undefined}

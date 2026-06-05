@@ -18,7 +18,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Descriptions, Spin, Tag, Typography } from "antd";
+import { Button, Descriptions, Spin, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import { DetailShell, HeaderSlotPortal, type DetailTab, type DocLink } from "@/components/DetailShell";
 import { DetailHeaderProvider } from "@/components/PanelHeader";
@@ -266,7 +266,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     return <ErrorResult error={error} />;
   }
 
-  const status = getByPath<string>(data, "status");
   const related = spec.related ?? [];
   const extCtx = { data, projectId: projectId ?? null, detailBase, navigate };
 
@@ -433,18 +432,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       <DetailShell
         resourceLabel={spec.plural}
         resourceName={name}
-        nameMeta={
-          <>
-            <CopyableId id={getByPath<string>(data, "id") ?? (uid ?? "")} />
-            {getByPath<string>(data, "created_at") && (
-              <>
-                <span style={{ opacity: 0.5 }}>·</span>
-                <span>Создан {formatDateTime(getByPath<string>(data, "created_at"))}</span>
-              </>
-            )}
-          </>
-        }
-        badges={status ? <Tag>{status}</Tag> : undefined}
+        nameEyebrow={spec.singular}
         tabs={tabs}
         docLinks={(spec.docs as DocLink[] | undefined) ?? []}
         mainOverride={mainOverride}
