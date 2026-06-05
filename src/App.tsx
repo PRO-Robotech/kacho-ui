@@ -20,6 +20,7 @@ import { ResourceShell } from "@/components/ResourceShell";
 // AddressDetailPage/NetworkInterfaceDetailPage/VpcDetailShell заменены единым
 // ResourceShell + DETAIL_EXTENSIONS. SubnetCreatePage сохранён (create со списка).
 import { SubnetCreatePage } from "@/pages/SubnetCreatePage";
+import { NetworkInterfaceCreatePage } from "@/pages/NetworkInterfaceCreatePage";
 import { VpcListShell } from "@/components/VpcShell";
 import { InstanceDetailPage } from "@/pages/InstanceDetailPage";
 import { TargetGroupDetailPage } from "@/pages/TargetGroupDetailPage";
@@ -187,11 +188,13 @@ export function AppRoutes() {
                     // ресурсов (Network, Address, RT, SG, Gateway, PE).
                     spec.id === "subnets"
                       ? <SubnetCreatePage />
-                      : <ResourceCreatePage
-                          spec={spec}
-                          parentField="project_id"
-                          parentParam="projectId"
-                        />
+                      : spec.id === "network-interfaces"
+                        ? <NetworkInterfaceCreatePage />
+                        : <ResourceCreatePage
+                            spec={spec}
+                            parentField="project_id"
+                            parentParam="projectId"
+                          />
                   }
                 />
                 {/* KAC-231: единый ResourceShell для ВСЕХ VPC-ресурсов.
