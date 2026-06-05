@@ -10,11 +10,12 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Checkbox, Dropdown, Modal, Space, Tag, Typography } from "antd";
+import { Button, Checkbox, Dropdown, Modal, Space, Tag } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { SectionHeader } from "@/components/SectionHeader";
+import { HeaderSlotPortal } from "@/components/DetailShell";
 import { SgRulesEditor } from "@/components/form/SgRulesEditor";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
 import { operationStore } from "@/lib/use-operation-store";
@@ -210,20 +211,17 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   // ── режим списка ──
   return (
     <div>
-      <SectionHeader
-        eyebrow="Список"
-        title={<>Правила <Typography.Text type="secondary">({rules.length})</Typography.Text></>}
-        right={
-          <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={startAdd}>
-              Добавить правило
-            </Button>
-            <Button danger icon={<DeleteOutlined />} disabled={!someSelected} onClick={confirmDeleteSelected}>
-              Удалить{selCount > 0 ? ` (${selCount})` : ""}
-            </Button>
-          </Space>
-        }
-      />
+      {/* Шапку «Правила» показывает зона-3 (название таба) — свой SectionHeader
+          здесь убран (дубль). Действия Добавить/Удалить поднимаем в слот шапки
+          таба (как фильтры у related-таблиц). */}
+      <HeaderSlotPortal>
+        <Button type="primary" icon={<PlusOutlined />} onClick={startAdd}>
+          Добавить правило
+        </Button>
+        <Button danger icon={<DeleteOutlined />} disabled={!someSelected} onClick={confirmDeleteSelected}>
+          Удалить{selCount > 0 ? ` (${selCount})` : ""}
+        </Button>
+      </HeaderSlotPortal>
       {rules.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Правил нет — трафик блокируется (default-deny).

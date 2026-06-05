@@ -62,7 +62,10 @@ export function FormShell({ specId, mode, singular, title, subtitle, children }:
     // Standalone (create/edit-страница, модалка) — прижато влево, kc-surface
     // (как секции detail/list), не модалка.
     <div style={{ maxWidth: FORM_WIDTH, width: "100%", margin: 0 }}>
-      <div className="kc-surface" style={{ padding: "20px 22px" }}>
+      {/* padding 20 (равномерно) = у list-страниц kc-surface padding 20 → бейдж
+          PanelHeader на той же позиции (не прыгает list↔create). Было 20px 22px
+          (гориз 22) → бейдж create на 2px правее списка. */}
+      <div className="kc-surface" style={{ padding: 20 }}>
         {header}
         {children}
       </div>
