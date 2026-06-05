@@ -16,7 +16,6 @@ import { Modal } from "antd";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
 import { useProjectStore } from "@/lib/context-store";
-import { CopyableId } from "@/components/CopyableId";
 import { ErrorResult } from "@/components/ErrorResult";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 
@@ -142,7 +141,6 @@ export function RefSelect({
           <option value={CREATE_SENTINEL}>+ Создать {createSpec.singular.toLowerCase()}…</option>
         )}
       </select>
-      {value && <CopyableId id={value} />}
       {refProjectScoped && !project && (
         <p className="text-xs text-amber-600">Выберите проект в шапке для загрузки.</p>
       )}
