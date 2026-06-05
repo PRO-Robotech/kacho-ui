@@ -38,7 +38,10 @@ export function FormFooter({
         // Симметричный вертикальный padding — кнопки по центру (был 14/2, «висели»
         // у низа). Боковые 0 — кнопки выровнены по левому краю полей.
         paddingTop: 16,
-        paddingBottom: 16,
+        // paddingBottom 0 — нижний отступ под кнопками даёт карточка/панель
+        // (FormShell padding 20 / main pane 24); иначе под кнопками копится
+        // ~36px и выглядит странно. В sticky-band ниже возвращаем нижний отступ.
+        paddingBottom: 0,
         paddingLeft: 0,
         paddingRight: 0,
         marginTop: 10,
@@ -56,6 +59,7 @@ export function FormFooter({
               marginBottom: -20,
               paddingLeft: 22,
               paddingRight: 22,
+              paddingBottom: 16,
               borderBottomLeftRadius: 12,
               borderBottomRightRadius: 12,
             }
