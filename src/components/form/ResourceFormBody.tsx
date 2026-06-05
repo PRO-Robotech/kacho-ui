@@ -40,10 +40,15 @@ function matchesVisibleWhen(
 ): boolean {
   if (!vw) return true;
   const cur = getByPath(obj, vw.field) as string | undefined;
-  return Array.isArray(vw.equals) ? vw.equals.includes(cur ?? "") : cur === vw.equals;
+  return Array.isArray(vw.equals)
+    ? vw.equals.includes(cur ?? "")
+    : cur === vw.equals;
 }
 
-function displayValue(obj: Record<string, unknown>, field: FormField): React.ReactNode {
+function displayValue(
+  obj: Record<string, unknown>,
+  field: FormField,
+): React.ReactNode {
   const raw = getByPath(obj, field.name);
   if (field.type === "enum") {
     const opt = field.options.find((o) => o.value === raw);
@@ -85,26 +90,38 @@ export function ResourceFormBody({
   });
 
   return (
-    <FormShell specId={spec.id} mode={mode} singular={spec.singular} title={title}>
+    <FormShell
+      specId={spec.id}
+      mode={mode}
+      singular={spec.singular}
+      title={title}
+    >
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
+        wrapperCol={{ flex: "1 1 0" }}
         labelAlign="left"
         colon={false}
         size="middle"
       >
         {visible.map((f) => {
           const isLocked = locked.has(f.name) || (editMode && !!f.immutable);
-          const fullWidth = FULL_WIDTH.has(f.type as string);
+          const fullWidth = f.fullWidth ?? FULL_WIDTH.has(f.type as string);
 
           // Locked scalar/ref → read-only affordance (not hidden, not silent-disabled).
           if (isLocked && !fullWidth && f.type !== "labels") {
             return (
-              <Form.Item key={f.name} label={<FieldLabel text={f.label} info={f.description} />}>
+              <Form.Item
+                key={f.name}
+                label={<FieldLabel text={f.label} info={f.description} />}
+              >
                 <ImmutableField
                   value={displayValue(obj, f)}
-                  reason={editMode ? "Неизменяемо после создания" : "Задано из контекста"}
+                  reason={
+                    editMode
+                      ? "Неизменяемо после создания"
+                      : "Задано из контекста"
+                  }
                 />
               </Form.Item>
             );
@@ -134,7 +151,11 @@ export function ResourceFormBody({
 
           if (fullWidth) {
             return (
-              <Form.Item key={f.name} wrapperCol={{ offset: 0, flex: "auto" }} colon={false}>
+              <Form.Item
+                key={f.name}
+                wrapperCol={{ offset: 0, flex: "auto" }}
+                colon={false}
+              >
                 {inner}
               </Form.Item>
             );
@@ -150,15 +171,15 @@ export function ResourceFormBody({
           );
         })}
 
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <FormFooter
-            submitLabel={submitLabel}
-            submitting={submitting}
-            onSubmit={onSubmit}
-            onCancel={onCancel}
-            sticky={stickyFooter}
-          />
-        </Form.Item>
+        {/* Футер — вне грид-Form.Item (иначе наследует пустую 200px label-колонку
+            и кнопки/разделитель уезжают вправо). Рендерим на всю ширину формы. */}
+        <FormFooter
+          submitLabel={submitLabel}
+          submitting={submitting}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+          sticky={stickyFooter}
+        />
       </Form>
     </FormShell>
   );

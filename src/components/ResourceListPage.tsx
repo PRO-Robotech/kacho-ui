@@ -5,16 +5,19 @@
 import { useMemo, useState } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Input, Select, Typography, Space } from "antd";
+import { Button, Input, Select, Typography, Space, Tag } from "antd";
 import { ErrorResult } from "@/components/ErrorResult";
 import { PlusOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import { ResourceTable, Column } from "@/components/ResourceTable";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
+import { PanelHeader } from "@/components/PanelHeader";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { type ReactNode } from "react";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ProjectRequiredEmpty } from "@/components/ProjectRequiredEmpty";
-import { useHeaderRight, useBreadcrumb } from "@/components/PageHeaderSlot";
+import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ResourceSpec, getByPath, resourceServicePrefix } from "@/lib/resource-registry";
 import { buildSpecColumns } from "@/lib/spec-columns";
 import { useResourceList } from "@/lib/use-resource-list";
@@ -70,17 +73,17 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     spec.id === "address-pools";
   const listBase = location.pathname.endsWith("/") ? location.pathname.slice(0, -1) : location.pathname;
   const createTarget = panelForms ? `${listBase}/create` : `${listBase}?modal=${spec.id}-create`;
+  // KAC-246: CTA «Создать» — в header right-slot (шапка), НЕ в page-toolbar.
   const cta = useMemo(() => {
     if (!spec.ops.create) return null;
     return (
       <Link to={createTarget}>
-        <Button type="primary" size="small" icon={<PlusOutlined />}>
+        <Button type="primary" icon={<PlusOutlined />}>
           Создать {spec.singular.toLowerCase()}
         </Button>
       </Link>
     );
   }, [spec, createTarget]);
-
   useHeaderRight(cta);
 
   if (parentField && !filterValue) return <ProjectRequiredEmpty resource={spec.plural} />;
@@ -181,61 +184,91 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
     query.trim() === "" &&
     (!hasZoneFilter || zone === "all");
 
-  return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <div>
-        <Typography.Title level={3} style={{ margin: 0 }}>
+  // Единая шапка списка (PanelHeader) — те же 3 части, что у табов/форм:
+  // [иконка ресурса] + «Список» (действие) + plural (название) + счётчик.
+  // CTA «Создать» — в шапке страницы (useHeaderRight). KAC-246.
+  const listHeader = (right?: ReactNode) => (
+    <PanelHeader
+      icon={<ResourceIcon specId={spec.id} />}
+      eyebrow="Список"
+      title={
+        // height:20 = строка заголовка (16px·1.25) — счётчик-Tag НЕ распирает
+        // строку (был 24px), иначе текст бейджа «скачет» относительно detail
+        // (там тега нет). Tag ≤18px помещается в строку.
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 20, lineHeight: "20px" }}>
           {spec.plural}
-        </Typography.Title>
-        {spec.description && (
-          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-            {spec.description}
-          </Typography.Text>
-        )}
-      </div>
-
-      {!showWelcome && (
-        <Space size={12} wrap>
-          <Input.Search
-            placeholder="Фильтр по имени или идентификатору"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            style={{ width: 360 }}
-            allowClear
-          />
-          {hasZoneFilter && (
-            <Select
-              value={zone}
-              onChange={setZone}
-              options={zoneOptions}
-              style={{ width: 240 }}
-            />
+          {!isLoading && !isError && (
+            <Tag
+              style={{
+                margin: 0,
+                fontSize: 11.5,
+                fontWeight: 600,
+                lineHeight: "16px",
+                height: 18,
+                paddingInline: 6,
+                borderRadius: 5,
+              }}
+            >
+              {filteredItems.length}
+            </Tag>
           )}
-        </Space>
-      )}
+        </span>
+      }
+      right={right}
+    />
+  );
 
-      {isError ? (
-        <ErrorResult error={error} />
-      ) : showWelcome ? (
+  // Welcome (пустой список) — та же surface-подложка, что и заполнённая страница,
+  // чтобы заголовок не «прыгал» и не выглядел инородно (KAC-246).
+  if (showWelcome) {
+    return (
+      <div className="kc-surface" style={{ padding: 20, minHeight: "100%" }}>
+        {listHeader()}
         <ResourceEmptyState spec={spec} onCreate={() => navigate(createTarget)} />
-      ) : (
-      <ResourceTable
-        rows={filteredItems}
-        loading={isLoading && items.length === 0}
-        rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
-        columns={columns}
-        onRowClick={(row) => {
-          const id = getByPath<string>(row, "id");
-          if (!id) return;
-          // childRoute шаблон: /projects/:id, ...
-          const target = spec.childRoute
-            ? spec.childRoute.replace(":id", id)
-            : `${basePath}/${id}`;
-          navigate(target);
-        }}
-      />
-      )}
-    </Space>
+      </div>
+    );
+  }
+
+  return (
+    <div className="kc-surface" style={{ padding: 20 }}>
+      <Space direction="vertical" size={0} style={{ width: "100%" }}>
+        {/* Шапка списка: иконка + «Список» + plural + счётчик слева, фильтры справа. */}
+        {listHeader(
+          <>
+            <Input.Search
+              placeholder="Фильтр по имени или идентификатору"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              style={{ width: 320 }}
+              allowClear
+            />
+            {hasZoneFilter && (
+              <Select value={zone} onChange={setZone} options={zoneOptions} style={{ width: 220 }} />
+            )}
+          </>,
+        )}
+
+        {isError ? (
+          <ErrorResult error={error} />
+        ) : (
+          <ResourceTable
+            rows={filteredItems}
+            loading={isLoading && items.length === 0}
+            rowKey={(r) => getByPath<string>(r, "id") ?? Math.random().toString()}
+            columns={columns}
+            onRowClick={(row) => {
+              const id = getByPath<string>(row, "id");
+              if (!id) return;
+              // childRoute шаблон: /projects/:id, ...
+              const target = spec.childRoute
+                ? spec.childRoute.replace(":id", id)
+                : `${basePath}/${id}`;
+              navigate(target);
+            }}
+          />
+        )}
+      </Space>
+    </div>
   );
 }
 

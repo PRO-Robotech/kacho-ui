@@ -14,15 +14,38 @@
 //
 // Tab выбирается через ?tab=<id>. Дефолт — первый tab.
 
-import { type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
+import { useDetailHeaderIcon } from "@/components/PanelHeader";
+
+// Слот в правой части строки-имени (зона 3): активный таб может «поднять» свой
+// тулбар (поиск/колонки/фильтры) на уровень имени ресурса через HeaderSlotPortal.
+const HeaderSlotContext = createContext<HTMLElement | null>(null);
+
+/** Рендерит children в правый слот строки-имени (зона 3) detail-страницы.
+ *  Вне DetailShell (нет слота) — graceful: ничего не рендерит. Используется
+ *  related-таблицами / OperationsTab, чтобы их фильтры были на уровне имени. */
+export function HeaderSlotPortal({ children }: { children: ReactNode }) {
+  const el = useContext(HeaderSlotContext);
+  return el ? createPortal(children, el) : null;
+}
 
 export interface DetailTab {
   id: string;
   label: string;
   count?: number;
   render: () => ReactNode;
+  /** Зона-2 «действие» (eyebrow) для этого таба — НЕ обязано совпадать с label
+   *  меню. Default: label. Напр. json → «Информация», связанный таб → «Список». */
+  eyebrow?: string;
+  /** Зона-2 заголовок (тип/название предмета таба). Default: resourceLabel
+   *  (тип мастер-ресурса). Напр. связанный таб «Подсети» → plural ребёнка. */
+  headerTitle?: string;
+  /** Зона-2 иконка предмета таба. Default: иконка мастер-ресурса (ctxIcon).
+   *  Напр. связанный таб → иконка дочернего ресурса. */
+  headerIcon?: ReactNode;
 }
 
 export interface DocLink {
@@ -50,12 +73,25 @@ interface Props {
    *  и переключение таба выходит из form-panel). Иначе — legacy ?tab=. */
   activeTabId?: string;
   onTabSelect?: (id: string) => void;
+  /** Действия рядом с именем ресурса в зоне 3 (Редактировать/Удалить/Создать). */
+  nameActions?: ReactNode;
+  /** Caps-eyebrow над именем (тип ресурса) — зеркалит eyebrow зоны-2 → симметрия. */
+  nameEyebrow?: string;
+  /** Override зоны-2 шапки (для форм edit/create: «Редактирование»/«Создание» +
+   *  тип + иконка ресурса формы). Иначе eyebrow = label активного таба. */
+  headerEyebrow?: string;
+  headerTitle?: string;
+  headerIcon?: ReactNode;
 }
 
-const SUB_PANE_WIDTH = 240;
+// Рейл табов: фиксированная ширина под самый длинный label/zone-2-заголовок
+// (после сокращения route-table longest = «Сетевые интерфейсы»/«Группы
+// безопасности» ≈175px@16 + иконка 42 + отступы). Жёстко пинуется (min=max),
+// иначе в `min-width:max-content` обёртке длинный заголовок распирал бы aside →
+// ширина рейла «прыгала» при смене таба (KAC-246).
+const SUB_PANE_WIDTH = 288;
 
 export function DetailShell({
-  resourceLabel,
   resourceName,
   badges,
   tabs,
@@ -65,7 +101,12 @@ export function DetailShell({
   mainOverride,
   activeTabId,
   onTabSelect,
+  nameActions,
+  nameEyebrow,
+  headerEyebrow,
 }: Props) {
+  const ctxIcon = useDetailHeaderIcon();
+  const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
   const controlled = onTabSelect !== undefined;
@@ -87,58 +128,111 @@ export function DetailShell({
 
   return (
     <div
+      className="kc-surface"
       style={{
         display: "flex",
-        gap: 24,
-        marginTop: -8,
         alignItems: "stretch",
+        overflow: "hidden",
         // Высота под viewport: header h=48 + Content padding 20+20 + small.
-        minHeight: "calc(100vh - 110px)",
+        // (marginTop:-8 убран — list-страница его не имеет, иначе фон прыгал
+        // вверх на 8px при переходе list↔detail.)
+        minHeight: "100%",
       }}
     >
+      {/* KAC-246: рейл табов — часть единой detail-поверхности. Без своего
+          фона/рамки/радиуса/тени; от main отделён ТОЛЬКО вертикальным
+          border-secondary. «Встроен», а не «плавает». */}
       <aside
         style={{
           width: SUB_PANE_WIDTH,
+          minWidth: SUB_PANE_WIDTH,
+          maxWidth: SUB_PANE_WIDTH,
+          flexGrow: 0,
           flexShrink: 0,
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
-          borderRight: "1px solid var(--ant-color-border-secondary)",
-          paddingRight: 8,
+          borderRight: "1px solid var(--kc-border-secondary)",
+          // padding 20 — как у list kc-surface, чтобы блок [иконка+действие+тип]
+          // был на той же позиции (20,20) от kc-surface и НЕ прыгал list↔detail.
+          padding: 20,
         }}
       >
+        {/* Зона 2 (рейл) — ИДЕНТИЧНОСТЬ ресурса: [иконка осн. ресурса] +
+            ТИП(eyebrow) + имя. (Поменяно местами с контекстом таба в зоне 3.) */}
         <div
           style={{
-            padding: "12px 8px",
-            borderBottom: "1px solid var(--ant-color-border-secondary)",
-            marginBottom: 8,
+            paddingBottom: 14,
+            marginBottom: 18,
+            borderBottom: "1px solid var(--kc-border-secondary)",
           }}
         >
-          {/* Имя ресурса — bold сверху, label-тип ниже мелким (как в YC). */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <Typography.Text strong style={{ wordBreak: "break-all", fontSize: 15 }}>
-              {resourceName || "(unnamed)"}
-            </Typography.Text>
-            {badges}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            {/* Бейдж основного ресурса — та же плитка-иконка, что у ContextBadge. */}
+            {ctxIcon && (
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 19,
+                  color: "var(--kc-primary)",
+                  background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
+                  border: "1px solid rgba(61,141,245,0.22)",
+                }}
+              >
+                {ctxIcon}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              {nameEyebrow && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--kc-primary)",
+                    marginBottom: 2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {nameEyebrow}
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                {/* Размер/вес синхронизированы с ContextBadge-title зоны-3
+                    (16/600/lh1.25) → типографика рейла и main идентична. */}
+                <Typography.Title
+                  level={3}
+                  ellipsis={{ tooltip: resourceName || undefined }}
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    lineHeight: 1.25,
+                    color: "var(--kc-text)",
+                  }}
+                >
+                  {resourceName || "(без имени)"}
+                </Typography.Title>
+                {badges}
+              </div>
+            </div>
           </div>
-          <Typography.Text
-            type="secondary"
-            style={{ fontSize: 12, marginTop: 2, display: "block" }}
-          >
-            {resourceLabel}
-          </Typography.Text>
         </div>
 
         <Menu
           mode="inline"
           selectedKeys={active ? [active.id] : []}
           onClick={({ key }) => setTab(key)}
+          className="kc-detail-rail-menu"
           style={{ borderRight: "none", background: "transparent" }}
           items={tabs.map((t) => ({
             key: t.id,
@@ -169,7 +263,7 @@ export function DetailShell({
             style={{
               marginTop: "auto",
               padding: "16px 8px 8px 8px",
-              borderTop: "1px solid var(--ant-color-border-secondary)",
+              borderTop: "1px solid var(--kc-border-secondary)",
             }}
           >
             <Typography.Text
@@ -210,7 +304,66 @@ export function DetailShell({
         )}
       </aside>
 
-      <main style={{ flex: 1, minWidth: 0 }}>
+      <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
+        {/* Зона 3 (main) верх — ТОЛЬКО название активного таба (дубль). Структура
+            ЗЕРКАЛИТ зону-2: невидимый eyebrow-спейсер (та же высота, что caps-тип
+            в рейле) → title встаёт ровно на строку ИМЕНИ зоны-2 (req3). minHeight
+            42 + paddingBottom 14 → нижняя линия на той же y, что у рейла (req2).
+            Всё nowrap → высота фиксирована, текст/линия НЕ прыгают при смене таба
+            (req1). Справа — слот фильтров. */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "nowrap",
+            // 56 (border-box) = высота блока зоны-2 (иконка 42 + paddingBottom 14)
+            // → нижние линии зоны-2/зоны-3 на одной y (req2). Контент-область 42,
+            // текст центрируется в ней как у зоны-2 → title на строке имени (req3).
+            minHeight: 56,
+            paddingBottom: 14,
+            marginBottom: 18,
+            borderBottom: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            {/* невидимый eyebrow-спейсер = caps-тип зоны-2 по высоте */}
+            <div
+              aria-hidden
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginBottom: 2,
+                visibility: "hidden",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {" "}
+            </div>
+            <Typography.Title
+              level={3}
+              ellipsis={{ tooltip: undefined }}
+              style={{
+                margin: 0,
+                fontSize: 16,
+                fontWeight: 600,
+                lineHeight: 1.25,
+                color: "var(--kc-text)",
+              }}
+            >
+              {headerEyebrow ?? active?.headerTitle ?? active?.label}
+            </Typography.Title>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", flexShrink: 0 }}>
+            {nameActions}
+            {/* Слот для фильтров активного таба. */}
+            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap" }} />
+          </div>
+        </div>
+
         {mainOverride ? (
           mainOverride
         ) : (
@@ -223,13 +376,15 @@ export function DetailShell({
                   flexWrap: "wrap",
                   marginBottom: 16,
                   paddingBottom: 12,
-                  borderBottom: "1px solid var(--ant-color-border-secondary)",
+                  borderBottom: "1px solid var(--kc-border-secondary)",
                 }}
               >
                 {secondaryActions}
               </div>
             )}
-            {active?.render()}
+            <HeaderSlotContext.Provider value={slotEl}>
+              {active?.render()}
+            </HeaderSlotContext.Provider>
           </>
         )}
       </main>

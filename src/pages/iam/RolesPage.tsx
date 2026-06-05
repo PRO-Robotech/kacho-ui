@@ -88,7 +88,7 @@ export function RolesPage() {
       render: (v) => <CopyableMonoId id={v} />,
     },
     {
-      title: "Account",
+      title: "Аккаунт",
       dataIndex: "account_id",
       key: "account",
       width: 200,
@@ -107,7 +107,7 @@ export function RolesPage() {
         v || <Typography.Text type="secondary">—</Typography.Text>,
     },
     {
-      title: "Permissions",
+      title: "Разрешения",
       dataIndex: "permissions",
       key: "perms",
       render: (v: string[] | undefined) => (
@@ -171,7 +171,7 @@ export function RolesPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={3} style={{ margin: 0 }}>
+      <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
         Roles
       </Typography.Title>
 
@@ -182,7 +182,7 @@ export function RolesPage() {
           icon={<PlusOutlined />}
           onClick={() => setCreateOpen(true)}
         >
-          Создать custom Role
+          Создать пользовательскую роль
         </Button>
       </Space>
 
@@ -304,7 +304,7 @@ function RoleCreateModal({
 
   return (
     <Modal
-      title="Создать custom Role"
+      title="Создать пользовательскую роль"
       open={open}
       onCancel={onClose}
       maskClosable

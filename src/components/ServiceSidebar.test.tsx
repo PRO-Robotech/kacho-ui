@@ -50,7 +50,8 @@ describe("ServiceSidebar — SidebarUserButton (anonymous)", () => {
       </MemoryRouter>,
     );
 
-    // Войти button рендерится когда user=null и loading завершён.
+    // Войти button рендерится когда user=null и loading завершён (узкий рейл —
+    // подпись скрыта, но aria-label «Войти» есть всегда).
     const btn = await screen.findByLabelText("Войти");
 
     await userEvent.click(btn);

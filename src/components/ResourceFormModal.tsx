@@ -17,6 +17,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Modal } from "antd";
 import { InlineResourceForm } from "@/components/InlineResourceForm";
+import { FORM_WIDTH } from "@/components/form/FormShell";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useContext } from "@/lib/context-store";
 import { api } from "@/api/client";
@@ -68,8 +69,9 @@ export function ResourceFormModal({ projectId }: Props) {
     return fields;
   }, [action, searchParams]);
 
-  // Единая ширина для ВСЕХ модалок ресурсов — visual unity.
-  const width = 860;
+  // Единая ширина для ВСЕХ модалок ресурсов — visual unity (= FORM_WIDTH,
+  // тот же стандарт, что и у page-форм).
+  const width = FORM_WIDTH;
 
   if (!spec || !action) return null;
   if (action === "edit" && (!id || !editData)) {
@@ -94,7 +96,6 @@ export function ResourceFormModal({ projectId }: Props) {
       presetFields={presetFields}
       networkId={searchParams.get("networkId") ?? undefined}
       subnetId={searchParams.get("subnetId") ?? searchParams.get("subnet_id") ?? undefined}
-      title={title}
       onCancel={close}
       onSuccess={close}
     />
@@ -110,16 +111,12 @@ export function ResourceFormModal({ projectId }: Props) {
       // Клик по маске вне модалки → закрытие (user UX-запрос).
       maskClosable={true}
       title={null}
-      // У всех inline-форм свой <Title level={4}> — не дублируем Modal-title.
-      // Компактный padding (user: «слишком большое расстояние по бокам»).
-      styles={{
-        body: {
-          paddingTop: 16,
-          paddingBottom: 12,
-          paddingLeft: 12,
-          paddingRight: 12,
-        },
-      }}
+      // FormShell сам рендерит band-шапку + подложку-карточку. Modal content/
+      // body — тёмный фон (--kc-page) через .kc-form-modal (см. index.css),
+      // чтобы карточка формы «всплывала» как на welcome-странице «первый
+      // ресурс». Паддинг 16 — небольшая рамка вокруг карточки.
+      className="kc-form-modal"
+      styles={{ body: { padding: 16 } }}
       // Anim — стандартная Antd (zoom from center). Без transform-origin
       // override модалка появляется из центра, не от точки клика.
     >

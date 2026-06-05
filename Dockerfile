@@ -8,6 +8,9 @@ RUN npm ci
 
 COPY tsconfig.json tsconfig.app.json tsconfig.node.json ./
 COPY vite.config.ts postcss.config.js tailwind.config.js index.html ./
+# public/ — статика, копируемая Vite в dist root (favicon, paws-logo.svg).
+# Без неё внутри docker-сборки эти файлы отсутствуют → 404 (был баг с favicon).
+COPY public ./public
 COPY src ./src
 
 RUN npm run build

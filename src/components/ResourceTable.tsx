@@ -71,6 +71,11 @@ export function ResourceTable<T extends object>({
     rowKey: (row) => rowKey(row),
     pagination: false,
     size: "small",
+    // KAC-246: kc-table — zebra-striping + контрастный header + комфортный
+    // row-height + чёткий hover (стили в index.css, theme-aware через vars).
+    className: "kc-table",
+    // NB: sticky header убран (KAC-246) — без scroll={{x}} он расширял таблицу по
+    // контенту и она уползала за пределы контейнера во flex-layout.
     loading,
     locale: {
       emptyText: empty ?? "Ресурсов не найдено",

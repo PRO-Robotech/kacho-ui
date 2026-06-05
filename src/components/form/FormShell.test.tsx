@@ -4,13 +4,15 @@ import { describe, it, expect } from "vitest";
 import { FormShell } from "./FormShell";
 
 describe("FormShell", () => {
-  it("renders verb title + singular and children", () => {
+  it("renders caps verb + singular heading and children", () => {
     render(
       <FormShell specId="subnets" mode="create" singular="Подсеть">
         <div>body</div>
       </FormShell>,
     );
-    expect(screen.getByText(/Создание: Подсеть/)).toBeInTheDocument();
+    // caps-verb и заголовок-singular — отдельные узлы band-шапки.
+    expect(screen.getByText("Создание")).toBeInTheDocument();
+    expect(screen.getByText("Подсеть")).toBeInTheDocument();
     expect(screen.getByText("body")).toBeInTheDocument();
   });
 
@@ -20,6 +22,7 @@ describe("FormShell", () => {
         <div />
       </FormShell>,
     );
-    expect(screen.getByText(/Редактирование: Подсеть/)).toBeInTheDocument();
+    expect(screen.getByText("Редактирование")).toBeInTheDocument();
+    expect(screen.getByText("Подсеть")).toBeInTheDocument();
   });
 });

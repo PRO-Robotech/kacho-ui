@@ -16,7 +16,6 @@ import { Modal } from "antd";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
 import { useProjectStore } from "@/lib/context-store";
-import { CopyableId } from "@/components/CopyableId";
 import { ErrorResult } from "@/components/ErrorResult";
 import { InlineResourceCreateForm } from "@/components/InlineResourceCreateForm";
 
@@ -113,6 +112,12 @@ export function RefSelect({
         value={value ?? ""}
         onChange={(e) => {
           if (e.target.value === CREATE_SENTINEL) {
+            // Sentinel — это действие, а не значение: возвращаем DOM-select на
+            // текущее value. Иначе controlled-select остаётся на «Создать…»
+            // (value-prop не меняется → React не сбрасывает selectedIndex), и
+            // повторный выбор того же пункта НЕ триггерит change → модалка не
+            // открывается снова после отмены.
+            e.target.value = value ?? "";
             setCreating(true);
             return;
           }
@@ -136,7 +141,6 @@ export function RefSelect({
           <option value={CREATE_SENTINEL}>+ Создать {createSpec.singular.toLowerCase()}…</option>
         )}
       </select>
-      {value && <CopyableId id={value} />}
       {refProjectScoped && !project && (
         <p className="text-xs text-amber-600">Выберите проект в шапке для загрузки.</p>
       )}

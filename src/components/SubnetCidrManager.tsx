@@ -1,42 +1,34 @@
-// SubnetCidrManager — управление v4_cidr_blocks / v6_cidr_blocks подсети через
-// verbs `:add-cidr-blocks` / `:remove-cidr-blocks`. Визуально — AntD Card+Tag
-// (parity с controlled-вариантом SubnetCidrChips в Create-форме).
+// CidrSection — управление CIDR-блоками подсети (одно семейство v4/v6) в блоке
+// «Обзор». Add и remove — РАЗНЫЕ методы (:add-cidr-blocks / :remove-cidr-blocks),
+// поэтому БЕЗ read/edit-режима с batch-save: каждое действие применяется сразу
+// своим RPC (immediate). Без кнопки «Редактировать».
 //
-// Backend (kacho-vpc/internal/service/subnet.go) запрещает менять CIDR-блоки
-// через обычный PATCH (`v4_cidr_blocks is immutable after Subnet.Create`; то же
-// для v6 — UpdateSubnet.v6_cidr_blocks no-op). Для этого выделены отдельные RPC,
-// которые UI вызывает через api.action(). Оба verb'а принимают v4_cidr_blocks
-// и/или v6_cidr_blocks и возвращают Operation (поллим до done).
-
+// Вид — общая табличная стилистика (как «Статические маршруты»): шапка с бейджем
+// IPv4/IPv6 + «CIDR (N)», таблица [CIDR-блок | ⌫], строки mono, удаление сразу
+// (со spinner на удаляемой строке), снизу строка ввода + «Добавить».
+//
+// Backend (kacho-vpc/internal/service/subnet.go) запрещает менять CIDR через
+// PATCH (immutable after Subnet.Create) — только эти verb'ы; возвращают Operation.
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Card,
-  Input,
-  Space,
-  Spin,
-  Tag,
-  Typography,
-} from "antd";
-import { CloseOutlined, LoadingOutlined, PlusOutlined } from "@ant-design/icons";
+import { Button, Input, Space, Spin, Typography } from "antd";
+import { DeleteOutlined, LoadingOutlined, PlusOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { OperationToastWatcher } from "@/components/OperationToastWatcher";
 import { extractOperationId } from "@/components/OperationDialog";
+import { SectionHeader } from "@/components/SectionHeader";
 import { toast } from "@/lib/toast";
 
 type CidrKind = "v4" | "v6";
-
-interface Props {
-  subnetId: string;
-  v4Blocks: string[];
-  v6Blocks?: string[];
-}
 
 const FIELD_BY_KIND: Record<CidrKind, "v4_cidr_blocks" | "v6_cidr_blocks"> = {
   v4: "v4_cidr_blocks",
   v6: "v6_cidr_blocks",
 };
+
+const SUBNETS_API = "/vpc/v1/subnets";
+const MONO_FONT = "ui-monospace, monospace";
+const ROW_H = 41;
 
 function validateCidr(kind: CidrKind, cidr: string): string | null {
   if (!cidr) return "Введите CIDR.";
@@ -45,51 +37,66 @@ function validateCidr(kind: CidrKind, cidr: string): string | null {
   return null;
 }
 
+// Бейдж семейства в плитке шапки — «IPv4» / «IPv6» (mono, мелко чтобы влезло).
+const familyTile = (text: string) => (
+  <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: MONO_FONT, letterSpacing: "-0.04em" }}>
+    {text}
+  </span>
+);
+
 interface SectionProps {
   subnetId: string;
   kind: CidrKind;
   blocks: string[];
+  /** Не используется (operation invalidate по query-key), оставлен для совместимости. */
+  projectId?: string | null;
 }
 
-function CidrSection({ subnetId, kind, blocks }: SectionProps) {
+export function CidrSection({ subnetId, kind, blocks }: SectionProps) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState("");
   const [opId, setOpId] = useState<string | null>(null);
   const [opTitle, setOpTitle] = useState("");
   const [pendingCidr, setPendingCidr] = useState<string | null>(null);
 
-  const label = kind === "v4" ? "IPv4 CIDR blocks" : "IPv6 CIDR blocks";
+  const family = kind === "v4" ? "IPv4" : "IPv6";
   const placeholder = kind === "v4" ? "10.0.1.0/24" : "fd00:1234::/64";
+  const field = FIELD_BY_KIND[kind];
 
   const mutate = useMutation({
     mutationFn: async (params: { verb: "add" | "remove"; cidr: string }) => {
-      const path = `/vpc/v1/subnets/${subnetId}:${params.verb}-cidr-blocks`;
-      return api.action(path, { [FIELD_BY_KIND[kind]]: [params.cidr] });
+      return api.action(`${SUBNETS_API}/${subnetId}:${params.verb}-cidr-blocks`, {
+        [field]: [params.cidr],
+      });
     },
     onSuccess: (resp, vars) => {
       const id = extractOperationId(resp);
       if (id) {
-        setOpTitle(`${vars.verb === "add" ? "Adding" : "Removing"} CIDR ${vars.cidr}`);
+        setOpTitle(`${vars.verb === "add" ? "Добавление" : "Удаление"} ${family} CIDR ${vars.cidr}`);
         setOpId(id);
         setPendingCidr(vars.cidr);
       } else {
-        qc.invalidateQueries({ queryKey: ["subnets", "detail", subnetId] });
+        // Широкий prefix-инвалидейт: ["subnets"] матчит и detail-страницу
+        // (["subnets","shell-detail",uid]), и list — иначе detail показывает
+        // старый CIDR (узкие ключи не совпадали с ключом ResourceShell).
+        qc.invalidateQueries({ queryKey: ["subnets"] });
         setPendingCidr(null);
       }
     },
     onError: (err, vars) => {
-      const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
-      toast.error(`CIDR ${vars.verb}: ${m}`);
+      const m = err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+      toast.error(`${family} CIDR ${vars.verb === "add" ? "добавление" : "удаление"}: ${m}`);
       setPendingCidr(null);
     },
   });
 
+  const inputDisabled = mutate.isPending || opId !== null;
+
   const onAdd = () => {
     const cidr = draft.trim();
-    const v = validateCidr(kind, cidr);
-    if (v) {
-      toast.error(v);
+    const verr = validateCidr(kind, cidr);
+    if (verr) {
+      toast.error(verr);
       return;
     }
     if (blocks.includes(cidr)) {
@@ -102,89 +109,114 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
   };
 
   const onRemove = (cidr: string) => {
-    if (blocks.length === 1) {
-      toast.error("Нельзя удалить последний CIDR — у subnet должен быть хотя бы один.");
-      return;
-    }
     setPendingCidr(cidr);
     mutate.mutate({ verb: "remove", cidr });
   };
 
-  const inputDisabled = mutate.isPending || opId !== null;
-
   return (
-    <Card
-      size="small"
-      title={
-        <Space size={8}>
-          <Typography.Text strong>{label}</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {blocks.length} блок(ов)
-          </Typography.Text>
-        </Space>
-      }
-    >
-      <Space direction="vertical" size={8} style={{ width: "100%" }}>
-        <div style={{ minHeight: 24 }}>
-          {blocks.length === 0 ? (
-            <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
-              — пусто —
-            </Typography.Text>
-          ) : (
-            <Space direction="vertical" size={6} style={{ alignItems: "flex-start", width: "100%" }}>
-              {blocks.map((cidr) => {
-                const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
-                return (
-                  <Tag
-                    key={cidr}
-                    closable={!busy}
-                    closeIcon={
-                      busy ? (
-                        <Spin
-                          indicator={<LoadingOutlined style={{ fontSize: 10 }} spin />}
-                        />
-                      ) : (
-                        <CloseOutlined style={{ fontSize: 10 }} />
-                      )
-                    }
-                    onClose={(e) => {
-                      e.preventDefault();
-                      if (!busy) onRemove(cidr);
-                    }}
-                    style={{ fontFamily: "monospace", fontSize: 12, margin: 0 }}
-                  >
+    <div style={{ marginTop: 24, maxWidth: 760 }}>
+      <SectionHeader
+        icon={familyTile(family)}
+        eyebrow="Список"
+        title={
+          <span>
+            CIDR <Typography.Text type="secondary">({blocks.length})</Typography.Text>
+          </span>
+        }
+      />
+
+      <div
+        style={{
+          border: "1px solid var(--kc-border)",
+          borderRadius: 8,
+          overflow: "hidden",
+          background: "var(--kc-page)",
+        }}
+      >
+        <table className="w-full text-sm kc-grid-table" style={{ tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "calc(100% - 48px)" }} />
+            <col style={{ width: 48 }} />
+          </colgroup>
+          <thead>
+            <tr style={{ background: "var(--kc-container)" }}>
+              <th
+                className="text-left"
+                style={{ padding: "7px 12px", fontSize: 11, fontWeight: 600, letterSpacing: "0.02em", color: "var(--kc-text-tertiary)" }}
+              >
+                CIDR-блок
+              </th>
+              <th style={{ padding: "7px 4px" }} />
+            </tr>
+          </thead>
+          <tbody>
+            {blocks.length === 0 && (
+              <tr style={{ height: ROW_H, borderTop: "1px solid var(--kc-border-secondary)" }}>
+                <td
+                  colSpan={2}
+                  style={{ textAlign: "center", verticalAlign: "middle", fontSize: 12, color: "var(--kc-text-tertiary)" }}
+                >
+                  CIDR-блоков нет
+                </td>
+              </tr>
+            )}
+            {blocks.map((cidr, i) => {
+              const busy = pendingCidr === cidr && (mutate.isPending || opId !== null);
+              return (
+                <tr key={i} className="kc-kv-row" style={{ height: ROW_H, borderTop: "1px solid var(--kc-border-secondary)" }}>
+                  <td className="px-3 font-mono text-xs" style={{ verticalAlign: "middle" }}>
                     {cidr}
-                  </Tag>
-                );
-              })}
-            </Space>
-          )}
-        </div>
-        <Space.Compact style={{ width: "100%" }}>
-          <Input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={placeholder}
-            disabled={inputDisabled}
-            style={{ fontFamily: "monospace", fontSize: 12 }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                onAdd();
-              }
-            }}
-          />
-          <Button
-            type="primary"
-            ghost
-            onClick={onAdd}
-            disabled={!draft.trim() || inputDisabled}
-            icon={<PlusOutlined />}
-          >
-            Add
-          </Button>
-        </Space.Compact>
-      </Space>
+                  </td>
+                  <td className="px-1 text-center" style={{ verticalAlign: "middle" }}>
+                    {busy ? (
+                      <Spin indicator={<LoadingOutlined style={{ fontSize: 12 }} spin />} />
+                    ) : (
+                      <Button
+                        type="text"
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        aria-label="Удалить CIDR"
+                        onClick={() => onRemove(cidr)}
+                        disabled={inputDisabled}
+                      />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: "1px solid var(--kc-border-secondary)" }}>
+              <td style={{ padding: "8px 10px" }} colSpan={2}>
+                <Space.Compact style={{ width: "100%" }}>
+                  <Input
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder={placeholder}
+                    disabled={inputDisabled}
+                    style={{ fontFamily: MONO_FONT, fontSize: 12.5 }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onAdd();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="dashed"
+                    icon={<PlusOutlined />}
+                    onClick={onAdd}
+                    disabled={!draft.trim() || inputDisabled}
+                  >
+                    Добавить
+                  </Button>
+                </Space.Compact>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <OperationToastWatcher
         opId={opId}
@@ -192,19 +224,11 @@ function CidrSection({ subnetId, kind, blocks }: SectionProps) {
         onDone={() => {
           setOpId(null);
           setPendingCidr(null);
-          qc.invalidateQueries({ queryKey: ["subnets", "detail", subnetId] });
-          qc.invalidateQueries({ queryKey: ["subnets", "list"] });
+          // Широкий prefix — обновляет detail (shell-detail) + list + любые
+          // subnet-вью, где видны CIDR-блоки.
+          qc.invalidateQueries({ queryKey: ["subnets"] });
         }}
       />
-    </Card>
-  );
-}
-
-export function SubnetCidrManager({ subnetId, v4Blocks, v6Blocks }: Props) {
-  return (
-    <div className="space-y-3">
-      <CidrSection subnetId={subnetId} kind="v4" blocks={v4Blocks} />
-      <CidrSection subnetId={subnetId} kind="v6" blocks={v6Blocks ?? []} />
     </div>
   );
 }

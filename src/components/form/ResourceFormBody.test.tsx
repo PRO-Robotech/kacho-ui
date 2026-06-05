@@ -21,7 +21,9 @@ describe("ResourceFormBody", () => {
         submitLabel="Создать сеть" submitting={false} onSubmit={() => {}} onCancel={() => {}}
       />,
     );
-    expect(screen.getByText(/Создание: Сеть/)).toBeInTheDocument();
+    // Band-шапка FormShell: caps-verb «Создание» (заголовок-singular «Сеть»
+    // тут неоднозначен — совпадает с label поля network_id).
+    expect(screen.getByText("Создание")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Создать сеть" })).toBeInTheDocument();
   });
 
@@ -33,7 +35,8 @@ describe("ResourceFormBody", () => {
         submitLabel="Создать сеть" submitting={false} onSubmit={() => {}} onCancel={() => {}}
       />,
     );
-    expect(screen.getByText("enpXYZ")).toBeInTheDocument();
+    // locked-поле — disabled-инпут (значение в value, не текст) + замок.
+    expect(screen.getByDisplayValue("enpXYZ")).toBeDisabled();
     expect(screen.getByLabelText("immutable-lock")).toBeInTheDocument();
   });
 

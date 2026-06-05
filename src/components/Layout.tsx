@@ -1,21 +1,21 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { Layout as AntLayout, Tooltip, Button, theme } from "antd";
-import { HomeOutlined, AppstoreOutlined } from "@ant-design/icons";
-import { ContextCascader } from "@/components/ContextCascader";
+import { Moon, Sun } from "lucide-react";
+import { useThemeMode } from "@/lib/theme-context";
 import { ContextUrlSync } from "@/components/ContextUrlSync";
+import { ContextBreadcrumb } from "@/components/ContextBreadcrumb";
 import { ServiceSidebar } from "@/components/ServiceSidebar";
-import {
-  HeaderRightSlot,
-  HeaderBreadcrumbSlot,
-  PageHeaderSlotProvider,
-} from "@/components/PageHeaderSlot";
+import { HeaderRightSlot, PageHeaderSlotProvider } from "@/components/PageHeaderSlot";
 import { GlobalResourceFormModal } from "@/components/GlobalResourceFormModal";
-// KAC-198: HeaderAuth перенесён в ServiceSidebar (SidebarUserButton — avatar + email
-// + dropdown {Профиль, Выйти}). В шапке остаётся только HeaderRightSlot для
-// per-page виджетов.
+import { OperationBanner } from "@/components/OperationBanner";
+// KAC-246: full-height sidebar (логотип сверху = левый верхний угол), от самого
+// верха до самого низа. Header — внутри правого под-лейаута, только НАД контентом
+// (а не во всю ширину поверх сайдбара). Сворачиватель убран.
 
 const { Header, Sider, Content } = AntLayout;
 
+// KAC-246: узкий icon-rail; ServiceSidebar разворачивается оверлеем при наведении
+// (надписи только при hover), поэтому Sider резервирует только ширину рейла.
 const SIDEBAR_WIDTH = 56;
 const HEADER_HEIGHT = 48;
 
@@ -29,124 +29,113 @@ export function Layout() {
 
 function LayoutInner() {
   const { token } = theme.useToken();
+  const { mode, toggle } = useThemeMode();
 
   return (
-    <AntLayout style={{ minHeight: "100vh" }}>
+    <AntLayout style={{ height: "100vh", overflow: "hidden" }} hasSider>
       <ContextUrlSync />
 
-      <Header
+      {/* Сайдбар во всю высоту: от верха до низа, логотип в верхней части. */}
+      <Sider
+        width={SIDEBAR_WIDTH}
+        theme="dark"
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          borderBottom: `1px solid ${token.colorBorder}`,
+          borderRight: `1px solid ${token.colorBorderSecondary}`,
           position: "sticky",
           top: 0,
-          zIndex: 20,
-          paddingInline: 12,
-          height: HEADER_HEIGHT,
-          lineHeight: `${HEADER_HEIGHT}px`,
+          height: "100vh",
+          overflow: "visible",
+          background: token.colorBgLayout,
         }}
       >
-        <NavLink
-          to="/"
-          aria-label="Kachō Console"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            height: 28,
-            width: 28,
-          }}
-        >
-          <div
-            style={{
-              height: 24,
-              width: 24,
-              borderRadius: 6,
-              background: "linear-gradient(135deg, #fbbf24, #f43f5e)",
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            K
-          </div>
-        </NavLink>
+        <ServiceSidebar />
+      </Sider>
 
-        <ContextCascader />
-
-        <Tooltip title="Все сервисы">
-          <NavLink to="/dashboard" aria-label="Все сервисы">
-            <Button type="text" size="small" icon={<AppstoreOutlined />} />
-          </NavLink>
-        </Tooltip>
-        <Tooltip title="На главную">
-          <NavLink to="/" aria-label="Главная">
-            <Button type="text" size="small" icon={<HomeOutlined />} />
-          </NavLink>
-        </Tooltip>
-
-        <span style={{ color: token.colorTextTertiary, padding: "0 4px" }}>/</span>
-        <div
+      {/* Правый под-лейаут: slim header над контентом + сам контент. */}
+      <AntLayout style={{ background: token.colorBgLayout }}>
+        <Header
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
-            fontSize: 13,
-            minWidth: 0,
-            flex: 1,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          <HeaderBreadcrumbSlot />
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <HeaderRightSlot />
-        </div>
-      </Header>
-
-
-      <AntLayout>
-        <Sider
-          width={SIDEBAR_WIDTH}
-          theme="dark"
-          style={{
-            borderRight: `1px solid ${token.colorBorder}`,
+            borderBottom: `1px solid ${token.colorBorderSecondary}`,
             position: "sticky",
-            top: HEADER_HEIGHT,
-            height: `calc(100vh - ${HEADER_HEIGHT}px)`,
-            overflow: "visible",
+            top: 0,
+            zIndex: 20,
+            paddingInline: 20,
+            height: HEADER_HEIGHT,
+            lineHeight: `${HEADER_HEIGHT}px`,
             background: token.colorBgLayout,
           }}
         >
-          <ServiceSidebar />
-        </Sider>
+          {/* Слева: breadcrumb-контекст Account › Project › Resource. */}
+          <div style={{ display: "flex", alignItems: "center", minWidth: 0, flex: 1, overflow: "hidden" }}>
+            <ContextBreadcrumb />
+          </div>
 
+          {/* Справа: per-page right-slot + переключатель темы. */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <HeaderRightSlot />
+            <Tooltip title={mode === "dark" ? "Светлая тема" : "Тёмная тема"}>
+              <Button
+                type="text"
+                size="small"
+                onClick={toggle}
+                aria-label={mode === "dark" ? "Включить светлую тему" : "Включить тёмную тему"}
+                icon={mode === "dark" ? <Sun size={16} strokeWidth={2} /> : <Moon size={16} strokeWidth={2} />}
+              />
+            </Tooltip>
+          </div>
+        </Header>
+
+        {/* Sticky-плашка async-операций (operationStore): поллит Operation до
+            done, на done инвалидирует detail/list → реактивное обновление после
+            RoutesPanel/SgRules/SG-edit. Раньше НЕ был смонтирован — изменения не
+            подтягивались. KAC-246. */}
+        <OperationBanner />
+
+        {/* Страница фиксирована (outer height:100vh overflow:hidden) — скроллится
+            ТОЛЬКО Content (flex:1, overflow:auto). Footer вынесен из Content и
+            всегда виден внизу. KAC-246. */}
         <Content
           style={{
+            flex: 1,
+            minHeight: 0,
             overflow: "auto",
+            // Резервируем место под вертикальный скроллбар ВСЕГДА (скролл здесь) —
+            // иначе при открытии высокого контента появляется скроллбар →
+            // горизонтальный сдвиг. KAC-246.
+            scrollbarGutter: "stable",
             minWidth: 0,
             background: token.colorBgLayout,
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           {/* min-width: max-content гарантирует, что широкие таблицы не сжимают
-              cells, а раздвигают page-level horizontal scrollbar (Content
-              имеет overflow:auto). */}
-          <div style={{ minWidth: "max-content", padding: "20px 24px" }}>
+              cells, а раздвигают page-level horizontal scrollbar. flex:1 — чтобы
+              kc-surface (minHeight:100%) заполняла высоту видимой области. */}
+          <div style={{ minWidth: "max-content", padding: "16px 16px", flex: 1 }}>
             <Outlet />
           </div>
-          {/* Глобальный mount модалок Create/Edit — для всех ресурсов
-              (vpc/compute/iam). Модалка сама читает URL и
-              решает, открываться по `?modal=<spec.id>-create|edit`. */}
+          {/* Глобальный mount модалок Create/Edit — для всех ресурсов (портал). */}
           <GlobalResourceFormModal />
         </Content>
+
+        {/* Глобальный футер — вне Content, всегда внизу; год автоматически. */}
+        <footer
+          style={{
+            flexShrink: 0,
+            padding: "9px 16px 11px",
+            textAlign: "center",
+            fontSize: 12,
+            color: token.colorTextTertiary,
+            borderTop: `1px solid ${token.colorBorderSecondary}`,
+            background: token.colorBgLayout,
+          }}
+        >
+          PRO Robotech © {new Date().getFullYear()}
+        </footer>
       </AntLayout>
     </AntLayout>
   );

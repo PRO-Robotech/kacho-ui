@@ -19,7 +19,7 @@ export function FieldLabel({ text, info }: Props) {
       <Tooltip title={info}>
         <QuestionCircleOutlined
           aria-label="field-info"
-          style={{ color: "rgba(255,255,255,0.45)" }}
+          style={{ color: "var(--kc-text-tertiary)" }}
         />
       </Tooltip>
     </Space>

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import type { FormField } from "./form-schema";
 import { setByPath } from "./path";
 import { CopyableId } from "@/components/CopyableId";
+import { RoutesEditor, type RouteEntry } from "@/components/RoutesEditor";
 import { CopyableName } from "@/components/CopyableName";
 import { RefNameLink } from "@/components/RefNameLink";
 import { LabelsCell } from "@/components/LabelsCell";
@@ -33,6 +34,9 @@ export interface ResourceSpec {
   singular: string;
   // plural label
   plural: string;
+  // родительный падеж ед.ч. («Обзор шлюзА», «Операции сетИ») — заголовок
+  // мастер-ресурса в зоне-3 (обзор/операции/json). Fallback: plural.
+  genitive?: string;
   description?: string;
   /** Service-domain заголовок (отображается в breadcrumb перед именем категории).
    *  Примеры: "Virtual Private Cloud", "IAM", "Администрирование". */
@@ -101,18 +105,18 @@ const POOL_KINDS = [{ value: "EXTERNAL_PUBLIC", label: "External" }];
 
 // Общие колонки
 const COL_NAME: ResourceColumn = {
-  header: "Name",
+  header: "Имя",
   path: "name",
   format: "text",
   className: "font-medium",
 };
 const COL_CREATED: ResourceColumn = {
-  header: "Created",
+  header: "Дата создания",
   path: "created_at",
   format: "datetime",
 };
 const COL_ID: ResourceColumn = {
-  header: "ID",
+  header: "Идентификатор",
   path: "id",
   format: "uid-short",
 };
@@ -194,8 +198,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "accounts",
     apiPath: "/iam/v1/accounts",
     payloadKey: "accounts",
-    singular: "Account",
+    singular: "Аккаунт",
     plural: "Accounts",
+    genitive: "Аккаунта",
     serviceTitle: "IAM",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -230,14 +235,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "projects",
     apiPath: "/iam/v1/projects",
     payloadKey: "projects",
-    singular: "Project",
+    singular: "Проект",
     plural: "Projects",
+    genitive: "Проекта",
     serviceTitle: "IAM",
     scope: "account",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Account", path: "account_id", format: "uid-short" },
+      { header: "Аккаунт", path: "account_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
@@ -263,14 +269,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "service-accounts",
     apiPath: "/iam/v1/serviceAccounts",
     payloadKey: "service_accounts",
-    singular: "Service Account",
+    singular: "Сервисный аккаунт",
     plural: "Service Accounts",
     serviceTitle: "IAM",
     scope: "account",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
-      { header: "Account", path: "account_id", format: "uid-short" },
+      { header: "Аккаунт", path: "account_id", format: "uid-short" },
       COL_CREATED,
       COL_ID,
     ],
@@ -294,14 +300,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "users",
     apiPath: "/iam/v1/users",
     payloadKey: "users",
-    singular: "User",
+    singular: "Пользователь",
     plural: "Users",
     serviceTitle: "IAM",
     scope: "global",
     ops: { create: false, update: false, delete: true },
     columns: [
       { header: "Имя", path: "display_name", format: "text" },
-      { header: "Email", path: "email", format: "text" },
+      { header: "Эл. почта", path: "email", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
@@ -319,7 +325,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     internalGetPath: "/vpc/v1/networks/{id}/internal",
     related: [
       { childId: "subnets", filterField: "network_id", label: "Подсети" },
-      { childId: "route-tables", filterField: "network_id", label: "Таблицы маршрутизации" },
+      { childId: "route-tables", filterField: "network_id", label: "Таблицы маршрутов" },
       { childId: "security-groups", filterField: "network_id", label: "Группы безопасности" },
     ],
     docs: [
@@ -336,8 +342,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "и публичные адреса.",
       docs: ["Облачные сети и подсети"],
     },
-    singular: "Network",
+    singular: "Облачная сеть",
     plural: "Облачные сети",
+    genitive: "Облачной сети",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -386,16 +393,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       FIELD_LABELS,
       FIELD_DESCRIPTION,
       FIELD_PROJECT_ID,
-      {
-        // KAC-239 S1: чекбокс авто-создания default-SG (только для Create).
-        name: "create_default_security_group",
-        label: "Группа безопасности по умолчанию",
-        type: "bool",
-        default: true,
-        createOnly: true,
-        description:
-          "Создать группу безопасности по умолчанию для сети. Снимите флажок, чтобы создать сеть без неё.",
-      },
+      // KAC-246: default-SG обязательна — вариативности (opt-out чекбокса KAC-239)
+      // на UI больше нет. Сеть всегда создаётся с группой безопасности по умолчанию
+      // (template ниже всегда шлёт create_default_security_group: true).
     ],
     template: ({ projectId }) => ({
       project_id: projectId ?? "",
@@ -415,6 +415,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "subnets",
     related: [
       {
+        // Под подсетью адреса всегда ВНУТРЕННИЕ (фильтр по internal_*.subnet_id).
         childId: "addresses",
         filterField: ["internal_ipv4_address.subnet_id", "internal_ipv6_address.subnet_id"],
         label: "IP-адреса",
@@ -433,8 +434,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "из их CIDR-блоков.",
       docs: ["Облачные сети и подсети"],
     },
-    singular: "Subnet",
+    singular: "Подсеть",
     plural: "Подсети",
+    genitive: "Подсети",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -634,8 +636,12 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "к ресурсам Kachō извне. Зарезервированный адрес сохраняется за вами, пока вы его не освободите.",
       docs: ["Адреса облачных ресурсов"],
     },
-    singular: "Address",
-    plural: "Публичные IP-адреса",
+    singular: "IP-адрес",
+    // Нейтральный plural — список содержит и внешние (Публичные), и внутренние
+    // адреса; вид различается колонкой «Вид» (Публичный/Внутренний). Раньше было
+    // «Публичные IP-адреса», что вводило в заблуждение для внутренних.
+    plural: "IP-адреса",
+    genitive: "IP-адреса",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -744,28 +750,32 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         required: true,
         default: "external",
         description:
-          "Тип резервируемого IP-адреса. External IPv4/IPv6 выделяются из IPv4/IPv6 пула выбранной зоны. Internal IPv4/IPv6 выделяются из CIDR-блока выбранной подсети.",
+          "Тип резервируемого IP-адреса. Внешний IPv4/IPv6 выделяется из IPv4/IPv6 пула выбранной зоны. Внутренний IPv4/IPv6 выделяется из CIDR-блока выбранной подсети.",
         // KAC-100: вернули Internal IPv4 / Internal IPv6 (откат UI-части KAC-61).
         // Internal-адреса также могут аллоцироваться compute-сервисом при
         // Instance.Create через nic-spec, но прямое резервирование с руки —
         // поддерживается.
         options: [
-          { value: "external", label: "External IPv4" },
-          { value: "external_v6", label: "External IPv6" },
-          { value: "internal", label: "Internal IPv4" },
-          { value: "internal_v6", label: "Internal IPv6" },
+          { value: "external", label: "Внешний IPv4" },
+          { value: "external_v6", label: "Внешний IPv6" },
+          { value: "internal", label: "Внутренний IPv4" },
+          { value: "internal_v6", label: "Внутренний IPv6" },
         ],
         editHidden: true,
       },
       {
-        name: "external_ipv4_address_spec.zone_id",
+        // Общая зона для external IPv4/IPv6 — UI-поле, sanitize кладёт его в
+        // активную ветку spec'а (external_ipv4/v6_address_spec.zone_id). Не
+        // сбрасывается при переключении IPv4↔IPv6 (раньше были два поля под
+        // разными ветками → значение терялось при смене типа).
+        name: "_zone_id",
         label: "Зона",
         type: "ref",
         refResource: "zones",
         required: true,
         description:
-          "Зона, в которой выделяется внешний IPv4. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv4-пула зоны.",
-        visibleWhen: { field: "_address_kind", equals: "external" },
+          "Зона, в которой выделяется внешний адрес. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из пула зоны.",
+        visibleWhen: { field: "_address_kind", equals: ["external", "external_v6"] },
         editHidden: true,
       },
       {
@@ -780,19 +790,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         // KAC-58: External IPv6 — sparse counter-based allocator (миграция 0021).
-        // CIDR-pool с v6 prefix создаётся через InternalAddressPoolService;
-        // cascade resolve фильтрует pool по family запроса.
-        name: "external_ipv6_address_spec.zone_id",
-        label: "Зона",
-        type: "ref",
-        refResource: "zones",
-        required: true,
-        description:
-          "Зона, в которой выделяется внешний IPv6. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv6-пула зоны.",
-        visibleWhen: { field: "_address_kind", equals: "external_v6" },
-        editHidden: true,
-      },
-      {
+        // Зона — общее поле `_zone_id` выше (для external и external_v6).
         name: "external_ipv6_address_spec.address",
         label: "Адрес",
         type: "string",
@@ -877,12 +875,27 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       const kind = obj["_address_kind"];
       const result: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        if (k === "_address_kind") continue;
+        if (k === "_address_kind" || k === "_zone_id") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
         if (k === "external_ipv6_address_spec" && kind !== "external_v6") continue;
         if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
         if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
         result[k] = v;
+      }
+      // Общая зона `_zone_id` → в активную external-ветку spec'а.
+      const zone = obj["_zone_id"];
+      if (zone) {
+        if (kind === "external") {
+          result["external_ipv4_address_spec"] = {
+            ...(result["external_ipv4_address_spec"] as Record<string, unknown> | undefined),
+            zone_id: zone,
+          };
+        } else if (kind === "external_v6") {
+          result["external_ipv6_address_spec"] = {
+            ...(result["external_ipv6_address_spec"] as Record<string, unknown> | undefined),
+            zone_id: zone,
+          };
+        }
       }
       return result;
     },
@@ -908,8 +921,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "маршрутами в нескольких зонах доступности.",
       docs: ["Статическая маршрутизация", "Маршрутизация через NAT-инстанс"],
     },
-    singular: "Route Table",
-    plural: "Таблицы маршрутизации",
+    singular: "Таблица маршрутов",
+    plural: "Таблицы маршрутов",
+    genitive: "Таблицы маршрутов",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1001,34 +1015,26 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       {
         name: "static_routes",
         label: "Статические маршруты",
-        type: "array",
-        // KAC-239: маршруты редактируются отдельно (RoutesPanel в detail),
-        // не в форме ресурса. В Create оставляем, в Edit скрыто.
+        type: "custom",
+        // KAC-239/KAC-246: в Create маршруты добавляются ТОЙ ЖЕ таблицей, что и в
+        // detail (RoutesPanel) — controlled RoutesEditor (Префикс назначения |
+        // Следующий узел | ⌫ + dashed «Добавить маршрут»). В Edit скрыто —
+        // маршруты правятся RoutesPanel отдельно (full-replace).
         editHidden: true,
-        itemLabel: "маршрут",
-        description:
-          "При обновлении список заменяется целиком (full-replace).",
-        newItem: () => ({ destination_prefix: "", next_hop_address: "" }),
-        itemFields: [
-          {
-            name: "destination_prefix",
-            label: "CIDR",
-            type: "string",
-            required: true,
-            placeholder: "10.0.0.0/24",
-            description:
-              "CIDR-блок назначения. Трафик в этот блок будет направлен через указанный next-hop.",
-          },
-          {
-            name: "next_hop_address",
-            label: "Next-hop",
-            type: "string",
-            required: true,
-            placeholder: "10.0.0.1",
-            description:
-              "IP-адрес next-hop. Должен быть достижим из подсетей, использующих эту таблицу маршрутизации.",
-          },
-        ],
+        // fullWidth:false — рендерить как обычное labeled-поле (label «Статические
+        // маршруты» слева 200px + таблица в wrapper-колонке 570px), выровнено с
+        // остальными полями. Без этого custom → full-width.
+        fullWidth: false,
+        description: "При обновлении список заменяется целиком (full-replace).",
+        render: ({ value, onChange }) => {
+          const routes = (getByPath(value, "static_routes") as RouteEntry[] | undefined) ?? [];
+          return (
+            <RoutesEditor
+              value={routes}
+              onChange={(next) => onChange(setByPath(value, "static_routes", next))}
+            />
+          );
+        },
       },
     ],
     template: ({ projectId }) => ({
@@ -1038,6 +1044,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       static_routes: [],
     }),
+    // Выкидываем пустые строки маршрутов (без префикса/next-hop) перед POST.
+    sanitize: (obj) => {
+      const routes = Array.isArray(obj.static_routes)
+        ? (obj.static_routes as RouteEntry[]).filter(
+            (r) => (r?.destination_prefix ?? "").trim() !== "" && (r?.next_hop_address ?? "").trim() !== "",
+          )
+        : [];
+      return { ...obj, static_routes: routes };
+    },
   },
 
   // proto: GET /vpc/v1/networkInterfaces — AWS-ENI-подобный ресурс (эпик KAC-2).
@@ -1053,8 +1068,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     apiPath: "/vpc/v1/networkInterfaces",
     payloadKey: "network_interfaces",
     internalGetPath: "/vpc/v1/networkInterfaces/{id}/internal",
-    singular: "Network Interface",
+    singular: "Сетевой интерфейс",
     plural: "Сетевые интерфейсы",
+    genitive: "Сетевого интерфейса",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1328,15 +1344,16 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "ресурсов облачной сети Kachō (виртуальных машин, балансировщиков, сетевых интерфейсов).",
       docs: ["Группы безопасности"],
     },
-    singular: "Security Group",
+    singular: "Группа безопасности",
     plural: "Группы безопасности",
+    genitive: "Группы безопасности",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
     columns: [
       COL_NAME,
       {
-        header: "Network",
+        header: "Сеть",
         path: "network_id",
         // KAC-243: network_id у SG — обязателен и неизменяем (kacho-proto вернул
         // (required) на CreateSecurityGroupRequest.network_id). Бессетевых SG
@@ -1346,8 +1363,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           return nid ? <RefNameLink specId="networks" refId={nid} /> : <span className="text-muted-foreground">—</span>;
         },
       },
-      { header: "Status", path: "status", format: "status" },
-      { header: "Default", path: "default_for_network", format: "text" },
+      { header: "Статус", path: "status", format: "status" },
+      { header: "По умолчанию", path: "default_for_network", format: "text" },
       COL_CREATED,
       COL_ID,
     ],
@@ -1411,8 +1428,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "gateways",
     apiPath: "/vpc/v1/gateways",
     payloadKey: "gateways",
-    singular: "Gateway",
+    singular: "Шлюз",
     plural: "Шлюзы",
+    genitive: "Шлюза",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1470,13 +1488,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "disk-types",
     apiPath: "/compute/v1/diskTypes",
     payloadKey: "disk_types",
-    singular: "Disk Type",
+    singular: "Тип диска",
     plural: "Типы дисков",
     serviceTitle: "Compute Cloud",
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Описание", path: "description", format: "text" },
       { header: "Зоны", path: "zone_ids", format: "list" },
     ],
@@ -1491,13 +1509,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "compute-zones",
     apiPath: "/compute/v1/zones",
     payloadKey: "zones",
-    singular: "Zone",
+    singular: "Зона",
     plural: "Зоны (Compute)",
     serviceTitle: "Compute Cloud",
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Регион", path: "region_id", format: "text" },
       { header: "Статус", path: "status", format: "status" },
     ],
@@ -1509,13 +1527,13 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "compute-regions",
     apiPath: "/compute/v1/regions",
     payloadKey: "regions",
-    singular: "Region",
+    singular: "Регион",
     plural: "Регионы (Compute)",
     serviceTitle: "Compute Cloud",
     scope: "global",
     ops: { create: false, update: false, delete: false },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
       { header: "Название", path: "name", format: "text" },
       { header: "Статус", path: "status", format: "status" },
     ],
@@ -1527,8 +1545,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "disks",
     apiPath: "/compute/v1/disks",
     payloadKey: "disks",
-    singular: "Disk",
+    singular: "Диск",
     plural: "Диски",
+    genitive: "Диска",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1629,8 +1648,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "images",
     apiPath: "/compute/v1/images",
     payloadKey: "images",
-    singular: "Image",
+    singular: "Образ",
     plural: "Образы",
+    genitive: "Образа",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1723,8 +1743,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "snapshots",
     apiPath: "/compute/v1/snapshots",
     payloadKey: "snapshots",
-    singular: "Snapshot",
+    singular: "Снимок диска",
     plural: "Снимки дисков",
+    genitive: "Снимка диска",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1775,8 +1796,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "instances",
     apiPath: "/compute/v1/instances",
     payloadKey: "instances",
-    singular: "Instance",
+    singular: "Виртуальная машина",
     plural: "Виртуальные машины",
+    genitive: "Виртуальной машины",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true, start: true, stop: true, restart: true },
@@ -1939,14 +1961,14 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "regions",
     apiPath: "/compute/v1/regions",
     payloadKey: "regions",
-    singular: "Region",
+    singular: "Регион",
     plural: "Регионы",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
-      { header: "Name", path: "name", format: "text" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
+      { header: "Имя", path: "name", format: "text" },
       COL_CREATED,
     ],
     fields: [
@@ -1970,15 +1992,15 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "zones",
     apiPath: "/compute/v1/zones",
     payloadKey: "zones",
-    singular: "Zone",
+    singular: "Зона",
     plural: "Зоны",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
     columns: [
-      { header: "ID", path: "id", format: "text", className: "font-mono" },
-      { header: "Region", path: "region_id", format: "text" },
-      { header: "Name", path: "name", format: "text" },
+      { header: "Идентификатор", path: "id", format: "text", className: "font-mono" },
+      { header: "Регион", path: "region_id", format: "text" },
+      { header: "Имя", path: "name", format: "text" },
       COL_CREATED,
     ],
     fields: [
@@ -2009,8 +2031,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "address-pools",
     apiPath: "/vpc/v1/addressPools",
     payloadKey: "pools",
-    singular: "Address Pool",
+    singular: "Пул адресов",
     plural: "Пулы адресов",
+    genitive: "Пула адресов",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -2051,7 +2074,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
             : <span className="text-muted-foreground">—</span>;
         },
       },
-      { header: "Default", path: "is_default", format: "text" },
+      { header: "По умолчанию", path: "is_default", format: "text" },
       {
         header: "Метки селектора",
         path: "selector_labels",
@@ -2059,7 +2082,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           <LabelsCell labels={row.selector_labels as Record<string, string> | undefined} />
         ),
       },
-      { header: "Selector priority", path: "selector_priority", format: "text" },
+      { header: "Приоритет селектора", path: "selector_priority", format: "text" },
     ],
     fields: [
       {
@@ -2186,6 +2209,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "network_load_balancers",
     singular: "Балансировщик нагрузки",
     plural: "Балансировщики нагрузки",
+    genitive: "Балансировщика нагрузки",
     serviceTitle: "Network Load Balancer",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -2250,7 +2274,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "listeners",
     apiPath: "/nlb/v1/listeners",
     payloadKey: "listeners",
-    singular: "Listener",
+    singular: "Обработчик",
     plural: "Listeners",
     serviceTitle: "Network Load Balancer",
     scope: "project",
@@ -2336,8 +2360,9 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     route: "target-groups",
     apiPath: "/nlb/v1/targetGroups",
     payloadKey: "target_groups",
-    singular: "Target Group",
+    singular: "Целевая группа",
     plural: "Target Groups",
+    genitive: "Целевой группы",
     serviceTitle: "Network Load Balancer",
     scope: "project",
     ops: { create: true, update: true, delete: true },

@@ -5,13 +5,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Modal, Typography, Input } from "antd";
+import { Button, Modal, Typography, Input, theme } from "antd";
+import { DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
+import { DopplerButton } from "@/components/DopplerButton";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import { DependencyTreePanel } from "@/components/DependencyTreePanel";
 import { hasDependencyResolver, loadDependents } from "@/lib/dependency-graph";
+
+/**
+ * High-risk ресурсы — удаление требует ввода имени для подтверждения
+ * (необратимо + каскадные RESTRICT-зависимости / влияние на трафик).
+ * Используется action-меню (DetailOverviewActions / RowActionsMenu) для
+ * вычисления requireNameConfirm по spec.id.
+ */
+export const HIGH_RISK_DELETE = new Set(["networks", "route-tables", "security-groups"]);
+
+export function requiresNameConfirm(specId: string): boolean {
+  return HIGH_RISK_DELETE.has(specId);
+}
 
 interface Props {
   open: boolean;
@@ -42,6 +56,7 @@ export function DeleteDialog({
   onSuccess,
   requireNameConfirm,
 }: Props) {
+  const { token } = theme.useToken();
   const [confirmText, setConfirmText] = useState("");
   const invalidate = useInvalidateResourceList();
   const [pendingOpId, setPendingOpId] = useState<string | null>(null);
@@ -94,29 +109,82 @@ export function DeleteDialog({
   const pending = mutation.isPending || pendingOpId !== null;
   const canConfirm = !requireNameConfirm || confirmText.trim() === name;
 
-  const left = (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 280 }}>
-      <Typography.Text>
-        Вы уверены, что хотите удалить{" "}
-        <Typography.Text strong>{name || "(без имени)"}</Typography.Text>?
-        Действие необратимо.
-      </Typography.Text>
+  const displayName = name || "(без имени)";
 
-      <Typography.Text code style={{ fontSize: 11, wordBreak: "break-all" }}>
-        DELETE {apiPath}
-      </Typography.Text>
+  const close = () => {
+    if (pending) return;
+    onOpenChange(false);
+    setConfirmText("");
+  };
+
+  const left = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18, flex: 1, minWidth: 280 }}>
+      {/* Header: danger-икон + caps-метка типа + имя (ellipsis) + подзаголовок. */}
+      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: 13,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 21,
+            color: token.colorError,
+            background: "linear-gradient(135deg, rgba(229,72,77,0.20), rgba(229,72,77,0.06))",
+            border: "1px solid rgba(229,72,77,0.26)",
+            boxShadow: "0 1px 0 rgba(255,255,255,0.04) inset",
+          }}
+        >
+          <DeleteOutlined />
+        </div>
+        <div style={{ minWidth: 0, flex: 1, paddingTop: 1 }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: token.colorError,
+            }}
+          >
+            Удаление · {resourceLabel}
+          </div>
+          <Typography.Title
+            level={5}
+            ellipsis={{ tooltip: displayName }}
+            style={{ margin: "3px 0 6px", fontWeight: 600, color: "var(--kc-text)" }}
+          >
+            {displayName}
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13, lineHeight: 1.55, display: "block" }}>
+            Ресурс будет удалён безвозвратно. Действие необратимо.
+          </Typography.Text>
+        </div>
+      </div>
 
       {requireNameConfirm && (
-        <div>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Введите имя ресурса <Typography.Text code>{name}</Typography.Text> для
-            подтверждения:
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 7,
+            padding: 12,
+            borderRadius: 10,
+            background: token.colorFillQuaternary,
+            border: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
+          <Typography.Text style={{ fontSize: 12.5, color: "var(--kc-text-secondary)", lineHeight: 1.5 }}>
+            Подтвердите удаление — введите имя ресурса
           </Typography.Text>
           <Input
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder={name}
-            style={{ marginTop: 6 }}
+            status={confirmText && !canConfirm ? "error" : undefined}
+            allowClear
             autoFocus
           />
         </div>
@@ -127,23 +195,41 @@ export function DeleteDialog({
   return (
     <Modal
       open={open}
-      width={showDeps ? 780 : undefined}
-      onCancel={() => {
-        if (pending) return;
-        onOpenChange(false);
-        setConfirmText("");
-      }}
-      onOk={() => mutation.mutate()}
-      okText="Удалить"
-      okButtonProps={{
-        danger: true,
-        loading: pending,
-        disabled: !canConfirm || pending,
-      }}
-      cancelButtonProps={{ disabled: pending }}
-      cancelText="Отмена"
-      title={`Удалить ${resourceLabel.toLowerCase()}?`}
+      // Стабильная ширина: 820 с панелью зависимостей (две колонки), иначе 560.
+      // Зависит только от наличия resolver'а ресурса — не «прыгает» в рамках
+      // одного ресурса.
+      width={showDeps ? 820 : 560}
+      onCancel={close}
+      title={null}
+      // KAC-246: крестик не нужен — есть кнопка «Отмена».
+      closable={false}
       destroyOnClose
+      footer={[
+        showDeps ? (
+          <Button
+            key="refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => depsQuery.refetch()}
+            disabled={pending || depsQuery.isFetching}
+            style={{ marginInlineEnd: "auto" }}
+          >
+            Обновить связи
+          </Button>
+        ) : null,
+        <Button key="cancel" onClick={close} disabled={pending}>
+          Отмена
+        </Button>,
+        <DopplerButton
+          key="ok"
+          danger
+          type="primary"
+          onClick={() => mutation.mutate()}
+          pulsing={pending}
+          disabled={!canConfirm}
+        >
+          Удалить
+        </DopplerButton>,
+      ]}
     >
       {showDeps ? (
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
@@ -152,7 +238,6 @@ export function DeleteDialog({
             nodes={depsQuery.data ?? []}
             loading={depsQuery.isLoading || depsQuery.isFetching}
             error={depsQuery.error ? (depsQuery.error as Error).message : null}
-            onRefresh={() => depsQuery.refetch()}
           />
         </div>
       ) : (

@@ -64,14 +64,14 @@ export function UsersPage() {
 
   const columns: ColumnsType<User> = [
     {
-      title: "Email",
+      title: "Эл. почта",
       dataIndex: "email",
       key: "email",
       render: (v) =>
         v ? <Typography.Text strong>{v}</Typography.Text> : "—",
     },
     {
-      title: "Display name",
+      title: "Отображаемое имя",
       dataIndex: "display_name",
       key: "display_name",
       render: (v) =>
@@ -124,7 +124,7 @@ export function UsersPage() {
 
   return (
     <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={3} style={{ margin: 0 }}>
+      <Typography.Title level={3} className="t-page-title" style={{ margin: 0 }}>
         Users
       </Typography.Title>
 

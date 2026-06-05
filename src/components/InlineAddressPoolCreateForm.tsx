@@ -13,21 +13,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Button,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-  Space,
-  Switch,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Form, Input, InputNumber, Select, Space, Switch, Tooltip } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { SubnetCidrChips } from "@/components/SubnetCidrChips";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -40,9 +31,7 @@ interface Props {
 // KAC-70: AddressPoolKind — единственный валидный вариант EXTERNAL_PUBLIC.
 // EXTERNAL_TEST = 2 / RESERVED_INTERNAL = 100 удалены из proto enum
 // (`reserved 2, 100` в kacho.cloud.vpc.v1.AddressPoolKind).
-const KIND_OPTIONS = [
-  { value: "EXTERNAL_PUBLIC", label: "External public" },
-];
+const KIND_OPTIONS = [{ value: "EXTERNAL_PUBLIC", label: "External public" }];
 
 export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   const invalidate = useInvalidateResourceList();
@@ -62,9 +51,12 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   const { data: zoneData } = useQuery({
     queryKey: ["zones", "list"],
     queryFn: () =>
-      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
-        pageSize: "500",
-      }),
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(
+        zoneSpec.apiPath,
+        {
+          pageSize: "500",
+        },
+      ),
     staleTime: 60_000,
   });
   const zoneOptions = useMemo(
@@ -93,7 +85,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Создать пул адресов: ${m}`);
     },
   });
@@ -117,24 +111,11 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
   };
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="address-pools" />
-        Создание: AddressPool
-      </Typography.Title>
-
+    <FormShell specId="address-pools" mode="create" singular={spec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
+        wrapperCol={{ flex: "1 1 0" }}
         labelAlign="left"
         colon={false}
         size="middle"
@@ -179,7 +160,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               IPv4 и IPv6 CIDR
               <Tooltip title="Блоки IPv4 (например, 198.51.100.0/24) и/или IPv6 (например, 2001:db8::/64), из которых аллоцируются адреса. Хотя бы одно семейство обязательно.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -197,7 +180,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               Default
               <Tooltip title="Один is_default=true на (zone, kind). Default-пул используется когда явный pool не задан.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -210,7 +195,9 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             <Space size={4}>
               Selector priority
               <Tooltip title="Tie-break при равенстве specificity. Higher wins.">
-                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+                <QuestionCircleOutlined
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                />
               </Tooltip>
             </Space>
           }
@@ -221,23 +208,13 @@ export function InlineAddressPoolCreateForm({ onCancel, onSuccess }: Props) {
             style={{ width: "100%" }}
           />
         </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button
-              type="primary"
-              onClick={submit}
-              loading={mutation.isPending}
-              disabled={mutation.isPending}
-            >
-              Создать пул адресов
-            </Button>
-            <Button onClick={onCancel} disabled={mutation.isPending}>
-              Отмена
-            </Button>
-          </Space>
-        </Form.Item>
+        <FormFooter
+          submitLabel="Создать пул адресов"
+          submitting={mutation.isPending}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
-    </div>
+    </FormShell>
   );
 }

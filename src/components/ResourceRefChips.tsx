@@ -6,8 +6,8 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Card, Modal, Select, Space, Tag, Typography } from "antd";
-import { CloseOutlined, PlusOutlined } from "@ant-design/icons";
+import { Card, Modal, Select, Space, Tag, Typography } from "antd";
+import { CloseOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
 import { getResource } from "@/lib/resource-registry";
 import { useContext } from "@/lib/context-store";
@@ -40,6 +40,10 @@ interface Props {
   createEditablePresetFields?: Record<string, unknown>;
   /** Опц. title модалки. */
   createTitle?: string;
+  /** Заблокировать селектор (например, пока не выбрана подсеть). */
+  disabled?: boolean;
+  /** Подсказка под селектором, когда disabled (например, «Сначала выберите подсеть»). */
+  disabledHint?: string;
 }
 
 export function ResourceRefChips({
@@ -55,12 +59,18 @@ export function ResourceRefChips({
   createPresetFields,
   createEditablePresetFields,
   createTitle,
+  disabled,
+  disabledHint,
 }: Props) {
   const spec = getResource(refResource);
   const createSpec = createResource ? getResource(createResource) : undefined;
   const account = useContext((s) => s.account);
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [creating, setCreating] = useState(false);
+  // Ремоунт Select при выборе sentinel «Создать»: AntD держит sentinel
+  // «выбранным» (controlled value не меняется) → повторный выбор того же пункта
+  // не триггерит onChange → модалка не открывалась снова после отмены.
+  const [selKey, setSelKey] = useState(0);
 
   // Загружаем список ресурсов проекта для resolve id→name + dropdown options.
   const { data: listData, refetch } = useQuery({
@@ -121,17 +131,6 @@ export function ResourceRefChips({
 
   const atCap = maxItems !== undefined && value.length >= maxItems;
 
-  const onAdd = () => {
-    if (!draft || atCap) return;
-    if (draft === CREATE_SENTINEL) {
-      setCreating(true);
-      setDraft(undefined);
-      return;
-    }
-    if (value.includes(draft)) return;
-    onChange([...value, draft]);
-    setDraft(undefined);
-  };
 
   // KAC-101: на выбор sentinel-опции открываем inline-create modal
   // (alt-flow: пользователь не жмёт Add, а сразу выбирает «+ Создать…»).
@@ -139,9 +138,17 @@ export function ResourceRefChips({
     if (next === CREATE_SENTINEL) {
       setCreating(true);
       setDraft(undefined);
+      setSelKey((k) => k + 1); // remount Select → нет залипшего sentinel
       return;
     }
-    setDraft(next);
+    // Авто-добавление при выборе — раньше требовался отдельный клик «Add», и
+    // пользователь, выбрав значение в селекторе, забывал его нажать → изменение
+    // не попадало в value → форма не детектила diff → запрос не отправлялся.
+    if (next && !value.includes(next) && !atCap) {
+      onChange([...value, next]);
+    }
+    setDraft(undefined);
+    setSelKey((k) => k + 1); // remount → Select сбрасывается на placeholder
   };
 
   const onRemove = (id: string) => {
@@ -193,24 +200,22 @@ export function ResourceRefChips({
         </div>
         <Space.Compact style={{ width: "100%" }}>
           <Select
+            key={selKey}
             showSearch
             value={draft}
             onChange={onDraftChange}
             options={options}
-            placeholder={atCap ? `Максимум ${maxItems}` : `Выбрать ${title}`}
+            placeholder={
+              disabled
+                ? (disabledHint ?? "Недоступно")
+                : atCap
+                  ? `Максимум ${maxItems}`
+                  : `Выбрать ${title}`
+            }
             optionFilterProp="label"
-            disabled={atCap}
+            disabled={disabled || atCap}
             style={{ flex: 1 }}
           />
-          <Button
-            type="primary"
-            ghost
-            onClick={onAdd}
-            disabled={!draft || atCap}
-            icon={<PlusOutlined />}
-          >
-            Add
-          </Button>
         </Space.Compact>
       </Space>
       {creating && createSpec && (

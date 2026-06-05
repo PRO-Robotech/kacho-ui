@@ -21,6 +21,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
+import { formatDateTime } from "@/lib/datetime";
 import { CopyableId } from "@/components/CopyableId";
 
 export type OperationStatus = "running" | "done" | "error" | "cancelled";
@@ -98,12 +99,7 @@ function statusCell(op: Op) {
 }
 
 function fmtTs(ts?: string): string {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return ts;
-  }
+  return formatDateTime(ts);
 }
 
 interface Props {

@@ -11,6 +11,7 @@ import { CopyableId } from "@/components/CopyableId";
 import { StatusBadge } from "@/components/StatusBadge";
 import { RefNameLink } from "@/components/RefNameLink";
 import { getByPath, type ResourceColumn, type ResourceSpec } from "@/lib/resource-registry";
+import { formatDateTime } from "@/lib/datetime";
 
 // Маппинг kacho.cloud.reference.Reference.referrer.type → registry specId, чтобы
 // рендерить потребителя как единую ссылку «иконка + имя» (RefNameLink) и иметь
@@ -174,7 +175,7 @@ export function formatCellByFormat(
     case "datetime":
       return typeof v === "string" && v ? (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {new Date(v).toLocaleString()}
+          {formatDateTime(v)}
         </Typography.Text>
       ) : (
         <Typography.Text type="secondary">—</Typography.Text>

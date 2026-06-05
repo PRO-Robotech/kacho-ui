@@ -21,6 +21,7 @@ import type { DetailTab } from "@/components/DetailShell";
 import { RefNameLink } from "@/components/RefNameLink";
 import { SgRulesPanel, type SgRule } from "@/components/SgRulesPanel";
 import { RoutesPanel } from "@/components/RoutesPanel";
+import { SubnetCidrPanel } from "@/components/SubnetCidrPanel";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ReferrerLink } from "@/lib/spec-columns";
 import { api } from "@/api/client";
@@ -202,9 +203,17 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
           dash
         ),
       },
-      { label: "IPv4 CIDR-блоки", value: cidrTags(getByPath<string[]>(data, "v4_cidr_blocks")) },
-      { label: "IPv6 CIDR-блоки", value: cidrTags(getByPath<string[]>(data, "v6_cidr_blocks")) },
+      // CIDR-блоки (IPv4/IPv6) — НЕ в таблице Обзора: они управляются отдельными
+      // RPC (:add/:remove-cidr-blocks) и показаны отдельной панелью ниже.
     ],
+    // CIDR-блоки — отдельная панель управления под Обзором (как «Статические
+    // маршруты» у route-tables). Мутируются :add/:remove-cidr-blocks, не PATCH.
+    overviewBelow: ({ data, projectId }) => {
+      const subnetId = getByPath<string>(data, "id") ?? "";
+      const v4 = (getByPath<string[]>(data, "v4_cidr_blocks") ?? []) as string[];
+      const v6 = (getByPath<string[]>(data, "v6_cidr_blocks") ?? []) as string[];
+      return <SubnetCidrPanel subnetId={subnetId} v4Blocks={v4} v6Blocks={v6} projectId={projectId} />;
+    },
   },
 
   "route-tables": {
@@ -253,14 +262,13 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
         },
       ];
     },
+    // req: правила — ОТДЕЛЬНЫМ табом «Правила» (таблица + «Добавить» + чекбоксы +
+    // bulk-delete через SgRulesPanel). Бэкенд — UpdateRules по стабильным id.
     extraTabs: ({ data, projectId }) => {
-      // KAC-239: один таб «Правила» (INGRESS+EGRESS вместе, направление — первый
-      // столбец). Управление по одному через SgRulesPanel (чекбоксы/⋮/редактор),
-      // не правкой всего SG. Бэкенд — UpdateRules по стабильным id.
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const sgId = getByPath<string>(data, "id") ?? "";
-      // KAC-243 (scenario 18): network_id редактируемой SG → SG-target picker в
-      // редакторе правил фильтрует кандидатов по той же сети.
+      // KAC-243 (scenario 18): network_id SG → SG-target picker в редакторе
+      // правил фильтрует кандидатов по той же сети.
       const networkId = getByPath<string>(data, "network_id") ?? "";
       return [
         {

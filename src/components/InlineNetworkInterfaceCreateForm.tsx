@@ -4,29 +4,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Button,
-  Form,
-  Input,
-  Select,
-  Space,
-  Tooltip,
-  Typography,
-} from "antd";
+import { Form, Input, Select, Space, Tooltip } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { ResourceRefChips } from "@/components/ResourceRefChips";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import {
   LabelsEditor,
   labelsToMap,
   type LabelEntry,
 } from "@/components/LabelsEditor";
 import { REGISTRY } from "@/lib/resource-registry";
-import {
-  useInvalidateResourceList,
-  useOperation,
-} from "@/lib/use-operation";
+import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { extractOperationId } from "@/components/OperationDialog";
 import { toast } from "@/lib/toast";
 
@@ -76,10 +66,13 @@ export function InlineNetworkInterfaceCreateForm({
   const { data: subnetList } = useQuery({
     queryKey: ["subnets", "list", projectId],
     queryFn: () =>
-      api.list<{ subnets: Array<{ id: string; name?: string }> }>(subnetSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ subnets: Array<{ id: string; name?: string }> }>(
+        subnetSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     enabled: !subnetLocked,
     staleTime: 30_000,
   });
@@ -109,7 +102,9 @@ export function InlineNetworkInterfaceCreateForm({
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Создать NIC: ${m}`);
     },
   });
@@ -147,30 +142,24 @@ export function InlineNetworkInterfaceCreateForm({
   };
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="network-interfaces" />
-        Создание: NetworkInterface
-      </Typography.Title>
-
+    <FormShell
+      specId="network-interfaces"
+      mode="create"
+      singular={spec.singular}
+    >
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
+        wrapperCol={{ flex: "1 1 0" }}
         labelAlign="left"
         colon={false}
         size="middle"
       >
         <Form.Item
-          label={labelWithInfo("Подсеть", "Подсеть, в которой создаётся NIC. После Create иммутабельно.")}
+          label={labelWithInfo(
+            "Подсеть",
+            "Подсеть, в которой создаётся NIC. После Create иммутабельно.",
+          )}
           required
         >
           <Select
@@ -191,7 +180,9 @@ export function InlineNetworkInterfaceCreateForm({
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Описание", "Опциональное описание для людей.")}>
+        <Form.Item
+          label={labelWithInfo("Описание", "Опциональное описание для людей.")}
+        >
           <Input.TextArea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -199,11 +190,21 @@ export function InlineNetworkInterfaceCreateForm({
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Метки", "Пары ключ=значение для группировки/фильтрации.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "Метки",
+            "Пары ключ=значение для группировки/фильтрации.",
+          )}
+        >
           <LabelsEditor value={labels} onChange={setLabels} />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("IPv4 адрес", "Один Address-ресурс с internal_ipv4. KAC-55: максимум один.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "IPv4 адрес",
+            "Один Address-ресурс с internal_ipv4. KAC-55: максимум один.",
+          )}
+        >
           <ResourceRefChips
             title="IPv4 Address"
             refResource="addresses"
@@ -212,7 +213,11 @@ export function InlineNetworkInterfaceCreateForm({
             value={v4}
             onChange={setV4}
             maxItems={1}
-            refFilter={(row) => !!row.internal_ipv4_address}
+            disabled={!subnetId}
+            disabledHint="Сначала выберите подсеть"
+            refFilter={(row) =>
+              (row.internal_ipv4_address as { subnet_id?: string } | undefined)?.subnet_id === subnetId
+            }
             createResource="addresses"
             createPresetFields={{
               _address_kind: "internal",
@@ -220,11 +225,16 @@ export function InlineNetworkInterfaceCreateForm({
                 ? { "internal_ipv4_address_spec.subnet_id": subnetId }
                 : {}),
             }}
-            createTitle="Создание Internal IPv4-адреса"
+            createTitle="Создание внутреннего IPv4-адреса"
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("IPv6 адрес", "Internal или external IPv6 Address-ресурс. KAC-55: максимум один.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "IPv6 адрес",
+            "Internal или external IPv6 Address-ресурс. KAC-55: максимум один.",
+          )}
+        >
           <ResourceRefChips
             title="IPv6 Address"
             refResource="addresses"
@@ -233,8 +243,10 @@ export function InlineNetworkInterfaceCreateForm({
             value={v6}
             onChange={setV6}
             maxItems={1}
+            disabled={!subnetId}
+            disabledHint="Сначала выберите подсеть"
             refFilter={(row) =>
-              !!row.internal_ipv6_address || !!row.external_ipv6_address
+              (row.internal_ipv6_address as { subnet_id?: string } | undefined)?.subnet_id === subnetId
             }
             createResource="addresses"
             createEditablePresetFields={{ _address_kind: "internal_v6" }}
@@ -247,7 +259,12 @@ export function InlineNetworkInterfaceCreateForm({
           />
         </Form.Item>
 
-        <Form.Item label={labelWithInfo("Группы безопасности", "Security Groups, прилинкованные к NIC.")}>
+        <Form.Item
+          label={labelWithInfo(
+            "Группы безопасности",
+            "Security Groups, прилинкованные к NIC.",
+          )}
+        >
           <ResourceRefChips
             title="Security Group"
             refResource="security-groups"
@@ -259,23 +276,13 @@ export function InlineNetworkInterfaceCreateForm({
             createTitle="Создание группы безопасности"
           />
         </Form.Item>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <Button
-              type="primary"
-              onClick={submit}
-              loading={mutation.isPending || !!pendingOpId}
-              disabled={mutation.isPending || !!pendingOpId}
-            >
-              Создать сетевой интерфейс
-            </Button>
-            <Button onClick={onCancel} disabled={mutation.isPending}>
-              Отмена
-            </Button>
-          </Space>
-        </Form.Item>
+        <FormFooter
+          submitLabel="Создать сетевой интерфейс"
+          submitting={mutation.isPending || !!pendingOpId}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
-    </div>
+    </FormShell>
   );
 }

@@ -6,6 +6,7 @@ import { Button, Typography, Tag } from "antd";
 import { useQueryClient } from "@tanstack/react-query";
 import { CopyOutlined } from "@ant-design/icons";
 import { api, ApiError } from "@/api/client";
+import { formatDateTime } from "@/lib/datetime";
 import { useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
 import type { Operation } from "@/api/types";
@@ -36,7 +37,7 @@ export function groupedRoleOptions(roles: Role[]) {
 export function fmtTs(ts?: string): string {
   if (!ts) return "—";
   try {
-    return new Date(ts).toLocaleString();
+    return formatDateTime(ts);
   } catch {
     return ts;
   }

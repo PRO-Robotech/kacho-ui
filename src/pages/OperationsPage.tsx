@@ -7,9 +7,10 @@
 
 import { useMemo, useState } from "react";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import { Button, Input, Select, Space, Typography } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
+import { Button, Input, Select, Space, Tag, Typography } from "antd";
+import { ReloadOutlined, DeploymentUnitOutlined } from "@ant-design/icons";
 import { api } from "@/api/client";
+import { PanelHeader } from "@/components/PanelHeader";
 import { useBreadcrumb, useHeaderRight } from "@/components/PageHeaderSlot";
 import { ErrorResult } from "@/components/ErrorResult";
 import {
@@ -42,7 +43,8 @@ const STATUS_OPTIONS: { value: OperationStatus | "all"; label: string }[] = [
 
 const KIND_OPTIONS = [
   { value: "all", label: "Все типы" },
-  ...VPC_RESOURCES.map((r) => ({ value: r.id, label: r.label })),
+  // Русские названия из реестра (singular), а не английские VPC_RESOURCES.label.
+  ...VPC_RESOURCES.map((r) => ({ value: r.id, label: REGISTRY[r.id]?.singular ?? r.label })),
 ];
 
 interface ResListResp {
@@ -180,44 +182,49 @@ export function OperationsPage() {
   }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: "100%" }}>
-      <div>
-        <Typography.Title level={3} style={{ margin: 0 }}>
-          Операции
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-          Все операции (LRO) по VPC-ресурсам в текущем проекте.
-        </Typography.Text>
-      </div>
+    <div className="kc-surface" style={{ padding: 20, minHeight: "100%" }}>
+      <Space direction="vertical" size={0} style={{ width: "100%" }}>
+        {/* Единая шапка: общая VPC-иконка модуля (DeploymentUnitOutlined,
+            отличная от network) + действие «Операции» + название «VPC» +
+            счётчик; фильтры — справа. */}
+        <PanelHeader
+          icon={<DeploymentUnitOutlined />}
+          eyebrow="Операции"
+          title={
+            // height 20 = строка заголовка (16·1.25); Tag ≤18 не распирает строку
+            // → бейдж не прыгает относительно list-страниц (тот же фикс, что в
+            // ResourceListPage).
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 20, lineHeight: "20px" }}>
+              VPC
+              <Tag
+                style={{ margin: 0, fontSize: 11.5, fontWeight: 600, lineHeight: "16px", height: 18, paddingInline: 6, borderRadius: 5 }}
+              >
+                {filtered.length}
+              </Tag>
+            </span>
+          }
+          right={
+            <>
+              <Input
+                placeholder="Фильтр по идентификатору"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                allowClear
+                style={{ width: 280 }}
+              />
+              <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+              <Select value={kind} onChange={setKind} options={KIND_OPTIONS} style={{ width: 180 }} />
+            </>
+          }
+        />
 
-      <Space size={8} wrap>
-        <Input
-          placeholder="Фильтр по идентификатору"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          allowClear
-          style={{ width: 320 }}
-        />
-        <Select
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-          style={{ width: 200 }}
-        />
-        <Select
-          value={kind}
-          onChange={setKind}
-          options={KIND_OPTIONS}
-          style={{ width: 200 }}
+        <OperationsTable
+          rows={filtered}
+          loading={isLoading}
+          showResourceKind
+          empty={allOps.length > 0 && filtered.length === 0}
         />
       </Space>
-
-      <OperationsTable
-        rows={filtered}
-        loading={isLoading}
-        showResourceKind
-        empty={allOps.length > 0 && filtered.length === 0}
-      />
-    </Space>
+    </div>
   );
 }

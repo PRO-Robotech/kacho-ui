@@ -18,15 +18,17 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Descriptions, Spin, Tag, Typography } from "antd";
+import { Button, Descriptions, Spin, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
-import { SectionHeader } from "@/components/SectionHeader";
+import { DetailShell, HeaderSlotPortal, type DetailTab, type DocLink } from "@/components/DetailShell";
+import { DetailHeaderProvider } from "@/components/PanelHeader";
+import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
 import { ResourceTable } from "@/components/ResourceTable";
 import { ErrorResult } from "@/components/ErrorResult";
 import { CopyableId } from "@/components/CopyableId";
 import { LabelsCell } from "@/components/LabelsCell";
+import { formatDateTime } from "@/lib/datetime";
 import { RowActionsMenu } from "@/components/RowActionsMenu";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
 import { OperationsTab } from "@/components/OperationsTab";
@@ -50,16 +52,6 @@ export type ResourceShellMode = "edit" | "child-create";
 
 function specByRoute(route: string): ResourceSpec | undefined {
   return Object.values(REGISTRY).find((s) => s.route === route);
-}
-
-/** Дата создания в формате "30.05.2026, в 00:38". */
-function fmtCreatedAt(iso?: string): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  const date = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  return `${date}, в ${time}`;
 }
 
 /** JsonIntView — internal/infra-проекция ресурса (GET spec.internalGetPath). */
@@ -139,21 +131,12 @@ function RelatedTable({
 
   return (
     <div>
-      <SectionHeader
-        title={
-          <>
-            {childSpec.plural} <Tag style={{ marginLeft: 4 }}>{ownRows.length}</Tag>
-          </>
-        }
-        right={
-          <>
-            <TableSearch value={search} onChange={setSearch} />
-            <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
-            {/* «Создать <child>» — в ШАПКЕ страницы (ResourceShell header, KAC-242),
-                не в заголовке таблицы. createPath/createLabel ещё нужны empty-state. */}
-          </>
-        }
-      />
+      {/* Фильтры (поиск/колонки) поднимаются на уровень имени ресурса (зона 3,
+          правый слот) через HeaderSlotPortal — req3. */}
+      <HeaderSlotPortal>
+        <TableSearch value={search} onChange={setSearch} />
+        <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
+      </HeaderSlotPortal>
       <ResourceTable
         rows={rows}
         columns={columns}
@@ -283,7 +266,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     return <ErrorResult error={error} />;
   }
 
-  const status = getByPath<string>(data, "status");
   const related = spec.related ?? [];
   const extCtx = { data, projectId: projectId ?? null, detailBase, navigate };
 
@@ -292,8 +274,10 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     { label: "Идентификатор", value: <CopyableId id={getByPath<string>(data, "id") ?? ""} /> },
     { label: "Имя", value: name },
     { label: "Описание", value: getByPath<string>(data, "description") || "—" },
-    { label: "Дата создания", value: fmtCreatedAt(getByPath<string>(data, "created_at")) },
-    { label: "Метки", value: <LabelsCell labels={getByPath<Record<string, string>>(data, "labels")} /> },
+    { label: "Дата создания", value: formatDateTime(getByPath<string>(data, "created_at")) },
+    // KAC-246: метки в обзоре — read-only (chips); добавление/правка — в форме
+    // создания/модификации (LabelsEditor, key=value-таблица).
+    { label: "Метки", value: <LabelsCell labels={getByPath<Record<string, string>>(data, "labels")} max={12} /> },
     ...(ext?.overviewExtra?.(extCtx) ?? []),
   ];
 
@@ -303,7 +287,6 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       label: "Обзор",
       render: () => (
         <div>
-          <SectionHeader title="Обзор" />
           <Descriptions
             column={1}
             size="small"
@@ -326,6 +309,11 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     tabs.push({
       id: childSpec.route,
       label: r.label ?? childSpec.plural,
+      // Зона-2: связанный таб = список дочернего ресурса → «действие» Список,
+      // тип/иконка ребёнка (а НЕ label таба над типом родителя).
+      eyebrow: "Список",
+      headerTitle: childSpec.plural,
+      headerIcon: <ResourceIcon specId={childSpec.id} />,
       render: () => (
         <RelatedTable
           childSpec={childSpec}
@@ -352,9 +340,9 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   tabs.push({
     id: "json",
     label: "JSON",
+    eyebrow: "JSON",
     render: () => (
       <div>
-        <SectionHeader title="JSON" />
         <JsonMonacoView data={data} />
       </div>
     ),
@@ -364,9 +352,9 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     tabs.push({
       id: "jsonint",
       label: "JSON (internal)",
+      eyebrow: "JSON",
       render: () => (
         <div>
-          <SectionHeader title="JSON (internal)" />
           <JsonIntView path={intPath} />
         </div>
       ),
@@ -426,16 +414,34 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     else navigate(`${detailBase}/${id}`);
   };
 
+  // Зона-2 шапка для форм (edit/child-create): действие + тип + иконка ресурса
+  // формы — контекст переезжает в блок табов, форма в зоне 3 свою шапку не дублирует.
+  const childForHeader =
+    mode === "child-create" && childRoute ? specByRoute(childRoute) : undefined;
+  const headerEyebrow =
+    mode === "edit" ? "Редактирование" : mode === "child-create" ? "Создание" : undefined;
+  const headerTitle =
+    mode === "edit" ? spec.plural : mode === "child-create" ? childForHeader?.plural : undefined;
+  const headerIcon =
+    mode === "child-create" && childForHeader ? <ResourceIcon specId={childForHeader.id} /> : undefined;
+
   return (
-    <DetailShell
-      resourceLabel={spec.singular}
-      resourceName={name}
-      badges={status ? <Tag>{status}</Tag> : undefined}
-      tabs={tabs}
-      docLinks={(spec.docs as DocLink[] | undefined) ?? []}
-      mainOverride={mainOverride}
-      activeTabId={activeTabId}
-      onTabSelect={onTabSelect}
-    />
+    // Прокидываем иконку ресурса вниз — все SectionHeader табов получают её
+    // (единая шапка с формами через PanelHeader).
+    <DetailHeaderProvider value={{ icon: <ResourceIcon specId={spec.id} /> }}>
+      <DetailShell
+        resourceLabel={spec.genitive ?? spec.plural}
+        resourceName={name}
+        nameEyebrow={spec.singular}
+        tabs={tabs}
+        docLinks={(spec.docs as DocLink[] | undefined) ?? []}
+        mainOverride={mainOverride}
+        activeTabId={activeTabId}
+        onTabSelect={onTabSelect}
+        headerEyebrow={headerEyebrow}
+        headerTitle={headerTitle}
+        headerIcon={headerIcon}
+      />
+    </DetailHeaderProvider>
   );
 }

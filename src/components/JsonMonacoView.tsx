@@ -5,6 +5,7 @@
 
 import Editor from "@monaco-editor/react";
 import { theme } from "antd";
+import { useThemeMode } from "@/lib/theme-context";
 
 interface Props {
   data: unknown;
@@ -14,7 +15,10 @@ interface Props {
 
 export function JsonMonacoView({ data, height = "60vh" }: Props) {
   const { token } = theme.useToken();
+  const { mode } = useThemeMode();
   const json = JSON.stringify(data, null, 2);
+  // KAC-246: Monaco-тема следует теме приложения (в светлой раньше оставался тёмным).
+  const monacoTheme = mode === "dark" ? "vs-dark" : "vs";
 
   return (
     <div
@@ -22,14 +26,14 @@ export function JsonMonacoView({ data, height = "60vh" }: Props) {
         border: `1px solid ${token.colorBorderSecondary}`,
         borderRadius: token.borderRadius,
         overflow: "hidden",
-        background: "#1e1e1e",
+        background: mode === "dark" ? "#1e1e1e" : "#ffffff",
       }}
     >
       <Editor
         height={height}
         defaultLanguage="json"
         value={json}
-        theme="vs-dark"
+        theme={monacoTheme}
         options={{
           readOnly: true,
           domReadOnly: true,

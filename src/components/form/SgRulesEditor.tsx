@@ -94,6 +94,35 @@ function emptyRule(): RuleExt {
   };
 }
 
+// Пресеты — частые INGRESS-правила в один клик (быстрый старт, чище UX).
+function ingressTcp(port: number): RuleExt {
+  return {
+    direction: "INGRESS",
+    _protocol_mode: "name",
+    protocol_name: "TCP",
+    _ports_any: false,
+    ports: { from_port: port, to_port: port },
+    _target_kind: "cidr",
+    cidr_blocks: { v4_cidr_blocks: ["0.0.0.0/0"] },
+  };
+}
+const RULE_PRESETS: { label: string; make: () => RuleExt }[] = [
+  { label: "SSH", make: () => ingressTcp(22) },
+  { label: "HTTP", make: () => ingressTcp(80) },
+  { label: "HTTPS", make: () => ingressTcp(443) },
+  {
+    label: "ICMP",
+    make: () => ({
+      direction: "INGRESS",
+      _protocol_mode: "name",
+      protocol_name: "ICMP",
+      _ports_any: true,
+      _target_kind: "cidr",
+      cidr_blocks: { v4_cidr_blocks: ["0.0.0.0/0"] },
+    }),
+  },
+];
+
 // One-line сводка правила для свёрнутой Collapse-панели.
 function ruleSummary(r: RuleExt): string {
   const parts: string[] = [];
@@ -141,6 +170,13 @@ export function SgRulesEditor({ value, onChange, path, description, editingNetwo
     setActiveKeys((prev) => [...prev, String(nextIdx)]);
   };
 
+  const addPreset = (make: () => RuleExt) => {
+    onChange(setByPath(value, path, [...rules, make()]));
+  };
+
+  const ingressN = rules.filter((r) => (r.direction ?? "INGRESS") === "INGRESS").length;
+  const egressN = rules.length - ingressN;
+
   const removeRule = (idx: number) => {
     onChange(deleteByPath(value, `${path}[${idx}]`));
     setActiveKeys((prev) => prev.filter((k) => k !== String(idx)));
@@ -150,11 +186,11 @@ export function SgRulesEditor({ value, onChange, path, description, editingNetwo
     <Card
       size="small"
       title={
-        <Space size={8}>
+        <Space size={10}>
           <Typography.Text strong>Правила</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {rules.length}
-          </Typography.Text>
+          {/* Живая сводка направлений (обновляется по мере добавления). */}
+          <Tag color="green" style={{ margin: 0, fontSize: 11 }}>↓ {ingressN} вход.</Tag>
+          <Tag color="blue" style={{ margin: 0, fontSize: 11 }}>↑ {egressN} исх.</Tag>
         </Space>
       }
       extra={
@@ -177,6 +213,17 @@ export function SgRulesEditor({ value, onChange, path, description, editingNetwo
           {description}
         </Typography.Text>
       )}
+      {/* Быстрые пресеты — частые INGRESS-правила в один клик. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+          Быстро:
+        </Typography.Text>
+        {RULE_PRESETS.map((p) => (
+          <AntButton key={p.label} size="small" icon={<PlusOutlined />} onClick={() => addPreset(p.make)}>
+            {p.label}
+          </AntButton>
+        ))}
+      </div>
       {rules.length === 0 ? (
         <Typography.Text type="secondary" italic style={{ fontSize: 12 }}>
           — пусто, трафик блокируется (default-deny) —

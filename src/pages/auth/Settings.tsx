@@ -40,6 +40,7 @@ import {
 } from "@/lib/kratos";
 import { AuthLayout, bufferToBase64Url } from "./Login";
 import { config } from "@/lib/config";
+import { formatDateTime } from "@/lib/datetime";
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -367,7 +368,7 @@ export function SettingsPage() {
                   title={entry.display_name}
                   description={
                     entry.added_at
-                      ? `Добавлен ${new Date(entry.added_at).toLocaleString()}`
+                      ? `Добавлен ${formatDateTime(entry.added_at)}`
                       : undefined
                   }
                 />

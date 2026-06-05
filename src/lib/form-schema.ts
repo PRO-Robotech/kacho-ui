@@ -40,6 +40,11 @@ interface BaseField {
   // неактивную ветку (external_* vs internal_*). Поле всё ещё может присутствовать
   // в `obj`, sanitize стрижёт его перед отправкой.
   visibleWhen?: { field: string; equals: string | string[] };
+  // Override авто-определения full-width (по умолчанию array/sg-rules/custom →
+  // full-width без label-колонки). fullWidth:false рендерит поле как обычное
+  // labeled (label слева 200px + контрол в wrapper-колонке) — например custom
+  // static_routes (RoutesEditor), чтобы выровнять с остальными полями.
+  fullWidth?: boolean;
 }
 
 export interface StringField extends BaseField {

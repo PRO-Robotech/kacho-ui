@@ -19,6 +19,7 @@ import {
   DragOutlined,
 } from "@ant-design/icons";
 import { JsonMonacoView } from "@/components/JsonMonacoView";
+import { formatDateTime } from "@/lib/datetime";
 import { ErrorResult } from "@/components/ErrorResult";
 import { RefNameLink } from "@/components/RefNameLink";
 import { InlineResourceEditForm } from "@/components/InlineResourceEditForm";
@@ -412,7 +413,7 @@ export function ResourceDetailPage({
     getByPath<string>(data, "created_at")
       ? {
           label: "Дата создания",
-          value: new Date(getByPath<string>(data, "created_at")!).toLocaleString(),
+          value: formatDateTime(getByPath<string>(data, "created_at")),
         }
       : null,
     getByPath<string>(data, "project_id")
@@ -637,8 +638,9 @@ export function ResourceDetailPage({
   return (
     <>
       <DetailShell
-        resourceLabel={spec.singular}
+        resourceLabel={spec.genitive ?? spec.plural}
         resourceName={name || resourceId}
+        nameEyebrow={spec.singular}
         badges={statusValue ? <StatusBadge state={statusValue} /> : null}
         tabs={tabs}
         secondaryActions={secondaryActions ? secondaryActions(data) : undefined}

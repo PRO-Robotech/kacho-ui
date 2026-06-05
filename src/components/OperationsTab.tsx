@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Input, Select, Space, Typography } from "antd";
+import { Input, Select } from "antd";
 import { api, ApiError } from "@/api/client";
 import { ErrorResult } from "@/components/ErrorResult";
 import {
@@ -16,6 +16,7 @@ import {
   type OperationStatus,
 } from "@/components/OperationsTable";
 import type { ResourceSpec } from "@/lib/resource-registry";
+import { HeaderSlotPortal } from "@/components/DetailShell";
 
 interface Props {
   spec: ResourceSpec;
@@ -86,32 +87,24 @@ export function OperationsTab({ spec, resourceId }: Props) {
   }
 
   return (
-    <Space direction="vertical" size={12} style={{ width: "100%" }}>
-      <Typography.Title level={4} style={{ margin: 0 }}>
-        Операции
-      </Typography.Title>
-
-      <Space size={8} wrap>
+    <div>
+      {/* Фильтры операций — на уровень имени ресурса (зона 3, правый слот). */}
+      <HeaderSlotPortal>
         <Input
           placeholder="Фильтр по идентификатору"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           allowClear
-          style={{ width: 320 }}
+          style={{ width: 260 }}
         />
-        <Select
-          value={status}
-          onChange={setStatus}
-          options={STATUS_OPTIONS}
-          style={{ width: 200 }}
-        />
-      </Space>
+        <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
+      </HeaderSlotPortal>
 
       <OperationsTable
         rows={filtered}
         loading={isLoading}
         empty={ops.length > 0 && filtered.length === 0}
       />
-    </Space>
+    </div>
   );
 }

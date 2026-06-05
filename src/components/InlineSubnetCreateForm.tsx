@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Button,
   Collapse,
   Form,
   Input,
@@ -26,9 +25,9 @@ import {
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
-import { SubnetCidrChips } from "@/components/SubnetCidrChips";
-import { DopplerButton } from "@/components/DopplerButton";
-import { ResourceIcon } from "@/components/form/ResourceIcon";
+import { CidrSection } from "@/components/SubnetCidrChips";
+import { FormShell } from "@/components/form/FormShell";
+import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
 import { useInvalidateResourceList, useOperation } from "@/lib/use-operation";
 import { toast } from "@/lib/toast";
@@ -66,17 +65,22 @@ export function InlineSubnetCreateForm({
 
   // Если networkId preset (передан из контекста — например, "Создать подсеть"
   // из NetworkDetailPage), сеть locked. Иначе — selectable в форме.
-  const [networkId, setNetworkId] = useState<string | undefined>(presetNetworkId);
+  const [networkId, setNetworkId] = useState<string | undefined>(
+    presetNetworkId,
+  );
   const networkLocked = !!presetNetworkId;
 
   // Список Networks для RefSelect (когда preset не задан).
   const { data: netData } = useQuery({
     queryKey: ["networks", "list", projectId],
     queryFn: () =>
-      api.list<{ networks: Array<{ id: string; name?: string }> }>(networkSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ networks: Array<{ id: string; name?: string }> }>(
+        networkSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     enabled: !networkLocked,
     staleTime: 30_000,
   });
@@ -93,7 +97,9 @@ export function InlineSubnetCreateForm({
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<LabelEntry[]>([]);
   const [zoneId, setZoneId] = useState<string | undefined>(undefined);
-  const [routeTableId, setRouteTableId] = useState<string | undefined>(undefined);
+  const [routeTableId, setRouteTableId] = useState<string | undefined>(
+    undefined,
+  );
   // CIDR-блоки храним как массив готовых строк "10.0.0.0/24" (как в edit-вью);
   // визуально — chip-list через SubnetCidrChips (visual parity с SubnetCidrManager).
   const [v4Blocks, setV4Blocks] = useState<string[]>([]);
@@ -106,9 +112,12 @@ export function InlineSubnetCreateForm({
   const { data: zoneData } = useQuery({
     queryKey: ["zones", "list"],
     queryFn: () =>
-      api.list<{ zones: Array<{ id: string; name?: string }> }>(zoneSpec.apiPath, {
-        pageSize: "500",
-      }),
+      api.list<{ zones: Array<{ id: string; name?: string }> }>(
+        zoneSpec.apiPath,
+        {
+          pageSize: "500",
+        },
+      ),
     staleTime: 60_000,
   });
   const zoneOptions = useMemo(
@@ -130,10 +139,13 @@ export function InlineSubnetCreateForm({
   const { data: rtData } = useQuery({
     queryKey: ["route-tables", "list", projectId, networkId],
     queryFn: () =>
-      api.list<{ route_tables: Array<Record<string, unknown>> }>(rtSpec.apiPath, {
-        project_id: projectId,
-        pageSize: "500",
-      }),
+      api.list<{ route_tables: Array<Record<string, unknown>> }>(
+        rtSpec.apiPath,
+        {
+          project_id: projectId,
+          pageSize: "500",
+        },
+      ),
     staleTime: 30_000,
   });
   const rtOptions = useMemo(
@@ -165,7 +177,9 @@ export function InlineSubnetCreateForm({
     },
     onError: (err) => {
       const m =
-        err instanceof ApiError ? `${err.code}: ${err.message}` : (err as Error).message;
+        err instanceof ApiError
+          ? `${err.code}: ${err.message}`
+          : (err as Error).message;
       toast.error(`Создать подсеть: ${m}`);
     },
   });
@@ -230,24 +244,11 @@ export function InlineSubnetCreateForm({
   };
 
   return (
-    <div>
-      <Typography.Title
-        level={4}
-        style={{
-          margin: "0 0 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <ResourceIcon specId="subnets" />
-        Создание: Subnet
-      </Typography.Title>
-
+    <FormShell specId="subnets" mode="create" singular={subnetSpec.singular}>
       <Form
         layout="horizontal"
         labelCol={{ flex: "200px" }}
-        wrapperCol={{ flex: "auto" }}
+        wrapperCol={{ flex: "1 1 0" }}
         labelAlign="left"
         colon={false}
         size="middle"
@@ -303,26 +304,33 @@ export function InlineSubnetCreateForm({
           />
         </Form.Item>
 
+        {/* IPv4 и IPv6 CIDR — ДВА отдельных поля (как в edit). Хотя бы одно
+            семейство обязательно (v4-only / v6-only / dual-stack). */}
         <Form.Item
           label={
             <Space size={4}>
-              IPv4 и IPv6 CIDR
-              <Tooltip title="IPv4 и/или IPv6 CIDR-блоки подсети. Хотя бы одно семейство обязательно (v4-only / v6-only / dual-stack). Введите CIDR с префиксом, например 10.0.0.0/24 или 2001:db8::/64, и нажмите Add.">
+              IPv4 CIDR
+              <Tooltip title="IPv4 CIDR-блоки подсети. Введите CIDR с префиксом, например 10.0.0.0/24, и нажмите Add. Можно оставить пустым для IPv6-only подсети.">
                 <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
               </Tooltip>
             </Space>
           }
           required
         >
-          {/* Тот же chip-list-виджет, что у Edit (SubnetCidrManager), но в
-              controlled-mode — мутирует локальный state, отправка вместе с
-              формой. Визуальная parity с edit-страницей. */}
-          <SubnetCidrChips
-            v4Blocks={v4Blocks}
-            onV4Change={setV4Blocks}
-            v6Blocks={v6Blocks}
-            onV6Change={setV6Blocks}
-          />
+          <CidrSection kind="v4" blocks={v4Blocks} onChange={setV4Blocks} hideTitle />
+        </Form.Item>
+
+        <Form.Item
+          label={
+            <Space size={4}>
+              IPv6 CIDR
+              <Tooltip title="IPv6 CIDR-блоки подсети. Введите CIDR с префиксом, например 2001:db8::/64, и нажмите Add. Можно оставить пустым для IPv4-only подсети.">
+                <QuestionCircleOutlined style={{ color: "rgba(255,255,255,0.45)" }} />
+              </Tooltip>
+            </Space>
+          }
+        >
+          <CidrSection kind="v6" blocks={v6Blocks} onChange={setV6Blocks} hideTitle />
         </Form.Item>
 
         <div style={{ margin: "16px 0" }}>
@@ -331,11 +339,13 @@ export function InlineSubnetCreateForm({
             items={[
               {
                 key: "dhcp",
-                label: (
-                  <Typography.Text strong>Настройки DHCP</Typography.Text>
-                ),
+                label: <Typography.Text strong>Настройки DHCP</Typography.Text>,
                 children: (
-                  <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    style={{ width: "100%" }}
+                  >
                     <Form.Item label="Domain name" style={{ marginBottom: 0 }}>
                       <Input
                         value={dhcpDomainName}
@@ -367,25 +377,13 @@ export function InlineSubnetCreateForm({
             ]}
           />
         </div>
-
-        <Form.Item wrapperCol={{ offset: 0, flex: "auto" }}>
-          <Space>
-            <DopplerButton
-              type="primary"
-              onClick={submit}
-              pulsing={mutation.isPending || pendingOpId !== null}
-            >
-              Создать подсеть
-            </DopplerButton>
-            <Button
-              onClick={onCancel}
-              disabled={mutation.isPending || pendingOpId !== null}
-            >
-              Отменить
-            </Button>
-          </Space>
-        </Form.Item>
+        <FormFooter
+          submitLabel="Создать подсеть"
+          submitting={mutation.isPending || pendingOpId !== null}
+          onSubmit={submit}
+          onCancel={onCancel}
+        />
       </Form>
-    </div>
+    </FormShell>
   );
 }
