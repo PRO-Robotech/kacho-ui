@@ -412,7 +412,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         // Под подсетью адреса всегда ВНУТРЕННИЕ (фильтр по internal_*.subnet_id).
         childId: "addresses",
         filterField: ["internal_ipv4_address.subnet_id", "internal_ipv6_address.subnet_id"],
-        label: "Внутренние адреса",
+        label: "IP-адреса",
       },
     ],
     docs: [
