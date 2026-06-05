@@ -2,6 +2,7 @@
 // InlineNetworkInterfaceCreateForm.
 
 import { useEffect, useState } from "react";
+import { snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Form, Input, Space, Tooltip, Typography } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
@@ -149,7 +150,7 @@ export function InlineNetworkInterfaceEditForm({
       v4_address_ids: v4,
       v6_address_ids: v6,
       security_group_ids: sgs,
-      update_mask: mask.join(","),
+      update_mask: mask.map(snakeToCamelPath).join(","),
     });
   };
 

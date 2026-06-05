@@ -10,6 +10,7 @@
 // + соответствующий пункт в update_mask.
 
 import { useEffect, useState } from "react";
+import { snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Form,
@@ -141,7 +142,7 @@ export function InlineAddressPoolEditForm({
       description: description || "",
       is_default: isDefault,
       selector_priority: selectorPriority,
-      update_mask: mask.join(","),
+      update_mask: mask.map(snakeToCamelPath).join(","),
     };
     if (v4Changed) {
       payload.v4_cidr_blocks = v4Blocks;

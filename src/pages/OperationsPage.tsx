@@ -191,10 +191,13 @@ export function OperationsPage() {
           icon={<DeploymentUnitOutlined />}
           eyebrow="Операции"
           title={
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            // height 20 = строка заголовка (16·1.25); Tag ≤18 не распирает строку
+            // → бейдж не прыгает относительно list-страниц (тот же фикс, что в
+            // ResourceListPage).
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 20, lineHeight: "20px" }}>
               VPC
               <Tag
-                style={{ margin: 0, fontSize: 13, fontWeight: 600, lineHeight: "22px", height: 24, paddingInline: 9, borderRadius: 7 }}
+                style={{ margin: 0, fontSize: 11.5, fontWeight: 600, lineHeight: "16px", height: 18, paddingInline: 6, borderRadius: 5 }}
               >
                 {filtered.length}
               </Tag>

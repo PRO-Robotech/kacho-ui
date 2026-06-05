@@ -7,6 +7,7 @@
 // действительно изменённые mutable-поля.
 
 import { useEffect, useMemo, useState } from "react";
+import { snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Collapse,
@@ -205,7 +206,7 @@ export function InlineSubnetEditForm({
 
     mutation.mutate({
       ...next,
-      update_mask: mask.join(","),
+      update_mask: mask.map(snakeToCamelPath).join(","),
     });
   };
 

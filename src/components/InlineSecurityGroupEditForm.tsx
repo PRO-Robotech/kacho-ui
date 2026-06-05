@@ -6,6 +6,7 @@
 // всего ресурса. Поэтому здесь rules-секции нет.
 
 import { useEffect, useState } from "react";
+import { snakeToCamelPath } from "@/components/ResourceFormDialog";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Form, Input, Typography } from "antd";
 import { ApiError, api } from "@/api/client";
@@ -76,7 +77,7 @@ export function InlineSecurityGroupEditForm({
         name,
         description,
         labels: obj.labels ?? {},
-        update_mask: mask.join(","),
+        update_mask: mask.map(snakeToCamelPath).join(","),
       });
       const opId = extractOperationId(
         resp as Parameters<typeof extractOperationId>[0],

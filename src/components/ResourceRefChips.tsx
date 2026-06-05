@@ -61,6 +61,10 @@ export function ResourceRefChips({
   const account = useContext((s) => s.account);
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [creating, setCreating] = useState(false);
+  // Ремоунт Select при выборе sentinel «Создать»: AntD держит sentinel
+  // «выбранным» (controlled value не меняется) → повторный выбор того же пункта
+  // не триггерит onChange → модалка не открывалась снова после отмены.
+  const [selKey, setSelKey] = useState(0);
 
   // Загружаем список ресурсов проекта для resolve id→name + dropdown options.
   const { data: listData, refetch } = useQuery({
@@ -139,6 +143,7 @@ export function ResourceRefChips({
     if (next === CREATE_SENTINEL) {
       setCreating(true);
       setDraft(undefined);
+      setSelKey((k) => k + 1); // remount Select → нет залипшего sentinel
       return;
     }
     setDraft(next);
@@ -193,6 +198,7 @@ export function ResourceRefChips({
         </div>
         <Space.Compact style={{ width: "100%" }}>
           <Select
+            key={selKey}
             showSearch
             value={draft}
             onChange={onDraftChange}
