@@ -92,11 +92,11 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
-// NameTruchet — бесток-identicon под Kachō: Truchet-плитки (перетекающие дуги),
-// детерминированно сгенерированные из hash(имя). Generative-art line-art в brand
-// cool-палитре, тон-плитка/радиус 1-в-1 с ContextBadge зоны-2 → вписано в
-// стилистику; у каждого ресурса — узнаваемый уникальный узор.
-const TRUCHET_PALETTE = [
+// NameNodeGrid — бесток-identicon под Kachō: узлы на сетке 3×3 + ортогональные
+// связи (PCB/схема-инфры), детерминированно из hash(имя). Центр всегда есть;
+// прочие узлы и связи — из бит hash. Brand cool-палитра, тон-плитка/радиус как у
+// ContextBadge зоны-2 → вписано в стилистику.
+const NODEGRID_PALETTE = [
   "#2BB5C0", // teal
   "#2D9CDB", // sky
   "#2F80ED", // blue
@@ -106,38 +106,42 @@ const TRUCHET_PALETTE = [
   "#6C5CE7", // violet
   "#7B6CF6", // periwinkle
 ];
-function truchetHash(s: string): number {
+function nodegridHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  // avalanche — мелкое изменение имени даёт сильно иной узор.
+  // avalanche — мелкое изменение имени даёт сильно иную схему.
   h ^= h >>> 13;
   h = (h * 0x5bd1e995) >>> 0;
   h ^= h >>> 15;
   return h >>> 0;
 }
-function NameTruchet({ name, size = 42 }: { name: string; size?: number }) {
-  const n = truchetHash((name || "?").trim() || "?");
-  const col = TRUCHET_PALETTE[n % TRUCHET_PALETTE.length];
+function NameNodeGrid({ name, size = 42 }: { name: string; size?: number }) {
+  const n = nodegridHash((name || "?").trim() || "?");
+  const col = NODEGRID_PALETTE[n % NODEGRID_PALETTE.length];
   const G = 3;
-  const cs = 100 / G;
-  const sw = cs * 0.17;
-  const r = cs / 2;
-  const f = (v: number) => v.toFixed(2);
-  // Каждая ячейка — пара четвертькругов в одной из 2 ориентаций (бит из hash) →
-  // перетекающий лабиринт-узор.
-  const paths: string[] = [];
+  const pad = 22;
+  const step = (100 - 2 * pad) / (G - 1);
+  const bit = (i: number) => (n >> (i % 30)) & 1;
+  // present[y*G+x] — есть ли узел; центр (1,1) всегда.
+  const present: boolean[] = [];
+  for (let y = 0; y < G; y++) {
+    for (let x = 0; x < G; x++) present.push(!!bit(y * G + x) || (x === 1 && y === 1));
+  }
+  const px = (x: number) => pad + x * step;
+  const py = (y: number) => pad + y * step;
+  const lines: Array<[number, number, number, number]> = [];
+  const dots: Array<[number, number, boolean]> = [];
   for (let y = 0; y < G; y++) {
     for (let x = 0; x < G; x++) {
-      const b = (n >> ((y * G + x) % 30)) & 1;
-      const ox = x * cs;
-      const oy = y * cs;
-      if (b) {
-        paths.push(`M${f(ox)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 0 ${f(ox + r)} ${f(oy)}`);
-        paths.push(`M${f(ox + cs)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 0 ${f(ox + r)} ${f(oy + cs)}`);
-      } else {
-        paths.push(`M${f(ox + r)} ${f(oy)} A ${f(r)} ${f(r)} 0 0 1 ${f(ox + cs)} ${f(oy + r)}`);
-        paths.push(`M${f(ox)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 1 ${f(ox + r)} ${f(oy + cs)}`);
-      }
+      if (!present[y * G + x]) continue;
+      if (x < G - 1 && present[y * G + x + 1] && bit(9 + y)) lines.push([px(x), py(y), px(x + 1), py(y)]);
+      if (y < G - 1 && present[(y + 1) * G + x] && bit(12 + x)) lines.push([px(x), py(y), px(x), py(y + 1)]);
+    }
+  }
+  for (let y = 0; y < G; y++) {
+    for (let x = 0; x < G; x++) {
+      if (!present[y * G + x]) continue;
+      dots.push([px(x), py(y), x === 1 && y === 1]);
     }
   }
   return (
@@ -156,8 +160,29 @@ function NameTruchet({ name, size = 42 }: { name: string; size?: number }) {
       }}
     >
       <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: "block" }}>
-        {paths.map((d, i) => (
-          <path key={i} d={d} fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round" />
+        {lines.map(([x1, y1, x2, y2], i) => (
+          <line
+            key={`l${i}`}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={col}
+            strokeWidth={2}
+            strokeOpacity={0.4}
+            strokeLinecap="round"
+          />
+        ))}
+        {dots.map(([cx, cy, big], i) => (
+          <rect
+            key={`d${i}`}
+            x={cx - (big ? 5 : 3.5)}
+            y={cy - (big ? 5 : 3.5)}
+            width={big ? 10 : 7}
+            height={big ? 10 : 7}
+            rx={2}
+            fill={col}
+          />
         ))}
       </svg>
     </div>
@@ -351,7 +376,7 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameTruchet name={resourceName} />
+            <NameNodeGrid name={resourceName} />
             <div style={{ minWidth: 0 }}>
               {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
