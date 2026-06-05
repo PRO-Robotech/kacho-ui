@@ -192,18 +192,21 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
       icon={<ResourceIcon specId={spec.id} />}
       eyebrow="Список"
       title={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+        // height:20 = строка заголовка (16px·1.25) — счётчик-Tag НЕ распирает
+        // строку (был 24px), иначе текст бейджа «скачет» относительно detail
+        // (там тега нет). Tag ≤18px помещается в строку.
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 20, lineHeight: "20px" }}>
           {spec.plural}
           {!isLoading && !isError && (
             <Tag
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: 11.5,
                 fontWeight: 600,
-                lineHeight: "22px",
-                height: 24,
-                paddingInline: 9,
-                borderRadius: 7,
+                lineHeight: "16px",
+                height: 18,
+                paddingInline: 6,
+                borderRadius: 5,
               }}
             >
               {filteredItems.length}
