@@ -113,8 +113,10 @@ function NameMonogram({ name }: { name: string }) {
     <div
       aria-hidden
       style={{
-        width: 44,
-        height: 44,
+        // Размер/радиус — 1-в-1 с плиткой ContextBadge (TILE=42) в зоне-2, чтобы
+        // бейдж таба и бейдж имени были одного размера и на одной линии (top=20).
+        width: 42,
+        height: 42,
         borderRadius: 12,
         flexShrink: 0,
         display: "flex",
@@ -306,20 +308,25 @@ export function DetailShell({
             (related-таблица / операции) на уровень имени (HeaderSlotPortal). */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-            flexWrap: "wrap",
             paddingBottom: 16,
             marginBottom: 18,
             borderBottom: "1px solid var(--kc-border-secondary)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            {/* Монограмма из имени — оживляет одиночный заголовок (req4). */}
-            <NameMonogram name={resourceName} />
-            <div style={{ minWidth: 0 }}>
+          {/* Строка имени: монограмма (самый высокий элемент) центрируется против
+              строки → её верх на y=20, как плитка ContextBadge в зоне-2 (синхрон
+              размера/положения бейджей). Справа — слот фильтров активного таба. */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+              <NameMonogram name={resourceName} />
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
                 <Typography.Title
                   level={3}
@@ -329,28 +336,31 @@ export function DetailShell({
                 </Typography.Title>
                 {badges}
               </div>
-              {nameMeta && (
-                <div
-                  style={{
-                    marginTop: 5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                    fontSize: 12.5,
-                    color: "var(--kc-text-secondary)",
-                  }}
-                >
-                  {nameMeta}
-                </div>
-              )}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
+              {nameActions}
+              {/* Слот для фильтров активного таба (req3). */}
+              <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
-            {nameActions}
-            {/* Слот для фильтров активного таба (req3). */}
-            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
-          </div>
+          {/* Мета — отдельной строкой под именем (выровнена под имя: монограмма
+              42 + gap 12), чтобы не растягивать строку имени и не сбивать монограмму. */}
+          {nameMeta && (
+            <div
+              style={{
+                marginTop: 8,
+                marginLeft: 54,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+                fontSize: 12.5,
+                color: "var(--kc-text-secondary)",
+              }}
+            >
+              {nameMeta}
+            </div>
+          )}
         </div>
 
         {mainOverride ? (
