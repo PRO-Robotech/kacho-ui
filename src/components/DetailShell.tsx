@@ -306,61 +306,67 @@ export function DetailShell({
             (в т.ч. над формой edit/child-create — имя мастер-ресурса остаётся
             сверху). Справа — слот: активный таб «поднимает» сюда свои фильтры
             (related-таблица / операции) на уровень имени (HeaderSlotPortal). */}
+        {/* Зона-3 шапка = ЗЕРКАЛО бейджа зоны-2: квадрат-бейдж 42 + 2-строчный
+            блок (имя / мета), высота 42, paddingBottom 14 → нижняя линия на той
+            же y, что и линия рейла (зона-2) → ОДНА сплошная линия через рейл и
+            main. Справа — слот фильтров активного таба (req3). */}
         <div
           style={{
-            paddingBottom: 16,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            paddingBottom: 14,
             marginBottom: 18,
             borderBottom: "1px solid var(--kc-border-secondary)",
           }}
         >
-          {/* Строка имени: монограмма (самый высокий элемент) центрируется против
-              строки → её верх на y=20, как плитка ContextBadge в зоне-2 (синхрон
-              размера/положения бейджей). Справа — слот фильтров активного таба. */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-              <NameMonogram name={resourceName} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <NameMonogram name={resourceName} />
+            <div style={{ minWidth: 0 }}>
+              {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                 <Typography.Title
                   level={3}
-                  style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--kc-text)", wordBreak: "break-all" }}
+                  ellipsis={{ tooltip: resourceName || undefined }}
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 700,
+                    lineHeight: "24px",
+                    color: "var(--kc-text)",
+                  }}
                 >
                   {resourceName || "(без имени)"}
                 </Typography.Title>
                 {badges}
               </div>
-            </div>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
-              {nameActions}
-              {/* Слот для фильтров активного таба (req3). */}
-              <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
+              {/* строка 2: мета (зеркало title зоны-2) */}
+              {nameMeta && (
+                <div
+                  style={{
+                    marginTop: 2,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "nowrap",
+                    overflow: "hidden",
+                    fontSize: 12.5,
+                    lineHeight: "16px",
+                    color: "var(--kc-text-secondary)",
+                  }}
+                >
+                  {nameMeta}
+                </div>
+              )}
             </div>
           </div>
-          {/* Мета — отдельной строкой под именем (выровнена под имя: монограмма
-              42 + gap 12), чтобы не растягивать строку имени и не сбивать монограмму. */}
-          {nameMeta && (
-            <div
-              style={{
-                marginTop: 8,
-                marginLeft: 54,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                flexWrap: "wrap",
-                fontSize: 12.5,
-                color: "var(--kc-text-secondary)",
-              }}
-            >
-              {nameMeta}
-            </div>
-          )}
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
+            {nameActions}
+            {/* Слот для фильтров активного таба (req3). */}
+            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
+          </div>
         </div>
 
         {mainOverride ? (
