@@ -18,6 +18,7 @@ import { type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
 import { useDetailHeaderIcon } from "@/components/PanelHeader";
+import { ContextBadge } from "@/components/ContextBadge";
 
 export interface DetailTab {
   id: string;
@@ -70,10 +71,11 @@ interface Props {
 }
 
 // Рейл табов: фиксированная ширина под самый длинный label/zone-2-заголовок
-// («Таблицы маршрутизации»/«Группы безопасности» + иконка 42). Жёстко пинуется
-// (min=max), иначе в `min-width:max-content` обёртке длинный заголовок распирал
-// бы aside → ширина рейла «прыгала» при смене таба (KAC-246).
-const SUB_PANE_WIDTH = 300;
+// (после сокращения route-table longest = «Сетевые интерфейсы»/«Группы
+// безопасности» ≈175px@16 + иконка 42 + отступы). Жёстко пинуется (min=max),
+// иначе в `min-width:max-content` обёртке длинный заголовок распирал бы aside →
+// ширина рейла «прыгала» при смене таба (KAC-246).
+const SUB_PANE_WIDTH = 272;
 
 export function DetailShell({
   resourceLabel,
@@ -143,13 +145,11 @@ export function DetailShell({
           padding: 20,
         }}
       >
-        {/* Зона 2 верх: [иконка] + действие (active tab) + тип ресурса. Имя
-            переехало в зону 3 (main). */}
+        {/* Зона 2 верх: ТОТ ЖЕ ContextBadge, что list-PanelHeader (единый
+            компонент → нет расхождений/прыжка). [иконка] + действие + тип. Имя
+            ресурса — в зоне 3 (main). Приоритеты: форма > per-tab > дефолт. */}
         <div
           style={{
-            display: "flex",
-            gap: 12,
-            alignItems: "center",
             // Без top/left padding — блок садится ровно на sub-pane padding(20),
             // т.е. на (20,20) от kc-surface, как list-PanelHeader → не прыгает.
             padding: "0 0 14px 0",
@@ -157,56 +157,11 @@ export function DetailShell({
             marginBottom: 8,
           }}
         >
-          {(headerIconOverride ?? active?.headerIcon ?? ctxIcon) && (
-            <div
-              style={{
-                width: 42,
-                height: 42,
-                borderRadius: 12,
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 19,
-                color: "var(--kc-primary)",
-                background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
-                border: "1px solid rgba(61,141,245,0.22)",
-              }}
-            >
-              {headerIconOverride ?? active?.headerIcon ?? ctxIcon}
-            </div>
-          )}
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: "var(--kc-primary)",
-                marginBottom: 2,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {/* действие: форма (Создание/Редактирование) > per-tab eyebrow > label */}
-              {headerEyebrow ?? active?.eyebrow ?? active?.label}
-            </div>
-            <div
-              style={{
-                fontSize: 16,
-                fontWeight: 600,
-                color: "var(--kc-text)",
-                lineHeight: 1.2,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {headerTitle ?? active?.headerTitle ?? resourceLabel}
-            </div>
-          </div>
+          <ContextBadge
+            icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
+            eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
+            title={headerTitle ?? active?.headerTitle ?? resourceLabel}
+          />
         </div>
 
         <Menu

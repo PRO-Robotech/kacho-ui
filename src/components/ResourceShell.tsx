@@ -430,7 +430,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     // (единая шапка с формами через PanelHeader).
     <DetailHeaderProvider value={{ icon: <ResourceIcon specId={spec.id} /> }}>
       <DetailShell
-        resourceLabel={spec.singular}
+        resourceLabel={spec.plural}
         resourceName={name}
         badges={status ? <Tag>{status}</Tag> : undefined}
         tabs={tabs}

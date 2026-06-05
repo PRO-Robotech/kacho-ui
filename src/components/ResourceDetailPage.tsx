@@ -638,7 +638,7 @@ export function ResourceDetailPage({
   return (
     <>
       <DetailShell
-        resourceLabel={spec.singular}
+        resourceLabel={spec.plural}
         resourceName={name || resourceId}
         badges={statusValue ? <StatusBadge state={statusValue} /> : null}
         tabs={tabs}

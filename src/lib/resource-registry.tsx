@@ -320,7 +320,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     internalGetPath: "/vpc/v1/networks/{id}/internal",
     related: [
       { childId: "subnets", filterField: "network_id", label: "Подсети" },
-      { childId: "route-tables", filterField: "network_id", label: "Таблицы маршрутизации" },
+      { childId: "route-tables", filterField: "network_id", label: "Таблицы маршрутов" },
       { childId: "security-groups", filterField: "network_id", label: "Группы безопасности" },
     ],
     docs: [
@@ -906,8 +906,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         "маршрутами в нескольких зонах доступности.",
       docs: ["Статическая маршрутизация", "Маршрутизация через NAT-инстанс"],
     },
-    singular: "Таблица маршрутизации",
-    plural: "Таблицы маршрутизации",
+    singular: "Таблица маршрутов",
+    plural: "Таблицы маршрутов",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
