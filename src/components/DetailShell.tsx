@@ -18,8 +18,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
-import { useDetailHeaderIcon } from "@/components/PanelHeader";
-import { ContextBadge } from "@/components/ContextBadge";
+import { PanelHeader, useDetailHeaderIcon } from "@/components/PanelHeader";
 
 // Слот в правой части строки-имени (зона 3): активный таб может «поднять» свой
 // тулбар (поиск/колонки/фильтры) на уровень имени ресурса через HeaderSlotPortal.
@@ -224,24 +223,15 @@ export function DetailShell({
           padding: 20,
         }}
       >
-        {/* Зона 2 верх: ТОТ ЖЕ ContextBadge, что list-PanelHeader (единый
-            компонент → нет расхождений/прыжка). [иконка] + действие + тип. Имя
-            ресурса — в зоне 3 (main). Приоритеты: форма > per-tab > дефолт. */}
-        <div
-          style={{
-            // Без top/left padding — блок садится ровно на sub-pane padding(20),
-            // т.е. на (20,20) от kc-surface, как list-PanelHeader → не прыгает.
-            padding: "0 0 14px 0",
-            borderBottom: "1px solid var(--kc-border-secondary)",
-            marginBottom: 8,
-          }}
-        >
-          <ContextBadge
-            icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
-            eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
-            title={headerTitle ?? active?.headerTitle ?? resourceLabel}
-          />
-        </div>
+        {/* Зона 2 верх: ТОТ ЖЕ PanelHeader, что шапка списка (ResourceListPage) —
+            один компонент на все страницы → нет расхождений/прыжка. [иконка] +
+            действие + тип. Имя ресурса — в зоне 3 (main). Приоритеты: форма >
+            per-tab > дефолт. */}
+        <PanelHeader
+          icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
+          eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
+          title={headerTitle ?? active?.headerTitle ?? resourceLabel}
+        />
 
         <Menu
           mode="inline"
