@@ -14,7 +14,7 @@
 //
 // Tab выбирается через ?tab=<id>. Дефолт — первый tab.
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
@@ -92,11 +92,30 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
-// NameMonogram — квадрат-аватар с инициалами из имени ресурса + цветом,
-// детерминированно выведенным из имени. Оживляет одиночный заголовок (req4):
-// одинаковые ресурсы получают стабильный «характерный» цвет.
-const MONO_HUES = [210, 260, 330, 16, 36, 150, 190, 280];
-function NameMonogram({ name }: { name: string }) {
+// NameMarble — «мраморный» генеративный аватар ресурса (boring-avatars-стиль):
+// детерминированный SVG из hash(имя) — 3 цвета палитры + размытые
+// смещённые/повёрнутые фигуры с mix-blend overlay. Поверх — лёгкие
+// полупрозрачные инициалы для идентичности. У каждого ресурса — своё «лицо».
+const MARBLE_PALETTE = [
+  "#3D8DF5", "#6C5CE7", "#22C3A6", "#0ABDE3", "#E84393",
+  "#F39C12", "#A569BD", "#FF6B6B", "#2ECC71", "#5B7CFA",
+];
+const MARBLE_VB = 80; // внутренний viewBox-размер фигур
+function marbleHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+function marbleDigit(n: number, ntn: number): number {
+  return Math.floor((n / Math.pow(10, ntn)) % 10);
+}
+// Псевдослучайное значение в диапазоне со знаком (как в boring-avatars).
+function marbleUnit(n: number, range: number, index = 0): number {
+  const v = n % range;
+  return index && marbleDigit(n, index) % 2 === 0 ? -v : v;
+}
+function NameMarble({ name, size = 42 }: { name: string; size?: number }) {
+  const rawId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const clean = (name || "?").trim();
   const initials =
     clean
@@ -106,32 +125,79 @@ function NameMonogram({ name }: { name: string }) {
       .map((w) => w[0])
       .join("")
       .toUpperCase() || "?";
-  let h = 0;
-  for (let i = 0; i < clean.length; i++) h = (h * 31 + clean.charCodeAt(i)) >>> 0;
-  const hue = MONO_HUES[h % MONO_HUES.length];
+  const num = marbleHash(clean || "?");
+  const colors = [0, 1, 2].map((i) => MARBLE_PALETTE[(num + i) % MARBLE_PALETTE.length]);
+  // Две фигуры — каждая со своим смещением/поворотом/масштабом из hash.
+  const shapes = [1, 2].map((i) => ({
+    tx: marbleUnit(num * (i + 1), MARBLE_VB / 10, 1),
+    ty: marbleUnit(num * (i + 1), MARBLE_VB / 10, 2),
+    scale: 1.2 + marbleUnit(num * (i + 1), MARBLE_VB / 20) / 10,
+    rotate: marbleUnit(num * (i + 1), 360, 1),
+  }));
+  const c = MARBLE_VB / 2;
   return (
     <div
       aria-hidden
       style={{
-        // Размер/радиус — 1-в-1 с плиткой ContextBadge (TILE=42) в зоне-2, чтобы
-        // бейдж таба и бейдж имени были одного размера и на одной линии (top=20).
-        width: 42,
-        height: 42,
+        // Размер/радиус 1-в-1 с плиткой ContextBadge (TILE=42) зоны-2.
+        position: "relative",
+        width: size,
+        height: size,
         borderRadius: 12,
         flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 16,
-        fontWeight: 700,
-        letterSpacing: "0.02em",
-        color: `hsl(${hue} 70% 72%)`,
-        background: `linear-gradient(135deg, hsl(${hue} 60% 22% / 0.85), hsl(${hue} 60% 14% / 0.65))`,
-        border: `1px solid hsl(${hue} 60% 45% / 0.4)`,
-        boxShadow: `inset 0 0 0 1px hsl(${hue} 70% 60% / 0.08)`,
+        overflow: "hidden",
+        border: "1px solid var(--kc-border)",
+        boxShadow: "var(--kc-shadow-sm)",
       }}
     >
-      {initials}
+      <svg viewBox={`0 0 ${MARBLE_VB} ${MARBLE_VB}`} width={size} height={size} style={{ display: "block" }}>
+        <g>
+          <rect width={MARBLE_VB} height={MARBLE_VB} fill={colors[0]} />
+          <path
+            filter={`url(#mf${rawId})`}
+            d="M32.414 59.35L50.376 70.5H72.5v-71H33.728L26.5 13.381l4.314 38.214L32.414 59.35z"
+            fill={colors[1]}
+            transform={`translate(${shapes[0].tx} ${shapes[0].ty}) rotate(${shapes[0].rotate} ${c} ${c}) scale(${shapes[0].scale})`}
+          />
+          <path
+            filter={`url(#mf${rawId})`}
+            style={{ mixBlendMode: "overlay" }}
+            d="M22.216 24L0 46.75l14.108 38.129L78 86l-3.081-59.276-22.378 4.005 12.972 20.186-23.35 27.395L22.215 24z"
+            fill={colors[2]}
+            transform={`translate(${shapes[1].tx} ${shapes[1].ty}) rotate(${shapes[1].rotate} ${c} ${c}) scale(${shapes[1].scale})`}
+          />
+        </g>
+        <defs>
+          <filter
+            id={`mf${rawId}`}
+            x={-20}
+            y={-20}
+            width={MARBLE_VB + 40}
+            height={MARBLE_VB + 40}
+            filterUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur stdDeviation={7} result="blur" />
+          </filter>
+        </defs>
+      </svg>
+      {/* Лёгкие инициалы поверх — идентичность ресурса. */}
+      <span
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: Math.round(size * 0.36),
+          fontWeight: 700,
+          letterSpacing: "0.02em",
+          color: "rgba(255,255,255,0.92)",
+          textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+        }}
+      >
+        {initials}
+      </span>
     </div>
   );
 }
@@ -323,7 +389,7 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameMonogram name={resourceName} />
+            <NameMarble name={resourceName} />
             <div style={{ minWidth: 0 }}>
               {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
