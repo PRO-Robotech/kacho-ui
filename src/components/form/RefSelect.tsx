@@ -113,6 +113,12 @@ export function RefSelect({
         value={value ?? ""}
         onChange={(e) => {
           if (e.target.value === CREATE_SENTINEL) {
+            // Sentinel — это действие, а не значение: возвращаем DOM-select на
+            // текущее value. Иначе controlled-select остаётся на «Создать…»
+            // (value-prop не меняется → React не сбрасывает selectedIndex), и
+            // повторный выбор того же пункта НЕ триггерит change → модалка не
+            // открывается снова после отмены.
+            e.target.value = value ?? "";
             setCreating(true);
             return;
           }
