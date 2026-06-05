@@ -34,7 +34,7 @@ import { getByPath, setByPath, deleteByPath } from "@/lib/path";
 type ProtocolMode = "any" | "name" | "number";
 type TargetKind = "cidr" | "sg" | "predefined";
 
-interface RuleExt {
+export interface RuleExt {
   direction?: string;
   description?: string;
   _protocol_mode?: ProtocolMode;
@@ -83,7 +83,7 @@ function inferTargetKind(r: RuleExt): TargetKind {
   return "cidr";
 }
 
-function emptyRule(): RuleExt {
+export function emptyRule(): RuleExt {
   return {
     direction: "INGRESS",
     description: "",
@@ -274,7 +274,7 @@ export function SgRulesEditor({ value, onChange, path, description, editingNetwo
   );
 }
 
-function RuleBody({
+export function RuleBody({
   rule,
   onChange,
   editingNetworkId,

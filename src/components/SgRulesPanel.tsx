@@ -10,12 +10,12 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Checkbox, Dropdown, Modal, Space, Tag } from "antd";
+import { Button, Checkbox, Dropdown, Modal, Space, Tag, Typography } from "antd";
 import { MoreOutlined, EditOutlined, DeleteOutlined, PlusOutlined, ExclamationCircleFilled } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
 import { extractOperationId } from "@/components/OperationDialog";
 import { HeaderSlotPortal } from "@/components/DetailShell";
-import { SgRulesEditor } from "@/components/form/SgRulesEditor";
+import { RuleBody, emptyRule, type RuleExt } from "@/components/form/SgRulesEditor";
 import { REGISTRY, sanitizeSgRule } from "@/lib/resource-registry";
 import { operationStore } from "@/lib/use-operation-store";
 import { toast } from "@/lib/toast";
@@ -74,7 +74,7 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   const sgSpec = REGISTRY["security-groups"];
   const qc = useQueryClient();
 
-  const [editObj, setEditObj] = useState<Record<string, unknown> | null>(null);
+  const [editObj, setEditObj] = useState<RuleExt | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null); // null = добавление
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -145,11 +145,11 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
 
   const startAdd = () => {
     setEditingId(null);
-    setEditObj({ rules: [{ direction: "INGRESS" }] });
+    setEditObj(emptyRule());
   };
   const startEdit = (r: SgRule) => {
     setEditingId(r.id ?? null);
-    setEditObj({ rules: [{ ...r }] });
+    setEditObj({ ...(r as RuleExt) });
   };
   const cancelEdit = () => {
     setEditObj(null);
@@ -157,46 +157,42 @@ export function SgRulesPanel({ sgId, projectId, rules, networkId }: Props) {
   };
 
   const saveEdit = async () => {
-    const arr = (editObj?.rules as SgRule[] | undefined) ?? [];
-    if (arr.length === 0) {
+    if (!editObj) {
       cancelEdit();
       return;
     }
-    // Edit — ровно одно правило; Add — все из редактора. Direction берётся из
-    // самого правила (выбирается в SgRulesEditor), не навязывается вкладкой.
-    const specs = (editingId ? arr.slice(0, 1) : arr).map((raw) => {
-      const clean = sanitizeSgRule({ ...raw });
-      delete clean.id;
-      return clean;
-    });
+    // Одно правило: direction/протокол/порты/источник — из самой формы (RuleBody).
+    const clean = sanitizeSgRule({ ...(editObj as Record<string, unknown>) });
+    delete clean.id;
     const payload: { deletion_rule_ids?: string[]; addition_rule_specs?: unknown[] } = {
-      addition_rule_specs: specs,
+      addition_rule_specs: [clean],
     };
-    if (editingId) payload.deletion_rule_ids = [editingId];
+    if (editingId) payload.deletion_rule_ids = [editingId]; // edit = delete+add
     cancelEdit();
     await runOp(
       payload,
       editingId
         ? "Изменение правила группы безопасности"
-        : `Добавление правил группы безопасности (${specs.length})`,
+        : "Добавление правила группы безопасности",
     );
   };
 
-  // ── режим редактора ──
+  // ── режим редактора ОДНОГО правила — плоская форма (RuleBody), без Collapse ──
   if (editObj) {
     return (
-      <div>
-        {/* Свой SectionHeader («Добавление/Редактирование · Правила») убран —
-            дубль заголовка таба зоны-3. */}
-        <SgRulesEditor
-          pathPrefix=""
-          value={editObj}
+      <div
+        className="kc-surface"
+        style={{ padding: "16px 18px", maxWidth: 760 }}
+      >
+        <Typography.Text strong style={{ display: "block", marginBottom: 12 }}>
+          {editingId ? "Редактирование правила" : "Новое правило"}
+        </Typography.Text>
+        <RuleBody
+          rule={editObj}
           onChange={setEditObj}
-          path="rules"
-          description="Направление (Входящий/Исходящий) выбирается в каждом правиле."
           editingNetworkId={networkId || undefined}
         />
-        <Space style={{ marginTop: 16 }}>
+        <Space style={{ marginTop: 18 }}>
           <Button type="primary" onClick={saveEdit} loading={mutation.isPending}>
             Сохранить
           </Button>
