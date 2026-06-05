@@ -91,68 +91,6 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 288;
 
-// NameDotGrid — бесток-identicon под Kachō: сетка 5×5 точек, размер/прозрачность
-// каждой из hash(имя) (Linear-стиль dot-pattern). Brand cool-палитра, тон-плитка/
-// радиус 1-в-1 с ContextBadge зоны-2 → вписано в стилистику.
-const DOTGRID_PALETTE = [
-  "#2BB5C0", // teal
-  "#2D9CDB", // sky
-  "#2F80ED", // blue
-  "#3D8DF5", // primary
-  "#4F6BF0", // royal
-  "#5B7CFA", // indigo
-  "#6C5CE7", // violet
-  "#7B6CF6", // periwinkle
-];
-function dotgridHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  // avalanche — мелкое изменение имени даёт сильно иной паттерн.
-  h ^= h >>> 13;
-  h = (h * 0x5bd1e995) >>> 0;
-  h ^= h >>> 15;
-  return h >>> 0;
-}
-const DOT_R = [1.6, 2.6, 3.8, 5.2];
-function NameDotGrid({ name, size = 42 }: { name: string; size?: number }) {
-  const n = dotgridHash((name || "?").trim() || "?");
-  const col = DOTGRID_PALETTE[n % DOTGRID_PALETTE.length];
-  const G = 5;
-  const pad = 14;
-  const step = (100 - 2 * pad) / (G - 1);
-  const dots: Array<[number, number, number, number]> = [];
-  for (let y = 0; y < G; y++) {
-    for (let x = 0; x < G; x++) {
-      const v = (n >> ((y * G + x) % 30)) & 3; // 0..3 — размер/яркость точки
-      const r = DOT_R[v];
-      const op = v === 0 ? 0.3 : Math.min(1, 0.55 + v * 0.13);
-      dots.push([pad + x * step, pad + y * step, r, op]);
-    }
-  }
-  return (
-    <div
-      aria-hidden
-      style={{
-        // Размер/радиус/тон-плитка 1-в-1 с ContextBadge (TILE=42) зоны-2.
-        width: size,
-        height: size,
-        borderRadius: 12,
-        flexShrink: 0,
-        overflow: "hidden",
-        background: "rgba(61,141,245,0.08)",
-        border: "1px solid rgba(61,141,245,0.20)",
-        boxShadow: "var(--kc-shadow-sm)",
-      }}
-    >
-      <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: "block" }}>
-        {dots.map(([cx, cy, r, op], i) => (
-          <circle key={i} cx={cx} cy={cy} r={r} fill={col} fillOpacity={Number(op.toFixed(2))} />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
 export function DetailShell({
   resourceLabel,
   resourceName,
@@ -223,8 +161,8 @@ export function DetailShell({
           padding: 20,
         }}
       >
-        {/* Зона 2 (рейл) — ИДЕНТИЧНОСТЬ ресурса: [аватар] + ТИП(eyebrow) + имя.
-            (Поменяно местами с контекстом таба, который теперь в зоне 3.) */}
+        {/* Зона 2 (рейл) — ИДЕНТИЧНОСТЬ ресурса: [иконка осн. ресурса] +
+            ТИП(eyebrow) + имя. (Поменяно местами с контекстом таба в зоне 3.) */}
         <div
           style={{
             paddingBottom: 14,
@@ -233,7 +171,26 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameDotGrid name={resourceName} />
+            {/* Бейдж основного ресурса — та же плитка-иконка, что у ContextBadge. */}
+            {ctxIcon && (
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 19,
+                  color: "var(--kc-primary)",
+                  background: "linear-gradient(135deg, rgba(61,141,245,0.16), rgba(61,141,245,0.05))",
+                  border: "1px solid rgba(61,141,245,0.22)",
+                }}
+              >
+                {ctxIcon}
+              </div>
+            )}
             <div style={{ minWidth: 0 }}>
               {nameEyebrow && (
                 <div
