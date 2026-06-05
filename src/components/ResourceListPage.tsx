@@ -231,7 +231,7 @@ export function ResourceListPage({ spec, parentField, parentParam, parentValue }
 
   return (
     <div className="kc-surface" style={{ padding: 20 }}>
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space direction="vertical" size={0} style={{ width: "100%" }}>
         {/* Шапка списка: иконка + «Список» + plural + счётчик слева, фильтры справа. */}
         {listHeader(
           <>

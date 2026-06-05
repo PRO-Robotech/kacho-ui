@@ -183,7 +183,7 @@ export function OperationsPage() {
 
   return (
     <div className="kc-surface" style={{ padding: 20, minHeight: "100%" }}>
-      <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Space direction="vertical" size={0} style={{ width: "100%" }}>
         {/* Единая шапка: общая VPC-иконка модуля (DeploymentUnitOutlined,
             отличная от network) + действие «Операции» + название «VPC» +
             счётчик; фильтры — справа. */}
