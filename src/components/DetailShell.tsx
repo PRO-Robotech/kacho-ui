@@ -18,7 +18,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
-import { PanelHeader, useDetailHeaderIcon } from "@/components/PanelHeader";
+import { useDetailHeaderIcon } from "@/components/PanelHeader";
 
 // Слот в правой части строки-имени (зона 3): активный таб может «поднять» свой
 // тулбар (поиск/колонки/фильтры) на уровень имени ресурса через HeaderSlotPortal.
@@ -92,7 +92,6 @@ interface Props {
 const SUB_PANE_WIDTH = 288;
 
 export function DetailShell({
-  resourceLabel,
   resourceName,
   badges,
   tabs,
@@ -105,8 +104,6 @@ export function DetailShell({
   nameActions,
   nameEyebrow,
   headerEyebrow,
-  headerTitle,
-  headerIcon: headerIconOverride,
 }: Props) {
   const ctxIcon = useDetailHeaderIcon();
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
@@ -308,23 +305,44 @@ export function DetailShell({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
-        {/* Зона 3 (main) верх — КОНТЕКСТ активного таба: [иконка] + действие +
-            тип (тот же PanelHeader, что список). Справа — слот: активный таб
-            «поднимает» сюда фильтры (related-таблица / операции). Приоритеты:
-            форма (Создание/Редактирование) > per-tab > дефолт. (Поменяно местами
-            с блоком имени, который теперь в зоне 2 / рейле.) */}
-        <PanelHeader
-          icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
-          eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
-          title={headerTitle ?? active?.headerTitle ?? resourceLabel}
-          right={
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {nameActions}
-              {/* Слот для фильтров активного таба. */}
-              <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
-            </div>
-          }
-        />
+        {/* Зона 3 (main) верх — ТОЛЬКО название активного таба (дубль), без иконки
+            и без eyebrow-действия. Заголовок вертикально центрирован в 42 (как
+            текст зоны-2) → симметрия по вертикали; нижняя линия на той же y, что и
+            у рейла. Справа — слот фильтров активного таба. Для форм — действие
+            (Создание/Редактирование). */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            minHeight: 42,
+            paddingBottom: 14,
+            marginBottom: 18,
+            borderBottom: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          <Typography.Title
+            level={3}
+            ellipsis={{ tooltip: undefined }}
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 600,
+              lineHeight: 1.25,
+              color: "var(--kc-text)",
+              minWidth: 0,
+            }}
+          >
+            {headerEyebrow ?? active?.headerTitle ?? active?.label}
+          </Typography.Title>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+            {nameActions}
+            {/* Слот для фильтров активного таба. */}
+            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
+          </div>
+        </div>
 
         {mainOverride ? (
           mainOverride
