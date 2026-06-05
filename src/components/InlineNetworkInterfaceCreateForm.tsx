@@ -213,7 +213,11 @@ export function InlineNetworkInterfaceCreateForm({
             value={v4}
             onChange={setV4}
             maxItems={1}
-            refFilter={(row) => !!row.internal_ipv4_address}
+            disabled={!subnetId}
+            disabledHint="Сначала выберите подсеть"
+            refFilter={(row) =>
+              (row.internal_ipv4_address as { subnet_id?: string } | undefined)?.subnet_id === subnetId
+            }
             createResource="addresses"
             createPresetFields={{
               _address_kind: "internal",
@@ -239,8 +243,10 @@ export function InlineNetworkInterfaceCreateForm({
             value={v6}
             onChange={setV6}
             maxItems={1}
+            disabled={!subnetId}
+            disabledHint="Сначала выберите подсеть"
             refFilter={(row) =>
-              !!row.internal_ipv6_address || !!row.external_ipv6_address
+              (row.internal_ipv6_address as { subnet_id?: string } | undefined)?.subnet_id === subnetId
             }
             createResource="addresses"
             createEditablePresetFields={{ _address_kind: "internal_v6" }}
