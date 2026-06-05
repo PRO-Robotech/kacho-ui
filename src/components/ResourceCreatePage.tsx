@@ -42,25 +42,29 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
   // `softPresetFields` — предзаполненные, но editable (начальное значение,
   // не lock). Пример: `_address_kind` для адреса из контекста подсети — дефолт
   // "internal", но пользователь может переключить на "internal_v6".
-  const { presetFields, softPresetFields } = useMemo(() => {
+  const { presetFields, softPresetFields, fieldOptionsFilter } = useMemo(() => {
     const out: Record<string, unknown> = {};
     const soft: Record<string, unknown> = {};
+    const optFilter: Record<string, string[]> = {};
     const subnetId = (params.subnetId as string | undefined) ?? searchParams.get("subnet_id");
     const networkId = (params.networkId as string | undefined) ?? searchParams.get("network_id");
     const kind = searchParams.get("kind");
     if (spec.id === "addresses" && subnetId) {
-      // К какой бы версии (v4/v6) пользователь ни переключился — адрес
-      // привязан к этой подсети; sanitize выкинет неактивную ветку.
+      // Адрес в контексте подсети — только ВНУТРЕННИЙ (internal); привязан к
+      // этой подсети, sanitize выкинет неактивную ветку.
       out["internal_ipv4_address_spec.subnet_id"] = subnetId;
       out["internal_ipv6_address_spec.subnet_id"] = subnetId;
-      // `?kind=` задаёт лишь дефолт переключателя, не запирает его.
       soft["_address_kind"] = kind === "internal_v6" ? "internal_v6" : "internal";
+      optFilter["_address_kind"] = ["internal", "internal_v6"];
     } else {
       if (kind) out["_address_kind"] = kind;
       if (subnetId) out["subnet_id"] = subnetId;
+      // Глобальное создание адреса — только ВНЕШНИЙ (external); internal задаётся
+      // из контекста подсети.
+      if (spec.id === "addresses") optFilter["_address_kind"] = ["external", "external_v6"];
     }
     if (networkId) out["network_id"] = networkId;
-    return { presetFields: out, softPresetFields: soft };
+    return { presetFields: out, softPresetFields: soft, fieldOptionsFilter: optFilter };
   }, [params.subnetId, params.networkId, searchParams, spec.id]);
 
   const initialObj = useMemo(() => {
@@ -195,6 +199,7 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
         obj={obj}
         onChange={setObj}
         lockedPaths={lockedPathsRef.current}
+        fieldOptionsFilter={fieldOptionsFilter}
         submitLabel={`Создать ${spec.singular.toLowerCase()}`}
         submitting={mutation.isPending || pendingOpId !== null}
         onSubmit={submit}
