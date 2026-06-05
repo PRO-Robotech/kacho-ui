@@ -199,7 +199,6 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
         submitting={mutation.isPending || pendingOpId !== null}
         onSubmit={submit}
         onCancel={() => navigate(backHref)}
-        stickyFooter
       />
     </div>
   );
