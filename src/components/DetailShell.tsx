@@ -96,9 +96,18 @@ const SUB_PANE_WIDTH = 272;
 // детерминированный SVG из hash(имя) — 3 цвета палитры + размытые
 // смещённые/повёрнутые фигуры с mix-blend overlay. Поверх — лёгкие
 // полупрозрачные инициалы для идентичности. У каждого ресурса — своё «лицо».
+// Палитра — только cool-семейство (teal→cyan→blue→indigo→violet), упорядочена
+// по hue, чтобы соседние выбранные цвета смешивались плавно и мармор не выбивался
+// из сдержанной сине-тёмной стилистики приложения (primary #3D8DF5).
 const MARBLE_PALETTE = [
-  "#3D8DF5", "#6C5CE7", "#22C3A6", "#0ABDE3", "#E84393",
-  "#F39C12", "#A569BD", "#FF6B6B", "#2ECC71", "#5B7CFA",
+  "#2BB5C0", // teal
+  "#2D9CDB", // sky
+  "#2F80ED", // blue
+  "#3D8DF5", // primary
+  "#4F6BF0", // royal
+  "#5B7CFA", // indigo
+  "#6C5CE7", // violet
+  "#7B6CF6", // periwinkle
 ];
 const MARBLE_VB = 80; // внутренний viewBox-размер фигур
 function marbleHash(s: string): number {
