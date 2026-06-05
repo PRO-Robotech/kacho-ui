@@ -340,7 +340,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   tabs.push({
     id: "json",
     label: "JSON",
-    eyebrow: "Информация",
+    eyebrow: "JSON",
     render: () => (
       <div>
         <JsonMonacoView data={data} />
@@ -352,7 +352,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     tabs.push({
       id: "jsonint",
       label: "JSON (internal)",
-      eyebrow: "Информация",
+      eyebrow: "JSON",
       render: () => (
         <div>
           <JsonIntView path={intPath} />
@@ -430,7 +430,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
     // (единая шапка с формами через PanelHeader).
     <DetailHeaderProvider value={{ icon: <ResourceIcon specId={spec.id} /> }}>
       <DetailShell
-        resourceLabel={spec.plural}
+        resourceLabel={spec.genitive ?? spec.plural}
         resourceName={name}
         nameEyebrow={spec.singular}
         tabs={tabs}

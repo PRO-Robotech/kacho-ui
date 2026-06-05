@@ -638,7 +638,7 @@ export function ResourceDetailPage({
   return (
     <>
       <DetailShell
-        resourceLabel={spec.plural}
+        resourceLabel={spec.genitive ?? spec.plural}
         resourceName={name || resourceId}
         nameEyebrow={spec.singular}
         badges={statusValue ? <StatusBadge state={statusValue} /> : null}

@@ -34,6 +34,9 @@ export interface ResourceSpec {
   singular: string;
   // plural label
   plural: string;
+  // родительный падеж ед.ч. («Обзор шлюзА», «Операции сетИ») — заголовок
+  // мастер-ресурса в зоне-3 (обзор/операции/json). Fallback: plural.
+  genitive?: string;
   description?: string;
   /** Service-domain заголовок (отображается в breadcrumb перед именем категории).
    *  Примеры: "Virtual Private Cloud", "IAM", "Администрирование". */
@@ -197,6 +200,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "accounts",
     singular: "Аккаунт",
     plural: "Accounts",
+    genitive: "Аккаунта",
     serviceTitle: "IAM",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -233,6 +237,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "projects",
     singular: "Проект",
     plural: "Projects",
+    genitive: "Проекта",
     serviceTitle: "IAM",
     scope: "account",
     ops: { create: true, update: true, delete: true },
@@ -339,6 +344,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
     singular: "Облачная сеть",
     plural: "Облачные сети",
+    genitive: "Облачной сети",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -430,6 +436,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
     singular: "Подсеть",
     plural: "Подсети",
+    genitive: "Подсети",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -634,6 +641,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     // адреса; вид различается колонкой «Вид» (Публичный/Внутренний). Раньше было
     // «Публичные IP-адреса», что вводило в заблуждение для внутренних.
     plural: "IP-адреса",
+    genitive: "IP-адреса",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -908,6 +916,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
     singular: "Таблица маршрутов",
     plural: "Таблицы маршрутов",
+    genitive: "Таблицы маршрутов",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1054,6 +1063,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     internalGetPath: "/vpc/v1/networkInterfaces/{id}/internal",
     singular: "Сетевой интерфейс",
     plural: "Сетевые интерфейсы",
+    genitive: "Сетевого интерфейса",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1329,6 +1339,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     },
     singular: "Группа безопасности",
     plural: "Группы безопасности",
+    genitive: "Группы безопасности",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1412,6 +1423,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "gateways",
     singular: "Шлюз",
     plural: "Шлюзы",
+    genitive: "Шлюза",
     serviceTitle: "Virtual Private Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1528,6 +1540,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "disks",
     singular: "Диск",
     plural: "Диски",
+    genitive: "Диска",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1630,6 +1643,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "images",
     singular: "Образ",
     plural: "Образы",
+    genitive: "Образа",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1724,6 +1738,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "snapshots",
     singular: "Снимок диска",
     plural: "Снимки дисков",
+    genitive: "Снимка диска",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -1776,6 +1791,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "instances",
     singular: "Виртуальная машина",
     plural: "Виртуальные машины",
+    genitive: "Виртуальной машины",
     serviceTitle: "Compute Cloud",
     scope: "project",
     ops: { create: true, update: true, delete: true, start: true, stop: true, restart: true },
@@ -2010,6 +2026,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "pools",
     singular: "Пул адресов",
     plural: "Пулы адресов",
+    genitive: "Пула адресов",
     serviceTitle: "Администрирование",
     scope: "global",
     ops: { create: true, update: true, delete: true },
@@ -2185,6 +2202,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "network_load_balancers",
     singular: "Балансировщик нагрузки",
     plural: "Балансировщики нагрузки",
+    genitive: "Балансировщика нагрузки",
     serviceTitle: "Network Load Balancer",
     scope: "project",
     ops: { create: true, update: true, delete: true },
@@ -2337,6 +2355,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
     payloadKey: "target_groups",
     singular: "Целевая группа",
     plural: "Target Groups",
+    genitive: "Целевой группы",
     serviceTitle: "Network Load Balancer",
     scope: "project",
     ops: { create: true, update: true, delete: true },
