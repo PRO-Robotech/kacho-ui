@@ -764,14 +764,18 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         editHidden: true,
       },
       {
-        name: "external_ipv4_address_spec.zone_id",
+        // Общая зона для external IPv4/IPv6 — UI-поле, sanitize кладёт его в
+        // активную ветку spec'а (external_ipv4/v6_address_spec.zone_id). Не
+        // сбрасывается при переключении IPv4↔IPv6 (раньше были два поля под
+        // разными ветками → значение терялось при смене типа).
+        name: "_zone_id",
         label: "Зона",
         type: "ref",
         refResource: "zones",
         required: true,
         description:
-          "Зона, в которой выделяется внешний IPv4. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv4-пула зоны.",
-        visibleWhen: { field: "_address_kind", equals: "external" },
+          "Зона, в которой выделяется внешний адрес. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из пула зоны.",
+        visibleWhen: { field: "_address_kind", equals: ["external", "external_v6"] },
         editHidden: true,
       },
       {
@@ -786,19 +790,7 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       },
       {
         // KAC-58: External IPv6 — sparse counter-based allocator (миграция 0021).
-        // CIDR-pool с v6 prefix создаётся через InternalAddressPoolService;
-        // cascade resolve фильтрует pool по family запроса.
-        name: "external_ipv6_address_spec.zone_id",
-        label: "Зона",
-        type: "ref",
-        refResource: "zones",
-        required: true,
-        description:
-          "Зона, в которой выделяется внешний IPv6. Оставьте поле «Адрес» пустым, чтобы адрес был выделен автоматически из IPv6-пула зоны.",
-        visibleWhen: { field: "_address_kind", equals: "external_v6" },
-        editHidden: true,
-      },
-      {
+        // Зона — общее поле `_zone_id` выше (для external и external_v6).
         name: "external_ipv6_address_spec.address",
         label: "Адрес",
         type: "string",
@@ -883,12 +875,27 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       const kind = obj["_address_kind"];
       const result: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj)) {
-        if (k === "_address_kind") continue;
+        if (k === "_address_kind" || k === "_zone_id") continue;
         if (k === "external_ipv4_address_spec" && kind !== "external") continue;
         if (k === "external_ipv6_address_spec" && kind !== "external_v6") continue;
         if (k === "internal_ipv4_address_spec" && kind !== "internal") continue;
         if (k === "internal_ipv6_address_spec" && kind !== "internal_v6") continue;
         result[k] = v;
+      }
+      // Общая зона `_zone_id` → в активную external-ветку spec'а.
+      const zone = obj["_zone_id"];
+      if (zone) {
+        if (kind === "external") {
+          result["external_ipv4_address_spec"] = {
+            ...(result["external_ipv4_address_spec"] as Record<string, unknown> | undefined),
+            zone_id: zone,
+          };
+        } else if (kind === "external_v6") {
+          result["external_ipv6_address_spec"] = {
+            ...(result["external_ipv6_address_spec"] as Record<string, unknown> | undefined),
+            zone_id: zone,
+          };
+        }
       }
       return result;
     },
