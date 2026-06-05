@@ -223,15 +223,54 @@ export function DetailShell({
           padding: 20,
         }}
       >
-        {/* Зона 2 верх: ТОТ ЖЕ PanelHeader, что шапка списка (ResourceListPage) —
-            один компонент на все страницы → нет расхождений/прыжка. [иконка] +
-            действие + тип. Имя ресурса — в зоне 3 (main). Приоритеты: форма >
-            per-tab > дефолт. */}
-        <PanelHeader
-          icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
-          eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
-          title={headerTitle ?? active?.headerTitle ?? resourceLabel}
-        />
+        {/* Зона 2 (рейл) — ИДЕНТИЧНОСТЬ ресурса: [аватар] + ТИП(eyebrow) + имя.
+            (Поменяно местами с контекстом таба, который теперь в зоне 3.) */}
+        <div
+          style={{
+            paddingBottom: 14,
+            marginBottom: 18,
+            borderBottom: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            <NameDotGrid name={resourceName} />
+            <div style={{ minWidth: 0 }}>
+              {nameEyebrow && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--kc-primary)",
+                    marginBottom: 2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {nameEyebrow}
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                <Typography.Title
+                  level={3}
+                  ellipsis={{ tooltip: resourceName || undefined }}
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 700,
+                    lineHeight: "24px",
+                    color: "var(--kc-text)",
+                  }}
+                >
+                  {resourceName || "(без имени)"}
+                </Typography.Title>
+                {badges}
+              </div>
+            </div>
+          </div>
+        </div>
 
         <Menu
           mode="inline"
@@ -310,75 +349,23 @@ export function DetailShell({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
-        {/* Зона 3 верх: имя ресурса (крупно) + статус + мета. Рендерится ВСЕГДА
-            (в т.ч. над формой edit/child-create — имя мастер-ресурса остаётся
-            сверху). Справа — слот: активный таб «поднимает» сюда свои фильтры
-            (related-таблица / операции) на уровень имени (HeaderSlotPortal). */}
-        {/* Зона-3 шапка = ЗЕРКАЛО бейджа зоны-2: квадрат-бейдж 42 + 2-строчный
-            блок (имя / мета), высота 42, paddingBottom 14 → нижняя линия на той
-            же y, что и линия рейла (зона-2) → ОДНА сплошная линия через рейл и
-            main. Справа — слот фильтров активного таба (req3). */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-            paddingBottom: 14,
-            marginBottom: 18,
-            borderBottom: "1px solid var(--kc-border-secondary)",
-          }}
-        >
-          {/* Зеркало бейджа зоны-2: [аватар] + ЗАГЛАВНЫЙ eyebrow(тип) + имя —
-              та же типографика, что [иконка] + действие + тип в рейле → один
-              вайб/симметрия. (req3) */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameDotGrid name={resourceName} />
-            <div style={{ minWidth: 0 }}>
-              {/* строка 1: тип ресурса (caps, как eyebrow зоны-2) */}
-              {nameEyebrow && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--kc-primary)",
-                    marginBottom: 2,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  {nameEyebrow}
-                </div>
-              )}
-              {/* строка 2: имя ресурса (крупнее — главный элемент) + статус */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                <Typography.Title
-                  level={3}
-                  ellipsis={{ tooltip: resourceName || undefined }}
-                  style={{
-                    margin: 0,
-                    fontSize: 20,
-                    fontWeight: 700,
-                    lineHeight: "24px",
-                    color: "var(--kc-text)",
-                  }}
-                >
-                  {resourceName || "(без имени)"}
-                </Typography.Title>
-                {badges}
-              </div>
+        {/* Зона 3 (main) верх — КОНТЕКСТ активного таба: [иконка] + действие +
+            тип (тот же PanelHeader, что список). Справа — слот: активный таб
+            «поднимает» сюда фильтры (related-таблица / операции). Приоритеты:
+            форма (Создание/Редактирование) > per-tab > дефолт. (Поменяно местами
+            с блоком имени, который теперь в зоне 2 / рейле.) */}
+        <PanelHeader
+          icon={headerIconOverride ?? active?.headerIcon ?? ctxIcon}
+          eyebrow={headerEyebrow ?? active?.eyebrow ?? active?.label}
+          title={headerTitle ?? active?.headerTitle ?? resourceLabel}
+          right={
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {nameActions}
+              {/* Слот для фильтров активного таба. */}
+              <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
             </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
-            {nameActions}
-            {/* Слот для фильтров активного таба (req3). */}
-            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
-          </div>
-        </div>
+          }
+        />
 
         {mainOverride ? (
           mainOverride
