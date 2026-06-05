@@ -85,6 +85,15 @@ export function InlineNetworkInterfaceCreateForm({
     [subnetList],
   );
 
+  // Выбранная подсеть → network_id: SG фильтруем по сети подсети.
+  const { data: selectedSubnet } = useQuery({
+    queryKey: ["subnets", "for-nic-filter", subnetId],
+    queryFn: () => api.get<{ network_id?: string }>(`${subnetSpec.apiPath}/${subnetId}`),
+    enabled: !!subnetId,
+    staleTime: 60_000,
+  });
+  const sgNetworkId = selectedSubnet?.network_id;
+
   const [pendingOpId, setPendingOpId] = useState<string | null>(null);
   const { data: op } = useOperation(pendingOpId);
 
@@ -272,6 +281,9 @@ export function InlineNetworkInterfaceCreateForm({
             tagColor="purple"
             value={sgs}
             onChange={setSgs}
+            disabled={!subnetId}
+            disabledHint="Сначала выберите подсеть"
+            refFilter={(row) => !!sgNetworkId && row.network_id === sgNetworkId}
             createResource="security-groups"
             createTitle="Создание группы безопасности"
           />

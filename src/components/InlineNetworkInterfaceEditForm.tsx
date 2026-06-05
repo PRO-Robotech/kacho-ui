@@ -63,6 +63,17 @@ export function InlineNetworkInterfaceEditForm({
     enabled: !!nicId,
   });
 
+  // Подсеть NIC → network_id: адреса фильтруем по подсети, SG — по её сети.
+  const subnetIdOfNic = nic?.subnet_id;
+  const { data: subnetOfNic } = useQuery({
+    queryKey: ["subnets", "for-nic-filter", subnetIdOfNic],
+    queryFn: () =>
+      api.get<{ network_id?: string }>(`${REGISTRY["subnets"].apiPath}/${subnetIdOfNic}`),
+    enabled: !!subnetIdOfNic,
+    staleTime: 60_000,
+  });
+  const sgNetworkId = subnetOfNic?.network_id;
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [labels, setLabels] = useState<LabelEntry[]>([]);
@@ -221,7 +232,10 @@ export function InlineNetworkInterfaceEditForm({
             value={v4}
             onChange={setV4}
             maxItems={1}
-            refFilter={(row) => !!row.internal_ipv4_address}
+            refFilter={(row) =>
+              (row.internal_ipv4_address as { subnet_id?: string } | undefined)?.subnet_id ===
+              nic.subnet_id
+            }
             createResource="addresses"
             createPresetFields={{
               _address_kind: "internal",
@@ -248,7 +262,8 @@ export function InlineNetworkInterfaceEditForm({
             onChange={setV6}
             maxItems={1}
             refFilter={(row) =>
-              !!row.internal_ipv6_address || !!row.external_ipv6_address
+              (row.internal_ipv6_address as { subnet_id?: string } | undefined)?.subnet_id ===
+              nic.subnet_id
             }
             createResource="addresses"
             createEditablePresetFields={{ _address_kind: "internal_v6" }}
@@ -274,6 +289,7 @@ export function InlineNetworkInterfaceEditForm({
             tagColor="purple"
             value={sgs}
             onChange={setSgs}
+            refFilter={(row) => !!sgNetworkId && row.network_id === sgNetworkId}
             createResource="security-groups"
             createTitle="Создание группы безопасности"
           />
