@@ -92,11 +92,10 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
-// NameSigil — генеративный «сигил» ресурса (identicon, GitHub/GitLab-стиль):
-// детерминированный симметричный 5×5 пиксель-глиф из hash(имя), один цвет на
-// ресурс из brand cool-палитры. Без текста. Тон-плитка как у ContextBadge →
-// вписан в стилистику; у каждого ресурса — своё узнаваемое «лицо».
-const SIGIL_PALETTE = [
+// NameMonogram — инициалы ресурса на плитке, тон выбран детерминированно из
+// имени (brand cool-палитра). Тон-плитка/радиус 1-в-1 с ContextBadge зоны-2 →
+// вписан в стилистику; разные ресурсы — разный (но синий) оттенок.
+const MONO_PALETTE = [
   "#2BB5C0", // teal
   "#2D9CDB", // sky
   "#2F80ED", // blue
@@ -106,54 +105,42 @@ const SIGIL_PALETTE = [
   "#6C5CE7", // violet
   "#7B6CF6", // periwinkle
 ];
-function sigilHash(s: string): number {
+function monoHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  // avalanche-перемешивание → мелкое изменение имени даёт сильно иной глиф.
-  h ^= h >>> 13;
-  h = (h * 0x5bd1e995) >>> 0;
-  h ^= h >>> 15;
   return h >>> 0;
 }
-function NameSigil({ name, size = 42 }: { name: string; size?: number }) {
-  const num = sigilHash((name || "?").trim() || "?");
-  const fg = SIGIL_PALETTE[num % SIGIL_PALETTE.length];
-  // Симметричный 5×5: считаем колонки 0..2, зеркалим 0→4, 1→3.
-  const cells: Array<[number, number]> = [];
-  for (let x = 0; x < 3; x++) {
-    for (let y = 0; y < 5; y++) {
-      if ((num >> (x * 5 + y)) & 1) {
-        cells.push([x, y]);
-        if (x < 2) cells.push([4 - x, y]);
-      }
-    }
-  }
+function NameMonogram({ name, size = 42 }: { name: string; size?: number }) {
+  const clean = (name || "?").trim();
+  const initials =
+    clean
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase() || "?";
+  const color = MONO_PALETTE[monoHash(clean || "?") % MONO_PALETTE.length];
   return (
     <div
-      aria-hidden
       style={{
-        // Размер/радиус/тон-плитка 1-в-1 с ContextBadge (TILE=42) зоны-2.
         width: size,
         height: size,
         borderRadius: 12,
         flexShrink: 0,
-        overflow: "hidden",
-        background: "rgba(61,141,245,0.08)",
-        border: "1px solid rgba(61,141,245,0.20)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: Math.round(size * 0.38),
+        fontWeight: 700,
+        letterSpacing: "0.02em",
+        color: "#fff",
+        background: `linear-gradient(135deg, ${color}2e, ${color}12)`,
+        border: `1px solid ${color}59`,
         boxShadow: "var(--kc-shadow-sm)",
       }}
     >
-      <svg
-        viewBox="-0.35 -0.35 5.7 5.7"
-        width={size}
-        height={size}
-        shapeRendering="crispEdges"
-        style={{ display: "block" }}
-      >
-        {cells.map(([x, y], i) => (
-          <rect key={i} x={x} y={y} width={1.02} height={1.02} rx={0.12} fill={fg} />
-        ))}
-      </svg>
+      {initials}
     </div>
   );
 }
@@ -345,7 +332,7 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameSigil name={resourceName} />
+            <NameMonogram name={resourceName} />
             <div style={{ minWidth: 0 }}>
               {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
