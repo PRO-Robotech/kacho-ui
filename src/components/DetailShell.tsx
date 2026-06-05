@@ -14,11 +14,24 @@
 //
 // Tab выбирается через ?tab=<id>. Дефолт — первый tab.
 
-import { type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Menu, Typography, Badge } from "antd";
 import { useDetailHeaderIcon } from "@/components/PanelHeader";
 import { ContextBadge } from "@/components/ContextBadge";
+
+// Слот в правой части строки-имени (зона 3): активный таб может «поднять» свой
+// тулбар (поиск/колонки/фильтры) на уровень имени ресурса через HeaderSlotPortal.
+const HeaderSlotContext = createContext<HTMLElement | null>(null);
+
+/** Рендерит children в правый слот строки-имени (зона 3) detail-страницы.
+ *  Вне DetailShell (нет слота) — graceful: ничего не рендерит. Используется
+ *  related-таблицами / OperationsTab, чтобы их фильтры были на уровне имени. */
+export function HeaderSlotPortal({ children }: { children: ReactNode }) {
+  const el = useContext(HeaderSlotContext);
+  return el ? createPortal(children, el) : null;
+}
 
 export interface DetailTab {
   id: string;
@@ -63,6 +76,8 @@ interface Props {
   onTabSelect?: (id: string) => void;
   /** Действия рядом с именем ресурса в зоне 3 (Редактировать/Удалить/Создать). */
   nameActions?: ReactNode;
+  /** Мета-строка под именем (ID + дата создания и т.п.) — оживляет зону 3. */
+  nameMeta?: ReactNode;
   /** Override зоны-2 шапки (для форм edit/create: «Редактирование»/«Создание» +
    *  тип + иконка ресурса формы). Иначе eyebrow = label активного таба. */
   headerEyebrow?: string;
@@ -77,6 +92,48 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
+// NameMonogram — квадрат-аватар с инициалами из имени ресурса + цветом,
+// детерминированно выведенным из имени. Оживляет одиночный заголовок (req4):
+// одинаковые ресурсы получают стабильный «характерный» цвет.
+const MONO_HUES = [210, 260, 330, 16, 36, 150, 190, 280];
+function NameMonogram({ name }: { name: string }) {
+  const clean = (name || "?").trim();
+  const initials =
+    clean
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase() || "?";
+  let h = 0;
+  for (let i = 0; i < clean.length; i++) h = (h * 31 + clean.charCodeAt(i)) >>> 0;
+  const hue = MONO_HUES[h % MONO_HUES.length];
+  return (
+    <div
+      aria-hidden
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: 12,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 16,
+        fontWeight: 700,
+        letterSpacing: "0.02em",
+        color: `hsl(${hue} 70% 72%)`,
+        background: `linear-gradient(135deg, hsl(${hue} 60% 22% / 0.85), hsl(${hue} 60% 14% / 0.65))`,
+        border: `1px solid hsl(${hue} 60% 45% / 0.4)`,
+        boxShadow: `inset 0 0 0 1px hsl(${hue} 70% 60% / 0.08)`,
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
+
 export function DetailShell({
   resourceLabel,
   resourceName,
@@ -89,11 +146,13 @@ export function DetailShell({
   activeTabId,
   onTabSelect,
   nameActions,
+  nameMeta,
   headerEyebrow,
   headerTitle,
   headerIcon: headerIconOverride,
 }: Props) {
   const ctxIcon = useDetailHeaderIcon();
+  const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
   const [params, setParams] = useSearchParams();
   const fallback = defaultTab ?? tabs[0]?.id ?? "overview";
   const controlled = onTabSelect !== undefined;
@@ -241,26 +300,27 @@ export function DetailShell({
       </aside>
 
       <main style={{ flex: 1, minWidth: 0, padding: "20px 24px" }}>
-        {mainOverride ? (
-          mainOverride
-        ) : (
-          <>
-            {/* Зона 3 верх: имя ресурса (крупно) + статус + действия. */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: 16,
-                flexWrap: "wrap",
-                paddingBottom: 16,
-                marginBottom: 18,
-                borderBottom: "1px solid var(--kc-border-secondary)",
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}
-              >
+        {/* Зона 3 верх: имя ресурса (крупно) + статус + мета. Рендерится ВСЕГДА
+            (в т.ч. над формой edit/child-create — имя мастер-ресурса остаётся
+            сверху). Справа — слот: активный таб «поднимает» сюда свои фильтры
+            (related-таблица / операции) на уровень имени (HeaderSlotPortal). */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 16,
+            flexWrap: "wrap",
+            paddingBottom: 16,
+            marginBottom: 18,
+            borderBottom: "1px solid var(--kc-border-secondary)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            {/* Монограмма из имени — оживляет одиночный заголовок (req4). */}
+            <NameMonogram name={resourceName} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", minWidth: 0 }}>
                 <Typography.Title
                   level={3}
                   style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "var(--kc-text)", wordBreak: "break-all" }}
@@ -269,12 +329,34 @@ export function DetailShell({
                 </Typography.Title>
                 {badges}
               </div>
-              {nameActions && (
-                <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center" }}>
-                  {nameActions}
+              {nameMeta && (
+                <div
+                  style={{
+                    marginTop: 5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    fontSize: 12.5,
+                    color: "var(--kc-text-secondary)",
+                  }}
+                >
+                  {nameMeta}
                 </div>
               )}
             </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
+            {nameActions}
+            {/* Слот для фильтров активного таба (req3). */}
+            <div ref={setSlotEl} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }} />
+          </div>
+        </div>
+
+        {mainOverride ? (
+          mainOverride
+        ) : (
+          <>
             {secondaryActions && (
               <div
                 style={{
@@ -289,7 +371,9 @@ export function DetailShell({
                 {secondaryActions}
               </div>
             )}
-            {active?.render()}
+            <HeaderSlotContext.Provider value={slotEl}>
+              {active?.render()}
+            </HeaderSlotContext.Provider>
           </>
         )}
       </main>

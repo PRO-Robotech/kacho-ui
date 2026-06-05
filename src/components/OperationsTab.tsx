@@ -16,6 +16,7 @@ import {
   type OperationStatus,
 } from "@/components/OperationsTable";
 import type { ResourceSpec } from "@/lib/resource-registry";
+import { HeaderSlotPortal } from "@/components/DetailShell";
 
 interface Props {
   spec: ResourceSpec;
@@ -87,9 +88,8 @@ export function OperationsTab({ spec, resourceId }: Props) {
 
   return (
     <div>
-      {/* Заголовок (иконка/действие «Операции») — в зоне 2 DetailShell; здесь
-          только тулбар фильтров. */}
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+      {/* Фильтры операций — на уровень имени ресурса (зона 3, правый слот). */}
+      <HeaderSlotPortal>
         <Input
           placeholder="Фильтр по идентификатору"
           value={query}
@@ -98,7 +98,7 @@ export function OperationsTab({ spec, resourceId }: Props) {
           style={{ width: 260 }}
         />
         <Select value={status} onChange={setStatus} options={STATUS_OPTIONS} style={{ width: 180 }} />
-      </div>
+      </HeaderSlotPortal>
 
       <OperationsTable
         rows={filtered}

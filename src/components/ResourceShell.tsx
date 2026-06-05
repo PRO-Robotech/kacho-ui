@@ -20,7 +20,7 @@ import { useParams, useNavigate, useLocation, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Descriptions, Spin, Tag, Typography } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
-import { DetailShell, type DetailTab, type DocLink } from "@/components/DetailShell";
+import { DetailShell, HeaderSlotPortal, type DetailTab, type DocLink } from "@/components/DetailShell";
 import { DetailHeaderProvider } from "@/components/PanelHeader";
 import { ResourceIcon } from "@/components/form/ResourceIcon";
 import { ResourceEmptyState } from "@/components/ResourceEmptyState";
@@ -131,11 +131,12 @@ function RelatedTable({
 
   return (
     <div>
-      {/* Заголовок раздела (тип/действие) — в зоне 2; здесь только тулбар. */}
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+      {/* Фильтры (поиск/колонки) поднимаются на уровень имени ресурса (зона 3,
+          правый слот) через HeaderSlotPortal — req3. */}
+      <HeaderSlotPortal>
         <TableSearch value={search} onChange={setSearch} />
         <ColumnSettings columns={toggleCols} hidden={hidden} onToggle={toggleHidden} />
-      </div>
+      </HeaderSlotPortal>
       <ResourceTable
         rows={rows}
         columns={columns}
@@ -421,7 +422,7 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
   const headerEyebrow =
     mode === "edit" ? "Редактирование" : mode === "child-create" ? "Создание" : undefined;
   const headerTitle =
-    mode === "edit" ? spec.singular : mode === "child-create" ? childForHeader?.singular : undefined;
+    mode === "edit" ? spec.plural : mode === "child-create" ? childForHeader?.plural : undefined;
   const headerIcon =
     mode === "child-create" && childForHeader ? <ResourceIcon specId={childForHeader.id} /> : undefined;
 
@@ -432,6 +433,17 @@ export function ResourceShell({ spec, mode }: { spec: ResourceSpec; mode?: Resou
       <DetailShell
         resourceLabel={spec.plural}
         resourceName={name}
+        nameMeta={
+          <>
+            <CopyableId id={getByPath<string>(data, "id") ?? (uid ?? "")} />
+            {getByPath<string>(data, "created_at") && (
+              <>
+                <span style={{ opacity: 0.5 }}>·</span>
+                <span>Создан {formatDateTime(getByPath<string>(data, "created_at"))}</span>
+              </>
+            )}
+          </>
+        }
         badges={status ? <Tag>{status}</Tag> : undefined}
         tabs={tabs}
         docLinks={(spec.docs as DocLink[] | undefined) ?? []}
