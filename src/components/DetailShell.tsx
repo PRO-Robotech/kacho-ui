@@ -92,11 +92,11 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
-// NameGraph — бесток-identicon под Kachō: мини-топология сети (хаб + узлы +
-// связи), детерминированно сгенерированная из hash(имя). Тема VPC, line-art в
-// brand cool-палитре, тон-плитка/радиус 1-в-1 с ContextBadge зоны-2 → вписано в
-// стилистику; у каждого ресурса — узнаваемый уникальный граф.
-const GRAPH_PALETTE = [
+// NameTruchet — бесток-identicon под Kachō: Truchet-плитки (перетекающие дуги),
+// детерминированно сгенерированные из hash(имя). Generative-art line-art в brand
+// cool-палитре, тон-плитка/радиус 1-в-1 с ContextBadge зоны-2 → вписано в
+// стилистику; у каждого ресурса — узнаваемый уникальный узор.
+const TRUCHET_PALETTE = [
   "#2BB5C0", // teal
   "#2D9CDB", // sky
   "#2F80ED", // blue
@@ -106,29 +106,39 @@ const GRAPH_PALETTE = [
   "#6C5CE7", // violet
   "#7B6CF6", // periwinkle
 ];
-function graphHash(s: string): number {
+function truchetHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  // avalanche — мелкое изменение имени даёт сильно иной граф.
+  // avalanche — мелкое изменение имени даёт сильно иной узор.
   h ^= h >>> 13;
   h = (h * 0x5bd1e995) >>> 0;
   h ^= h >>> 15;
   return h >>> 0;
 }
-function NameGraph({ name, size = 42 }: { name: string; size?: number }) {
-  const n = graphHash((name || "?").trim() || "?");
-  const col = GRAPH_PALETTE[n % GRAPH_PALETTE.length];
-  const dot = GRAPH_PALETTE[(n + 3) % GRAPH_PALETTE.length];
-  const rng = (i: number) => ((n >> (i * 3)) % 1000) / 1000;
-  const bit = (i: number) => (n >> (i % 30)) & 1;
-  const k = 3 + (n % 3); // 3..5 узлов-спутников
-  const cx = 50;
-  const cy = 50;
-  const pts: Array<[number, number]> = [];
-  for (let i = 0; i < k; i++) {
-    const ang = i * ((2 * Math.PI) / k) + (rng(i) - 0.5) * 0.9;
-    const rad = 28 + rng(i + 5) * 12;
-    pts.push([cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)]);
+function NameTruchet({ name, size = 42 }: { name: string; size?: number }) {
+  const n = truchetHash((name || "?").trim() || "?");
+  const col = TRUCHET_PALETTE[n % TRUCHET_PALETTE.length];
+  const G = 3;
+  const cs = 100 / G;
+  const sw = cs * 0.17;
+  const r = cs / 2;
+  const f = (v: number) => v.toFixed(2);
+  // Каждая ячейка — пара четвертькругов в одной из 2 ориентаций (бит из hash) →
+  // перетекающий лабиринт-узор.
+  const paths: string[] = [];
+  for (let y = 0; y < G; y++) {
+    for (let x = 0; x < G; x++) {
+      const b = (n >> ((y * G + x) % 30)) & 1;
+      const ox = x * cs;
+      const oy = y * cs;
+      if (b) {
+        paths.push(`M${f(ox)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 0 ${f(ox + r)} ${f(oy)}`);
+        paths.push(`M${f(ox + cs)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 0 ${f(ox + r)} ${f(oy + cs)}`);
+      } else {
+        paths.push(`M${f(ox + r)} ${f(oy)} A ${f(r)} ${f(r)} 0 0 1 ${f(ox + cs)} ${f(oy + r)}`);
+        paths.push(`M${f(ox)} ${f(oy + r)} A ${f(r)} ${f(r)} 0 0 1 ${f(ox + r)} ${f(oy + cs)}`);
+      }
+    }
   }
   return (
     <div
@@ -146,46 +156,9 @@ function NameGraph({ name, size = 42 }: { name: string; size?: number }) {
       }}
     >
       <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: "block" }}>
-        {/* связи хаб→узел */}
-        {pts.map((p, i) => (
-          <line
-            key={`l${i}`}
-            x1={cx}
-            y1={cy}
-            x2={p[0].toFixed(1)}
-            y2={p[1].toFixed(1)}
-            stroke={col}
-            strokeWidth={2.4}
-            strokeOpacity={0.45}
-            strokeLinecap="round"
-          />
+        {paths.map((d, i) => (
+          <path key={i} d={d} fill="none" stroke={col} strokeWidth={sw} strokeLinecap="round" />
         ))}
-        {/* доп. хорда между двумя узлами (по hash) */}
-        {k > 2 && bit(7) ? (
-          <line
-            x1={pts[0][0].toFixed(1)}
-            y1={pts[0][1].toFixed(1)}
-            x2={pts[1][0].toFixed(1)}
-            y2={pts[1][1].toFixed(1)}
-            stroke={col}
-            strokeWidth={2}
-            strokeOpacity={0.3}
-            strokeLinecap="round"
-          />
-        ) : null}
-        {/* узлы-спутники */}
-        {pts.map((p, i) => (
-          <circle
-            key={`c${i}`}
-            cx={p[0].toFixed(1)}
-            cy={p[1].toFixed(1)}
-            r={4 + (bit(i + 2) ? 1.3 : 0)}
-            fill={dot}
-          />
-        ))}
-        {/* хаб */}
-        <circle cx={cx} cy={cy} r={7.5} fill={col} />
-        <circle cx={cx} cy={cy} r={11.5} fill="none" stroke={col} strokeWidth={1.6} strokeOpacity={0.4} />
       </svg>
     </div>
   );
@@ -378,7 +351,7 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameGraph name={resourceName} />
+            <NameTruchet name={resourceName} />
             <div style={{ minWidth: 0 }}>
               {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
