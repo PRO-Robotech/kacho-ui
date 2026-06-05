@@ -1,11 +1,18 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
   <defs>
-    <linearGradient id="kacho-grad" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3D8DF5"/>
-      <stop offset="1" stop-color="#6E56CF"/>
+    <linearGradient id="kachoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3D8DF5"/>
+      <stop offset="1" stop-color="#7B6CF6"/>
+    </linearGradient>
+    <linearGradient id="kachoG2" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#2BB5C0"/>
+      <stop offset="1" stop-color="#5B7CFA"/>
     </linearGradient>
   </defs>
-  <path d="M16 27 C 9 21, 4.5 15, 6.5 7.5 C 12 10.5, 15 16, 16 23 Z" fill="url(#kacho-grad)" opacity="0.72"/>
-  <path d="M16 27 C 23 21, 27.5 15, 25.5 7.5 C 20 10.5, 17 16, 16 23 Z" fill="url(#kacho-grad)" opacity="0.72"/>
-  <path d="M16 28 C 13.5 20, 13.5 11, 16 3 C 18.5 11, 18.5 20, 16 28 Z" fill="url(#kacho-grad)"/>
+  <g transform="translate(24 24)">
+    <path d="M0 0 L0 -20 A8 8 0 0 1 14 -14 Z" fill="url(#kachoG)"/>
+    <path d="M0 0 L20 0 A8 8 0 0 1 14 14 Z" fill="url(#kachoG2)"/>
+    <path d="M0 0 L0 20 A8 8 0 0 1 -14 14 Z" fill="url(#kachoG)" opacity="0.8"/>
+    <path d="M0 0 L-20 0 A8 8 0 0 1 -14 -14 Z" fill="url(#kachoG2)" opacity="0.8"/>
+  </g>
 </svg>

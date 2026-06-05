@@ -262,25 +262,16 @@ export const DETAIL_EXTENSIONS: Record<string, DetailExtension> = {
         },
       ];
     },
-    extraTabs: ({ data, projectId }) => {
-      // KAC-239: один таб «Правила» (INGRESS+EGRESS вместе, направление — первый
-      // столбец). Управление по одному через SgRulesPanel (чекбоксы/⋮/редактор),
-      // не правкой всего SG. Бэкенд — UpdateRules по стабильным id.
+    // req: правила — в ОБЗОРЕ (под Descriptions), как маршруты у route-tables,
+    // а не отдельным табом. Управление по одному через SgRulesPanel
+    // (чекбоксы/⋮/редактор), бэкенд — UpdateRules по стабильным id.
+    overviewBelow: ({ data, projectId }) => {
       const all = (getByPath<SgRule[]>(data, "rules") ?? []) as SgRule[];
       const sgId = getByPath<string>(data, "id") ?? "";
-      // KAC-243 (scenario 18): network_id редактируемой SG → SG-target picker в
-      // редакторе правил фильтрует кандидатов по той же сети.
+      // KAC-243 (scenario 18): network_id SG → SG-target picker в редакторе
+      // правил фильтрует кандидатов по той же сети.
       const networkId = getByPath<string>(data, "network_id") ?? "";
-      return [
-        {
-          id: "rules",
-          label: "Правила",
-          count: all.length,
-          render: () => (
-            <SgRulesPanel sgId={sgId} projectId={projectId} rules={all} networkId={networkId} />
-          ),
-        },
-      ];
+      return <SgRulesPanel sgId={sgId} projectId={projectId} rules={all} networkId={networkId} />;
     },
   },
 

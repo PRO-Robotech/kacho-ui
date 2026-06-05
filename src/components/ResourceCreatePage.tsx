@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Alert, Button, Space, Typography } from "antd";
-import { ArrowLeftOutlined } from "@ant-design/icons";
+import { Alert, Typography } from "antd";
 import { ResourceFormBody } from "@/components/form/ResourceFormBody";
 import { FORM_WIDTH } from "@/components/form/FormShell";
 import { extractOperationId } from "@/components/OperationDialog";
@@ -189,27 +188,19 @@ export function ResourceCreatePage({ spec, parentField, parentParam }: Props) {
 
   return (
     <div style={{ maxWidth: FORM_WIDTH }}>
-      <Space direction="vertical" size={20} style={{ width: "100%" }}>
-        <div>
-          <Link to={backHref}>
-            <Button type="text" size="small" icon={<ArrowLeftOutlined />} style={{ marginLeft: -8 }}>
-              {spec.plural}
-            </Button>
-          </Link>
-        </div>
-        <ResourceFormBody
-          spec={spec}
-          mode="create"
-          obj={obj}
-          onChange={setObj}
-          lockedPaths={lockedPathsRef.current}
-          submitLabel={`Создать ${spec.singular.toLowerCase()}`}
-          submitting={mutation.isPending || pendingOpId !== null}
-          onSubmit={submit}
-          onCancel={() => navigate(backHref)}
-          stickyFooter
-        />
-      </Space>
+      {/* Беклинк убран (req) — путь назад есть в breadcrumb хедера. */}
+      <ResourceFormBody
+        spec={spec}
+        mode="create"
+        obj={obj}
+        onChange={setObj}
+        lockedPaths={lockedPathsRef.current}
+        submitLabel={`Создать ${spec.singular.toLowerCase()}`}
+        submitting={mutation.isPending || pendingOpId !== null}
+        onSubmit={submit}
+        onCancel={() => navigate(backHref)}
+        stickyFooter
+      />
     </div>
   );
 }
