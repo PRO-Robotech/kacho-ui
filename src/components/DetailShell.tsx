@@ -92,11 +92,10 @@ interface Props {
 // ширина рейла «прыгала» при смене таба (KAC-246).
 const SUB_PANE_WIDTH = 272;
 
-// NameNodeGrid — бесток-identicon под Kachō: узлы на сетке 3×3 + ортогональные
-// связи (PCB/схема-инфры), детерминированно из hash(имя). Центр всегда есть;
-// прочие узлы и связи — из бит hash. Brand cool-палитра, тон-плитка/радиус как у
-// ContextBadge зоны-2 → вписано в стилистику.
-const NODEGRID_PALETTE = [
+// NameDotGrid — бесток-identicon под Kachō: сетка 5×5 точек, размер/прозрачность
+// каждой из hash(имя) (Linear-стиль dot-pattern). Brand cool-палитра, тон-плитка/
+// радиус 1-в-1 с ContextBadge зоны-2 → вписано в стилистику.
+const DOTGRID_PALETTE = [
   "#2BB5C0", // teal
   "#2D9CDB", // sky
   "#2F80ED", // blue
@@ -106,42 +105,29 @@ const NODEGRID_PALETTE = [
   "#6C5CE7", // violet
   "#7B6CF6", // periwinkle
 ];
-function nodegridHash(s: string): number {
+function dotgridHash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  // avalanche — мелкое изменение имени даёт сильно иную схему.
+  // avalanche — мелкое изменение имени даёт сильно иной паттерн.
   h ^= h >>> 13;
   h = (h * 0x5bd1e995) >>> 0;
   h ^= h >>> 15;
   return h >>> 0;
 }
-function NameNodeGrid({ name, size = 42 }: { name: string; size?: number }) {
-  const n = nodegridHash((name || "?").trim() || "?");
-  const col = NODEGRID_PALETTE[n % NODEGRID_PALETTE.length];
-  const G = 3;
-  const pad = 22;
+const DOT_R = [1.6, 2.6, 3.8, 5.2];
+function NameDotGrid({ name, size = 42 }: { name: string; size?: number }) {
+  const n = dotgridHash((name || "?").trim() || "?");
+  const col = DOTGRID_PALETTE[n % DOTGRID_PALETTE.length];
+  const G = 5;
+  const pad = 14;
   const step = (100 - 2 * pad) / (G - 1);
-  const bit = (i: number) => (n >> (i % 30)) & 1;
-  // present[y*G+x] — есть ли узел; центр (1,1) всегда.
-  const present: boolean[] = [];
-  for (let y = 0; y < G; y++) {
-    for (let x = 0; x < G; x++) present.push(!!bit(y * G + x) || (x === 1 && y === 1));
-  }
-  const px = (x: number) => pad + x * step;
-  const py = (y: number) => pad + y * step;
-  const lines: Array<[number, number, number, number]> = [];
-  const dots: Array<[number, number, boolean]> = [];
+  const dots: Array<[number, number, number, number]> = [];
   for (let y = 0; y < G; y++) {
     for (let x = 0; x < G; x++) {
-      if (!present[y * G + x]) continue;
-      if (x < G - 1 && present[y * G + x + 1] && bit(9 + y)) lines.push([px(x), py(y), px(x + 1), py(y)]);
-      if (y < G - 1 && present[(y + 1) * G + x] && bit(12 + x)) lines.push([px(x), py(y), px(x), py(y + 1)]);
-    }
-  }
-  for (let y = 0; y < G; y++) {
-    for (let x = 0; x < G; x++) {
-      if (!present[y * G + x]) continue;
-      dots.push([px(x), py(y), x === 1 && y === 1]);
+      const v = (n >> ((y * G + x) % 30)) & 3; // 0..3 — размер/яркость точки
+      const r = DOT_R[v];
+      const op = v === 0 ? 0.3 : Math.min(1, 0.55 + v * 0.13);
+      dots.push([pad + x * step, pad + y * step, r, op]);
     }
   }
   return (
@@ -160,29 +146,8 @@ function NameNodeGrid({ name, size = 42 }: { name: string; size?: number }) {
       }}
     >
       <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: "block" }}>
-        {lines.map(([x1, y1, x2, y2], i) => (
-          <line
-            key={`l${i}`}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
-            stroke={col}
-            strokeWidth={2}
-            strokeOpacity={0.4}
-            strokeLinecap="round"
-          />
-        ))}
-        {dots.map(([cx, cy, big], i) => (
-          <rect
-            key={`d${i}`}
-            x={cx - (big ? 5 : 3.5)}
-            y={cy - (big ? 5 : 3.5)}
-            width={big ? 10 : 7}
-            height={big ? 10 : 7}
-            rx={2}
-            fill={col}
-          />
+        {dots.map(([cx, cy, r, op], i) => (
+          <circle key={i} cx={cx} cy={cy} r={r} fill={col} fillOpacity={Number(op.toFixed(2))} />
         ))}
       </svg>
     </div>
@@ -376,7 +341,7 @@ export function DetailShell({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-            <NameNodeGrid name={resourceName} />
+            <NameDotGrid name={resourceName} />
             <div style={{ minWidth: 0 }}>
               {/* строка 1: имя + статус (зеркало eyebrow зоны-2) */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
