@@ -1,8 +1,8 @@
-// AddressPoolDetailPage — admin страница AddressPool: utilization + cross-project addresses.
+// AddressPoolDetailPage — admin страница AddressPool: utilization + выделенные адреса.
 //
-// Корневой системный тенант (нет account/project для самого pool), но в табличке
-// addresses показываются клиентские project / account (reverse-lookup) после
-// KAC-124: Organization/Cloud/Folder → Account/Project.
+// Корневой системный тенант (нет account/project для самого pool). Вкладка
+// «Адреса» (KAC-273) показывает выделенные из пула адреса колонками
+// имя / идентификатор / IP-адрес / дата создания.
 
 import { Link, useParams } from "react-router-dom";
 import { useMemo } from "react";
@@ -10,10 +10,12 @@ import { useQuery } from "@tanstack/react-query";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { IpamUtilizationBar, CIDRBreakdown } from "@/components/IpamUtilizationBar";
 import { AddressPoolCidrManager } from "@/components/AddressPoolCidrManager";
+import { CopyableName } from "@/components/CopyableName";
+import { CopyableId } from "@/components/CopyableId";
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
+import { formatDateTime } from "@/lib/datetime";
 import type { DetailTab } from "@/components/DetailShell";
-import type { AccountSummaryList, ProjectSummaryList } from "@/api/types";
 
 interface PoolAddrEntry {
   id: string;
@@ -55,31 +57,6 @@ export function AddressPoolDetailPage() {
     enabled: !!poolId,
   });
 
-  // KAC-124: IAM Account + Project заменили Resource-Manager Organization+Cloud+Folder.
-  // VPC резервирует addresses под `project_id`.
-  const { data: projects } = useQuery({
-    queryKey: ["iam-projects-all"],
-    queryFn: () => api.list<ProjectSummaryList>("/iam/v1/projects"),
-    staleTime: 30_000,
-  });
-  const { data: accounts } = useQuery({
-    queryKey: ["iam-accounts-all"],
-    queryFn: () => api.list<AccountSummaryList>("/iam/v1/accounts"),
-    staleTime: 30_000,
-  });
-
-  const projectMap = new Map((projects?.projects ?? []).map((p) => [p.id, p]));
-  const accountMap = new Map((accounts?.accounts ?? []).map((a) => [a.id, a]));
-
-  const reverseLookup = (
-    projectId: string,
-  ): { project?: string; account?: string } => {
-    const p = projectMap.get(projectId);
-    if (!p) return {};
-    const a = p.account_id ? accountMap.get(p.account_id) : undefined;
-    return { project: p.name, account: a?.name };
-  };
-
   const extraTabs = useMemo(
     () =>
       (): DetailTab[] => {
@@ -116,46 +93,32 @@ export function AddressPoolDetailPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40 text-xs uppercase tracking-wide">
                     <tr>
-                      <th className="text-left px-3 py-2">IP</th>
-                      <th className="text-left px-3 py-2">Адрес</th>
-                      <th className="text-left px-3 py-2">Зона</th>
-                      <th className="text-left px-3 py-2">Project</th>
-                      <th className="text-left px-3 py-2">Account</th>
-                      <th className="text-left px-3 py-2">Reserved/Used</th>
+                      <th className="text-left px-3 py-2">Имя</th>
+                      <th className="text-left px-3 py-2">Идентификатор</th>
+                      <th className="text-left px-3 py-2">IP-адрес</th>
+                      <th className="text-left px-3 py-2">Дата создания</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(addresses?.addresses ?? []).map((a) => {
-                      const lk = reverseLookup(a.project_id);
-                      return (
-                        <tr key={a.id} className="border-t border-border hover:bg-muted/20">
-                          <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
-                          <td className="px-3 py-2">
-                            <Link
-                              to={`/projects/${a.project_id}/vpc/addresses/${a.id}`}
-                              className="text-blue-400 hover:underline"
-                            >
-                              {a.name || a.id.slice(0, 12) + "…"}
-                            </Link>
-                            <div className="text-[10px] text-muted-foreground font-mono">{a.id}</div>
-                          </td>
-                          <td className="px-3 py-2 font-mono text-xs">{a.zone_id}</td>
-                          <td className="px-3 py-2 text-xs">
-                            <Link to={`/projects/${a.project_id}`} className="hover:underline">
-                              {lk.project ?? a.project_id.slice(0, 8) + "…"}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2 text-xs">{lk.account ?? "—"}</td>
-                          <td className="px-3 py-2 text-xs">
-                            {a.reserved && <span className="text-blue-400 mr-1">RES</span>}
-                            {a.used && <span className="text-emerald-400">USED</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {(addresses?.addresses ?? []).map((a) => (
+                      <tr key={a.id} className="border-t border-border hover:bg-muted/20">
+                        <td className="px-3 py-2">
+                          <Link to={`/projects/${a.project_id}/vpc/addresses/${a.id}`}>
+                            <CopyableName name={a.name} fallback={a.id} />
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">
+                          <CopyableId id={a.id} />
+                        </td>
+                        <td className="px-3 py-2 font-mono">{a.ipv4 || "—"}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {formatDateTime(a.created_at)}
+                        </td>
+                      </tr>
+                    ))}
                     {(!addresses?.addresses || addresses.addresses.length === 0) && (
                       <tr>
-                        <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
+                        <td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">
                           Из этого пула адреса ещё не выделены
                         </td>
                       </tr>
@@ -167,10 +130,7 @@ export function AddressPoolDetailPage() {
           },
         ];
       },
-    // reverseLookup замыкает projectMap/accountMap из текущего рендера — OK:
-    // при смене любого запроса компонент перерендерится и tab'ы получат
-    // новый callback.
-    [util, addresses, projectMap, accountMap, reverseLookup],
+    [util, addresses],
   );
 
   // CIDR-блоки пула — отдельная панель управления под «Общим» в Обзоре (паритет
