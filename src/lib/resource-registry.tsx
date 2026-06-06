@@ -2167,25 +2167,30 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       kind: "EXTERNAL_PUBLIC",
       zone_id: "",
-      cidr_blocks: [{ value: "" }],
+      v4_cidr_blocks: [],
+      v6_cidr_blocks: [],
       is_default: false,
       selector_priority: 0,
     }),
-    // Конвертирует [{value: "..."}, ...] → ["...", ...] для wire format
-    // (аналогично subnets.v4_cidr_blocks).
+    // KAC-71: cidr_blocks разделён на v4_cidr_blocks + v6_cidr_blocks. Конвертирует
+    // [{value: "..."}] → ["..."] для wire format (как subnets.v4/v6_cidr_blocks),
+    // отбрасывает пустые и legacy-поле cidr_blocks.
     sanitize: (obj) => {
-      const raw = obj["cidr_blocks"];
-      if (Array.isArray(raw)) {
-        obj = {
-          ...obj,
-          cidr_blocks: raw.map((item) =>
-            typeof item === "object" && item !== null && "value" in (item as object)
-              ? (item as Record<string, unknown>)["value"]
-              : item
-          ),
-        };
+      const flat: Record<string, unknown> = { ...obj };
+      for (const key of ["v4_cidr_blocks", "v6_cidr_blocks"]) {
+        const raw = flat[key];
+        if (Array.isArray(raw)) {
+          flat[key] = raw
+            .map((item) =>
+              typeof item === "object" && item !== null && "value" in (item as object)
+                ? (item as Record<string, unknown>)["value"]
+                : item
+            )
+            .filter((v) => typeof v === "string" && v.trim() !== "");
+        }
       }
-      return obj;
+      delete flat["cidr_blocks"];
+      return flat;
     },
   },
 
