@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ResourceDetailPage } from "@/components/ResourceDetailPage";
 import { IpamUtilizationBar, CIDRBreakdown } from "@/components/IpamUtilizationBar";
+import { AddressPoolCidrManager } from "@/components/AddressPoolCidrManager";
 import { api } from "@/api/client";
 import { REGISTRY } from "@/lib/resource-registry";
 import type { DetailTab } from "@/components/DetailShell";
@@ -172,5 +173,21 @@ export function AddressPoolDetailPage() {
     [util, addresses, projectMap, accountMap, reverseLookup],
   );
 
-  return <ResourceDetailPage spec={spec} extraTabs={extraTabs} />;
+  // CIDR-блоки пула — отдельная панель управления под «Общим» в Обзоре (паритет
+  // с Subnet CIDR). KAC-269: мутируются :addCidrBlocks / :removeCidrBlocks, не
+  // PATCH (Update больше не меняет CIDR).
+  const overviewExtras = (data: Record<string, unknown>) => {
+    const id = (data.id as string) ?? poolId ?? "";
+    const v4 = (data.v4_cidr_blocks as string[] | undefined) ?? [];
+    const v6 = (data.v6_cidr_blocks as string[] | undefined) ?? [];
+    return (
+      <div style={{ marginTop: 24, maxWidth: 760 }}>
+        <AddressPoolCidrManager poolId={id} v4Blocks={v4} v6Blocks={v6} />
+      </div>
+    );
+  };
+
+  return (
+    <ResourceDetailPage spec={spec} extraTabs={extraTabs} overviewExtras={overviewExtras} />
+  );
 }

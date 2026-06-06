@@ -2121,6 +2121,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "v4-CIDR",
         description: "IPv4 CIDR-блоки, из которых аллоцируются внешние v4 адреса.",
+        // KAC-269: CIDR задаётся только при Create; Update больше не меняет CIDR
+        // (proto убрал поля из UpdateAddressPoolRequest). В edit-форме скрыто и
+        // не попадает в update_mask — изменение через :addCidrBlocks /
+        // :removeCidrBlocks (AddressPoolCidrManager).
+        createOnly: true,
         newItem: () => ({ value: "" }),
         itemFields: [
           {
@@ -2137,6 +2142,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "v6-CIDR",
         description: "IPv6 CIDR-блоки, из которых аллоцируются внешние v6 адреса.",
+        // KAC-269: createOnly — см. v4_cidr_blocks выше.
+        createOnly: true,
         newItem: () => ({ value: "" }),
         itemFields: [
           {
@@ -2167,25 +2174,30 @@ export const REGISTRY: Record<string, ResourceSpec> = {
       description: "",
       kind: "EXTERNAL_PUBLIC",
       zone_id: "",
-      cidr_blocks: [{ value: "" }],
+      v4_cidr_blocks: [],
+      v6_cidr_blocks: [],
       is_default: false,
       selector_priority: 0,
     }),
-    // Конвертирует [{value: "..."}, ...] → ["...", ...] для wire format
-    // (аналогично subnets.v4_cidr_blocks).
+    // KAC-71: cidr_blocks разделён на v4_cidr_blocks + v6_cidr_blocks. Конвертирует
+    // [{value: "..."}] → ["..."] для wire format (как subnets.v4/v6_cidr_blocks),
+    // отбрасывает пустые и legacy-поле cidr_blocks.
     sanitize: (obj) => {
-      const raw = obj["cidr_blocks"];
-      if (Array.isArray(raw)) {
-        obj = {
-          ...obj,
-          cidr_blocks: raw.map((item) =>
-            typeof item === "object" && item !== null && "value" in (item as object)
-              ? (item as Record<string, unknown>)["value"]
-              : item
-          ),
-        };
+      const flat: Record<string, unknown> = { ...obj };
+      for (const key of ["v4_cidr_blocks", "v6_cidr_blocks"]) {
+        const raw = flat[key];
+        if (Array.isArray(raw)) {
+          flat[key] = raw
+            .map((item) =>
+              typeof item === "object" && item !== null && "value" in (item as object)
+                ? (item as Record<string, unknown>)["value"]
+                : item
+            )
+            .filter((v) => typeof v === "string" && v.trim() !== "");
+        }
       }
-      return obj;
+      delete flat["cidr_blocks"];
+      return flat;
     },
   },
 
