@@ -2121,6 +2121,11 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "v4-CIDR",
         description: "IPv4 CIDR-блоки, из которых аллоцируются внешние v4 адреса.",
+        // KAC-269: CIDR задаётся только при Create; Update больше не меняет CIDR
+        // (proto убрал поля из UpdateAddressPoolRequest). В edit-форме скрыто и
+        // не попадает в update_mask — изменение через :addCidrBlocks /
+        // :removeCidrBlocks (AddressPoolCidrManager).
+        createOnly: true,
         newItem: () => ({ value: "" }),
         itemFields: [
           {
@@ -2137,6 +2142,8 @@ export const REGISTRY: Record<string, ResourceSpec> = {
         type: "array",
         itemLabel: "v6-CIDR",
         description: "IPv6 CIDR-блоки, из которых аллоцируются внешние v6 адреса.",
+        // KAC-269: createOnly — см. v4_cidr_blocks выше.
+        createOnly: true,
         newItem: () => ({ value: "" }),
         itemFields: [
           {

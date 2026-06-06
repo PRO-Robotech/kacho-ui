@@ -1,13 +1,14 @@
 // InlineAddressPoolEditForm — YC-style форма редактирования AddressPool,
 // визуально парная к InlineAddressPoolCreateForm: тот же horizontal Form
-// layout, тот же CIDR-chip widget. Wire-format:
+// layout. Wire-format:
 //   PATCH /vpc/v1/addressPools/{id}  { name, description, ..., update_mask }
 //
-// kind / zone_id — immutable (disabled в форме). v4_cidr_blocks / v6_cidr_blocks
-// — editable, full-replace через replace_v4_cidr_blocks / replace_v6_cidr_blocks
-// флаги (KAC-71, REQ-IPL-UPD-05/06): backend применяет replace только если
-// флаг = true. Если по полю diff — добавляем оба поля (массив + флаг) в payload
-// + соответствующий пункт в update_mask.
+// kind / zone_id — immutable (disabled в форме).
+//
+// KAC-269: AddressPool.Update БОЛЬШЕ НЕ меняет CIDR (proto убрал
+// v4/v6_cidr_blocks + replace_* из UpdateAddressPoolRequest). CIDR-блоки
+// управляются отдельными RPC (:addCidrBlocks / :removeCidrBlocks) через
+// AddressPoolCidrManager (sync, мутирует сразу, не через эту Update-форму).
 
 import { useEffect, useState } from "react";
 import { snakeToCamelPath } from "@/components/ResourceFormDialog";
@@ -24,7 +25,7 @@ import {
 } from "antd";
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { ApiError, api } from "@/api/client";
-import { SubnetCidrChips } from "@/components/SubnetCidrChips";
+import { AddressPoolCidrManager } from "@/components/AddressPoolCidrManager";
 import { FormShell } from "@/components/form/FormShell";
 import { FormFooter } from "@/components/form/FormFooter";
 import { REGISTRY } from "@/lib/resource-registry";
@@ -70,20 +71,16 @@ export function InlineAddressPoolEditForm({
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [v4Blocks, setV4Blocks] = useState<string[]>([]);
-  const [v6Blocks, setV6Blocks] = useState<string[]>([]);
   const [isDefault, setIsDefault] = useState(false);
   const [selectorPriority, setSelectorPriority] = useState<number>(0);
   const [hydrated, setHydrated] = useState(false);
 
-  // Hydrate из загруженных данных. KAC-71: backend отдаёт уже split-shape
-  // (v4_cidr_blocks + v6_cidr_blocks), client-side family-фильтр больше не нужен.
+  // Hydrate из загруженных данных. CIDR-блоки НЕ в state формы (KAC-269: их не
+  // меняет Update) — они читаются напрямую из pool для AddressPoolCidrManager.
   useEffect(() => {
     if (!pool || hydrated) return;
     setName(pool.name ?? "");
     setDescription(pool.description ?? "");
-    setV4Blocks(pool.v4_cidr_blocks ?? []);
-    setV6Blocks(pool.v6_cidr_blocks ?? []);
     setIsDefault(!!pool.is_default);
     setSelectorPriority(pool.selector_priority ?? 0);
     setHydrated(true);
@@ -109,26 +106,14 @@ export function InlineAddressPoolEditForm({
 
   const submit = () => {
     if (!pool) return;
-    if (v4Blocks.length === 0 && v6Blocks.length === 0) {
-      toast.error("Добавьте хотя бы один CIDR (IPv4 или IPv6).");
-      return;
-    }
 
-    // KAC-71: split-shape + явные replace-флаги. Diff по каждому family
-    // отдельно — если массив изменился, добавляем (а) поле массива, (б)
-    // replace-флаг = true, (в) оба пункта в update_mask.
-    const origV4 = (pool.v4_cidr_blocks ?? []).slice().sort();
-    const origV6 = (pool.v6_cidr_blocks ?? []).slice().sort();
-    const newV4 = v4Blocks.slice().sort();
-    const newV6 = v6Blocks.slice().sort();
-    const v4Changed = JSON.stringify(origV4) !== JSON.stringify(newV4);
-    const v6Changed = JSON.stringify(origV6) !== JSON.stringify(newV6);
-
+    // KAC-269: CIDR-блоки больше НЕ в Update — только name/description/is_default/
+    // selector_priority. CIDR управляется AddressPoolCidrManager (:addCidrBlocks /
+    // :removeCidrBlocks). proto убрал v4/v6_cidr_blocks + replace_* из
+    // UpdateAddressPoolRequest, так что включать их в mask нельзя.
     const mask: string[] = [];
     if ((pool.name ?? "") !== name) mask.push("name");
     if ((pool.description ?? "") !== description) mask.push("description");
-    if (v4Changed) mask.push("v4_cidr_blocks", "replace_v4_cidr_blocks");
-    if (v6Changed) mask.push("v6_cidr_blocks", "replace_v6_cidr_blocks");
     if ((pool.is_default ?? false) !== isDefault) mask.push("is_default");
     if ((pool.selector_priority ?? 0) !== selectorPriority)
       mask.push("selector_priority");
@@ -144,14 +129,6 @@ export function InlineAddressPoolEditForm({
       selector_priority: selectorPriority,
       update_mask: mask.map(snakeToCamelPath).join(","),
     };
-    if (v4Changed) {
-      payload.v4_cidr_blocks = v4Blocks;
-      payload.replace_v4_cidr_blocks = true;
-    }
-    if (v6Changed) {
-      payload.v6_cidr_blocks = v6Blocks;
-      payload.replace_v6_cidr_blocks = true;
-    }
     mutation.mutate(payload);
   };
 
@@ -202,11 +179,10 @@ export function InlineAddressPoolEditForm({
         </Form.Item>
 
         <Form.Item
-          required
           label={
             <Space size={4}>
               IPv4 и IPv6 CIDR
-              <Tooltip title="Блоки IPv4 и/или IPv6, из которых аллоцируются адреса. Update заменяет полный список.">
+              <Tooltip title="Блоки IPv4 и/или IPv6, из которых аллоцируются адреса. Добавление/удаление применяется сразу (отдельный RPC), не через «Сохранить». Удалить блок с уже выделенными адресами нельзя.">
                 <QuestionCircleOutlined
                   style={{ color: "rgba(255,255,255,0.45)" }}
                 />
@@ -214,11 +190,10 @@ export function InlineAddressPoolEditForm({
             </Space>
           }
         >
-          <SubnetCidrChips
-            v4Blocks={v4Blocks}
-            onV4Change={setV4Blocks}
-            v6Blocks={v6Blocks}
-            onV6Change={setV6Blocks}
+          <AddressPoolCidrManager
+            poolId={poolId}
+            v4Blocks={pool.v4_cidr_blocks ?? []}
+            v6Blocks={pool.v6_cidr_blocks ?? []}
           />
         </Form.Item>
 
