@@ -1363,7 +1363,6 @@ export const REGISTRY: Record<string, ResourceSpec> = {
           return nid ? <RefNameLink specId="networks" refId={nid} /> : <span className="text-muted-foreground">—</span>;
         },
       },
-      { header: "Статус", path: "status", format: "status" },
       { header: "По умолчанию", path: "default_for_network", format: "text" },
       COL_CREATED,
       COL_ID,
