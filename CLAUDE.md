@@ -6,8 +6,8 @@ UI-специфичный CLAUDE.md, дополняющий общий workspace
 
 ## 1. Что это
 
-Vite + React + TypeScript SPA для control plane Kachō. Дизайн повторяет
-консоль Yandex Cloud (dark, плотный, YC-style). UI ходит в `kacho-api-gateway`
+Vite + React + TypeScript SPA для control plane Kachō. Дизайн — dark,
+плотная, информационно-насыщенная админ-консоль. UI ходит в `kacho-api-gateway`
 по REST (через nginx-proxy в production, port-forward на 18080 локально).
 Никаких отдельных backend-вызовов мимо api-gateway — только публичные REST RPC.
 
@@ -123,7 +123,7 @@ Operation envelope) или после `op.done && !op.error` (Doppler polling).
 
 ## 4. Form layout (нормативно)
 
-YC-style горизонтальный layout. Все формы — generic `InlineResourceCreateForm` /
+Горизонтальный layout (label слева, поле справа). Все формы — generic `InlineResourceCreateForm` /
 `InlineResourceEditForm` и кастомные (Subnet/SG/NIC/AddressPool/…) — обязаны:
 
 ### 4.1 Заголовок
@@ -164,7 +164,7 @@ YC-style горизонтальный layout. Все формы — generic `Inl
 - **labelCol 200px** — единая ширина «лево-label / право-input» для всех модалок.
   Не 140px (NIC форма раньше была 140, «Группы безопасности» наползала на
   селектор — исправлено).
-- **`colon={false}`** — без двоеточий после label (YC-style).
+- **`colon={false}`** — без двоеточий после label.
 
 ### 4.3 Required ⭐ справа
 
@@ -241,7 +241,7 @@ fields.filter((f) => {
 - Inputs / Select dropdown — `#1c1d22` (один цвет со страницей, чтобы они
   «утопали» в форме). Это требование user'а («у селекторов внутренний цвет
   rgb(28, 29, 33) у фона модалки rgb(52, 54, 61)»).
-- Primary: `#3D8DF5` (YC-blue).
+- Primary: `#3D8DF5` (основной синий).
 - Tag colors: IPv4 → `"blue"`, IPv6 → `"geekblue"`, INGRESS → `"green"`,
   EGRESS → `"blue"` (см. SgRulesEditor).
 
@@ -455,7 +455,7 @@ kubectl -n kacho rollout status deploy/ui --timeout=120s
 6. **Не вводить лишний layout-`<div maxWidth=…>`** внутри Modal-body —
    `ResourceFormModal` уже ограничивает ширину через `width={860}`.
 7. **Все мутации — async через Operation.** Никаких sync-create return ресурса
-   — `api.create` отдаёт Operation envelope (verbatim YC).
+   — `api.create` отдаёт Operation envelope (async-мутации Kachō).
 8. **Не выкладывать на external TLS endpoint admin-ресурсы.** AddressPool /
    Region / Zone / Hypervisor — только cluster-internal listener (api-gateway
    internal mux), `/system/*` UI-paths. См. workspace-CLAUDE.md §«Запреты» #6.
