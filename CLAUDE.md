@@ -1,8 +1,22 @@
 # kacho-ui — CLAUDE.md
 
-UI-специфичный CLAUDE.md, дополняющий общий workspace-`CLAUDE.md` (корень
-`kacho-workspace/`, подцепляется через parent-walkup discovery). Обязательный
-контекст при работе из `project/kacho-ui/` и любых его подпапок.
+UI-специфичный CLAUDE.md. Базовые правила Kachō (`.claude/rules/*`) — локальная
+копия, синхронизируемая из workspace (`./sync-tooling.sh`; источник истины —
+`kacho-workspace/.claude/rules/`, копию здесь не редактировать). `@import` ниже делает
+репо самодостаточным и при standalone-клоне.
+
+## Базовые правила Kachō (@import — синканная копия из workspace)
+
+@.claude/rules/00-kacho-core.md
+@.claude/rules/api-conventions.md
+@.claude/rules/polyrepo.md
+@.claude/rules/architecture.md
+@.claude/rules/data-integrity.md
+@.claude/rules/security.md
+@.claude/rules/git-youtrack.md
+@.claude/rules/testing.md
+@.claude/rules/vault.md
+@.claude/rules/ai-tooling.md
 
 ## 1. Что это
 
