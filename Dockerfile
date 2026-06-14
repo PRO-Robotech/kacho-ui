@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.6
-# Build stage
-FROM node:22-alpine AS build
+# Build stage — pinned to $BUILDPLATFORM so the heavy `npm ci`/`npm run build`
+# run natively (Vite output is arch-agnostic JS); only the tiny nginx runtime
+# stage is per-target. Base from mirror.gcr.io to keep the DockerHub pull
+# budget free (multiarch build in CI, KAC-127).
+FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -16,7 +19,7 @@ COPY src ./src
 RUN npm run build
 
 # Runtime stage — nginx serves /usr/share/nginx/html, proxy_pass /v1/* → api-gateway
-FROM nginx:1.27-alpine
+FROM mirror.gcr.io/library/nginx:1.27-alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY deploy/default.conf.template /etc/nginx/templates/default.conf.template
 # Resolver-IP экспортируется из /etc/resolv.conf на startup (нумерация 05- идёт
