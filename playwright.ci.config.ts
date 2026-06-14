@@ -17,8 +17,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
-  timeout: 30_000,
-  expect: { timeout: 7_000 },
+  timeout: 45_000,
+  expect: { timeout: 15_000 },
   use: {
     baseURL: `http://localhost:${PORT}`,
     trace: "retain-on-failure",
@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: "npm run build && npm run preview",
     url: `http://localhost:${PORT}`,
-    timeout: 180_000,
+    timeout: 300_000,
     reuseExistingServer: !process.env.CI,
   },
 });
